@@ -5,13 +5,7 @@
 extern "C" {
 #endif
 
-#include <stddef.h>
-
-struct ink_source {
-    char *filename;
-    unsigned char *bytes;
-    size_t length;
-};
+struct ink_source;
 
 enum ink_token_type {
     INK_TT_EOF,

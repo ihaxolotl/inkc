@@ -1,4 +1,5 @@
 #include "lex.h"
+#include "source.h"
 
 const char *ink_token_type_strz(enum ink_token_type type)
 {
