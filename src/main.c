@@ -5,12 +5,6 @@
 #include "lex.h"
 #include "source.h"
 
-void ink_token_print(const struct ink_token *token)
-{
-    printf("[DEBUG] %s(%u, %u)\n", ink_token_type_strz(token->type),
-           token->start_offset, token->end_offset);
-}
-
 int main(int argc, char *argv[])
 {
     int rc;
@@ -33,12 +27,14 @@ int main(int argc, char *argv[])
     rc = ink_source_load(filename, &source);
     if (rc < 0) {
         switch (-rc) {
-        case INK_E_OS:
+        case INK_E_OS: {
             fprintf(stderr, "[ERROR] OS Error.\n");
             break;
-        case INK_E_FILE:
+        }
+        case INK_E_FILE: {
             fprintf(stderr, "[ERROR] %s is not an ink script.\n", filename);
             break;
+        }
         default:
             fprintf(stderr, "[ERROR] Unknown error.\n");
             break;
@@ -50,7 +46,7 @@ int main(int argc, char *argv[])
 
     do {
         ink_token_next(&lexer, &token);
-        ink_token_print(&token);
+        ink_token_print(&source, &token);
     } while (token.type != INK_TT_EOF);
 
     ink_source_free(&source);

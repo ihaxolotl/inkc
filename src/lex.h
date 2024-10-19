@@ -28,6 +28,7 @@ struct ink_lexer {
 
 extern const char *ink_token_type_strz(enum ink_token_type type);
 extern void ink_token_next(struct ink_lexer *lexer, struct ink_token *token);
+void ink_token_print(struct ink_source *source, const struct ink_token *token);
 
 #ifdef __cplusplus
 }
