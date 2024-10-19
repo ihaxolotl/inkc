@@ -4,17 +4,13 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "lex.h"
+
 enum ink_status {
     INK_E_OK,
     INK_E_OOM,
     INK_E_OS,
     INK_E_FILE,
-};
-
-struct ink_source {
-    char *filename;
-    unsigned char *bytes;
-    size_t length;
 };
 
 static const char *INK_FILE_EXT = ".ink";
@@ -112,11 +108,23 @@ void ink_source_free(struct ink_source *source)
     source->length = 0;
 }
 
+void ink_token_print(const struct ink_token *token)
+{
+    printf("[DEBUG] %s(%u, %u)\n", ink_token_type_strz(token->type),
+           token->start_offset, token->end_offset);
+}
+
 int main(int argc, char *argv[])
 {
     int rc;
     const char *filename;
     struct ink_source source;
+    struct ink_token token;
+    struct ink_lexer lexer = {
+        .source = &source,
+        .start_offset = 0,
+        .cursor_offset = 0,
+    };
 
     if (argc < 2) {
         fprintf(stderr, "Not enough arguments.\n");
@@ -142,6 +150,12 @@ int main(int argc, char *argv[])
     }
 
     printf("Source file %s is %zu bytes\n", source.filename, source.length);
+
+    do {
+        ink_token_next(&lexer, &token);
+        ink_token_print(&token);
+    } while (token.type != INK_TT_EOF);
+
     ink_source_free(&source);
     return EXIT_SUCCESS;
 }
