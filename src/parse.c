@@ -7,205 +7,17 @@
 #include "arena.h"
 #include "lex.h"
 #include "parse.h"
-#include "platform.h"
+#include "tree.h"
 
 #define INK_PARSE_DEPTH 128
-#define INK_SCRATCH_MIN_COUNT 16
-#define INK_SCRATCH_GROWTH_FACTOR 2
-
-struct ink_scratch_buffer {
-    size_t count;
-    size_t capacity;
-    struct ink_syntax_node **entries;
-};
 
 struct ink_parser {
     struct ink_arena *arena;
+    struct ink_syntax_tree *tree;
     struct ink_lexer lexer;
     struct ink_token current_token;
     struct ink_scratch_buffer scratch;
 };
-
-#define T(name, description) description,
-static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
-#undef T
-
-static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
-                                       int level);
-
-/**
- * Reserve scratch space for a specified number of items.
- */
-static int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
-                               size_t item_count)
-{
-    struct ink_syntax_node **storage;
-    size_t scratch_capacity = item_count * sizeof(storage);
-
-    storage = platform_mem_alloc(scratch_capacity);
-    if (scratch == NULL)
-        return -1;
-
-    scratch->count = 0;
-    scratch->capacity = scratch_capacity;
-    scratch->entries = storage;
-
-    return 0;
-}
-
-/**
- * Shrink the parser's scratch storage down to a specified size.
- *
- * Re-allocation is not performed here. Therefore, subsequent allocations
- * are amortized.
- */
-static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
-{
-    assert(count <= scratch->capacity);
-
-    scratch->count = count;
-}
-
-/**
- * Append a syntax tree node to the parser's scratch storage.
- *
- * These nodes can be retrieved later for creating sequences.
- */
-static void ink_scratch_append(struct ink_scratch_buffer *scratch,
-                               struct ink_syntax_node *node)
-{
-    size_t capacity;
-
-    if (scratch->count + 1 > scratch->capacity) {
-        if (scratch->capacity < INK_SCRATCH_MIN_COUNT) {
-            capacity = INK_SCRATCH_MIN_COUNT;
-        } else {
-            capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
-        }
-
-        scratch->entries =
-            realloc(scratch->entries, capacity * sizeof(scratch->entries));
-        scratch->capacity = capacity;
-    }
-
-    scratch->entries[scratch->count++] = node;
-}
-
-/**
- * Release memory for scratch storage.
- */
-static void ink_scratch_cleanup(struct ink_scratch_buffer *scratch)
-{
-    size_t mem_size = sizeof(scratch->entries) * scratch->capacity;
-
-    platform_mem_dealloc(scratch->entries, mem_size);
-}
-
-/**
- * Create a syntax tree node sequence.
- */
-static struct ink_syntax_seq *
-ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,
-                   size_t start_offset, size_t end_offset)
-{
-    struct ink_syntax_seq *seq;
-    size_t seq_index = 0;
-    size_t span = end_offset - start_offset;
-
-    assert(span > 0);
-
-    seq = ink_arena_allocate(arena, sizeof(*seq) + span * sizeof(seq->nodes));
-    if (seq == NULL)
-        return NULL;
-
-    seq->count = span;
-
-    for (size_t i = start_offset; i < end_offset; i++) {
-        seq->nodes[seq_index] = scratch->entries[i];
-        seq_index++;
-    }
-    return seq;
-}
-
-/**
- * Create a syntax tree node.
- */
-static struct ink_syntax_node *
-ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
-                    struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    struct ink_syntax_seq *seq)
-{
-    struct ink_syntax_node *node;
-
-    node = ink_arena_allocate(arena, sizeof(*node));
-    if (node == NULL)
-        return NULL;
-
-    node->type = type;
-    node->lhs = lhs;
-    node->rhs = rhs;
-    node->seq = seq;
-
-    return node;
-}
-
-static const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
-{
-    return INK_NODE_TYPE_STR[type];
-}
-
-static void ink_syntax_seq_print(const struct ink_syntax_seq *seq, int level)
-{
-    for (size_t i = 0; i < seq->count; i++) {
-        ink_syntax_node_print_walk(seq->nodes[i], level);
-    }
-}
-
-static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
-                                       int level)
-{
-    const char *type_str;
-
-    if (node == NULL)
-        return;
-
-    type_str = ink_syntax_node_type_strz(node->type);
-    printf("%*s%s\n", level * 2, "", type_str);
-
-    level++;
-
-    ink_syntax_node_print_walk(node->lhs, level);
-    ink_syntax_node_print_walk(node->rhs, level);
-
-    if (node->seq)
-        ink_syntax_seq_print(node->seq, level);
-}
-
-/**
- * Print a syntax tree node
- */
-void ink_syntax_node_print(const struct ink_syntax_node *node)
-{
-    if (node == NULL)
-        return;
-
-    ink_syntax_node_print_walk(node, 0);
-}
-
-static struct ink_syntax_seq *
-ink_seq_from_scratch(struct ink_arena *arena,
-                     struct ink_scratch_buffer *scratch, size_t start_offset,
-                     size_t end_offset)
-{
-    struct ink_syntax_seq *seq = NULL;
-
-    if (start_offset < end_offset) {
-        seq = ink_syntax_seq_new(arena, scratch, start_offset, end_offset);
-
-        ink_scratch_shrink(scratch, start_offset);
-    }
-    return seq;
-}
 
 /**
  * Check if the current token matches a specified type.
@@ -283,12 +95,11 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
  */
 static int ink_parser_initialize(struct ink_parser *parser,
                                  struct ink_source *source,
+                                 struct ink_syntax_tree *tree,
                                  struct ink_arena *arena)
 {
-    if (ink_scratch_reserve(&parser->scratch, INK_SCRATCH_MIN_COUNT) < 0)
-        return -1;
-
     parser->arena = arena;
+    parser->tree = tree;
     parser->lexer.source = source;
     parser->lexer.start_offset = 0;
     parser->lexer.cursor_offset = 0;
@@ -302,8 +113,6 @@ static int ink_parser_initialize(struct ink_parser *parser,
  */
 static void ink_parser_cleanup(struct ink_parser *parser)
 {
-    ink_scratch_cleanup(&parser->scratch);
-
     memset(parser, 0, sizeof(*parser));
 }
 
@@ -311,15 +120,27 @@ static void ink_parser_cleanup(struct ink_parser *parser)
  * Parse a source file and output a syntax tree.
  */
 int ink_parse(struct ink_arena *arena, struct ink_source *source,
-              struct ink_syntax_node **tree)
+              struct ink_syntax_tree *syntax_tree)
 {
     struct ink_parser parser;
+    struct ink_syntax_node *root;
 
-    if (ink_parser_initialize(&parser, source, arena) < 0)
+    if (ink_syntax_tree_initialize(source, syntax_tree) < 0)
         return -1;
+    if (ink_parser_initialize(&parser, source, syntax_tree, arena) < 0)
+        goto err;
 
-    *tree = ink_parse_file(&parser);
+    root = ink_parse_file(&parser);
+    if (root == NULL)
+        goto err;
+
+    syntax_tree->root = root;
 
     ink_parser_cleanup(&parser);
     return 0;
+
+err:
+    ink_syntax_tree_cleanup(syntax_tree);
+    ink_parser_cleanup(&parser);
+    return -1;
 }

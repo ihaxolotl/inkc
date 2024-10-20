@@ -5,6 +5,7 @@
 #include "common.h"
 #include "parse.h"
 #include "source.h"
+#include "tree.h"
 
 int main(int argc, char *argv[])
 {
@@ -14,7 +15,7 @@ int main(int argc, char *argv[])
     const char *filename;
     struct ink_arena arena;
     struct ink_source source;
-    struct ink_syntax_node *tree;
+    struct ink_syntax_tree syntax_tree;
 
     if (argc < 2) {
         fprintf(stderr, "Not enough arguments.\n");
@@ -44,9 +45,10 @@ int main(int argc, char *argv[])
     printf("Source file %s is %zu bytes\n", source.filename, source.length);
 
     ink_arena_initialize(&arena, arena_block_size, arena_alignment);
-    ink_parse(&arena, &source, &tree);
-    ink_syntax_node_print(tree);
-    ink_source_free(&source);
+    ink_parse(&arena, &source, &syntax_tree);
+    ink_syntax_tree_print(&syntax_tree);
+    ink_syntax_tree_cleanup(&syntax_tree);
     ink_arena_release(&arena);
+
     return EXIT_SUCCESS;
 }

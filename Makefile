@@ -16,6 +16,7 @@ SRCS := src/main.c             \
         src/platform.c         \
         src/arena.c            \
         src/source.c           \
+        src/tree.c             \
         src/lex.c              \
         src/parse.c
 
