@@ -118,7 +118,7 @@ ink_seq_from_scratch(struct ink_arena *arena,
 extern struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    struct ink_syntax_seq *seq);
+                    size_t main_token, struct ink_syntax_seq *seq);
 
 extern struct ink_syntax_seq *
 ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,

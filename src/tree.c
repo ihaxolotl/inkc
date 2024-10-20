@@ -11,7 +11,8 @@
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
-static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
+static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
+                                       const struct ink_syntax_node *node,
                                        int level);
 
 /**
@@ -26,34 +27,44 @@ static const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
 /**
  * Print a syntax tree node sequence to stdout.
  */
-static void ink_syntax_seq_print(const struct ink_syntax_seq *seq, int level)
+static void ink_syntax_seq_print(const struct ink_syntax_tree *tree,
+                                 const struct ink_syntax_seq *seq, int level)
 {
     for (size_t i = 0; i < seq->count; i++) {
-        ink_syntax_node_print_walk(seq->nodes[i], level);
+        ink_syntax_node_print_walk(tree, seq->nodes[i], level);
     }
 }
 
 /**
  * Walk the syntax tree and print each node.
  */
-static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
+static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
+                                       const struct ink_syntax_node *node,
                                        int level)
 {
     const char *type_str;
+    unsigned char *lexeme;
+    size_t lexeme_length;
+    struct ink_token token;
 
     if (node == NULL)
         return;
 
+    token = tree->tokens.entries[node->main_token];
+    lexeme_length = token.end_offset - token.start_offset;
+    lexeme = tree->source->bytes + token.start_offset;
+
     type_str = ink_syntax_node_type_strz(node->type);
-    printf("%*s%s\n", level * 2, "", type_str);
+    printf("%*s%s `%.*s`\n", level * 2, "", type_str, (int)lexeme_length,
+           lexeme);
 
     level++;
 
-    ink_syntax_node_print_walk(node->lhs, level);
-    ink_syntax_node_print_walk(node->rhs, level);
+    ink_syntax_node_print_walk(tree, node->lhs, level);
+    ink_syntax_node_print_walk(tree, node->rhs, level);
 
     if (node->seq)
-        ink_syntax_seq_print(node->seq, level);
+        ink_syntax_seq_print(tree, node->seq, level);
 }
 
 /**
@@ -62,7 +73,7 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
 void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
 {
     if (tree->root)
-        ink_syntax_node_print_walk(tree->root, 0);
+        ink_syntax_node_print_walk(tree, tree->root, 0);
 }
 
 /**
@@ -212,11 +223,10 @@ void ink_token_stream_cleanup(struct ink_token_stream *stream)
 /**
  * Create a syntax tree node.
  */
-struct ink_syntax_node *ink_syntax_node_new(struct ink_arena *arena,
-                                            enum ink_syntax_node_type type,
-                                            struct ink_syntax_node *lhs,
-                                            struct ink_syntax_node *rhs,
-                                            struct ink_syntax_seq *seq)
+struct ink_syntax_node *
+ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
+                    struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
+                    size_t main_token, struct ink_syntax_seq *seq)
 {
     struct ink_syntax_node *node;
 
@@ -225,6 +235,7 @@ struct ink_syntax_node *ink_syntax_node_new(struct ink_arena *arena,
         return NULL;
 
     node->type = type;
+    node->main_token = main_token;
     node->lhs = lhs;
     node->rhs = rhs;
     node->seq = seq;
