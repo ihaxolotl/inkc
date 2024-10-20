@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stddef.h>
 
+struct ink_arena;
 struct ink_source;
 
 #define INK_NODE(T)                                                            \
@@ -34,7 +35,8 @@ struct ink_syntax_node {
 };
 
 extern void ink_syntax_node_print(const struct ink_syntax_node *node);
-extern int ink_parse(struct ink_source *source, struct ink_syntax_node **tree);
+extern int ink_parse(struct ink_arena *arena, struct ink_source *source,
+                     struct ink_syntax_node **tree);
 
 #ifdef __cplusplus
 }

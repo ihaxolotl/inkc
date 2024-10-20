@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "lex.h"
 #include "parse.h"
 
@@ -18,6 +19,7 @@ struct ink_scratch_buffer {
 };
 
 struct ink_parser {
+    struct ink_arena *arena;
     struct ink_lexer lexer;
     struct ink_token current_token;
     struct ink_scratch_buffer scratch;
@@ -34,8 +36,8 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
  * Create a syntax tree node sequence.
  */
 static struct ink_syntax_seq *
-ink_syntax_seq_new(struct ink_scratch_buffer *scratch, size_t start_offset,
-                   size_t end_offset)
+ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,
+                   size_t start_offset, size_t end_offset)
 {
     struct ink_syntax_seq *seq;
     size_t seq_index = 0;
@@ -43,7 +45,7 @@ ink_syntax_seq_new(struct ink_scratch_buffer *scratch, size_t start_offset,
 
     assert(span > 0);
 
-    seq = malloc(sizeof(*seq) + span * sizeof(seq->nodes));
+    seq = ink_arena_allocate(arena, sizeof(*seq) + span * sizeof(seq->nodes));
     if (seq == NULL)
         return NULL;
 
@@ -60,12 +62,13 @@ ink_syntax_seq_new(struct ink_scratch_buffer *scratch, size_t start_offset,
  * Create a syntax tree node.
  */
 static struct ink_syntax_node *
-ink_syntax_node_new(enum ink_syntax_node_type type, struct ink_syntax_node *lhs,
-                    struct ink_syntax_node *rhs, struct ink_syntax_seq *seq)
+ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
+                    struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
+                    struct ink_syntax_seq *seq)
 {
     struct ink_syntax_node *node;
 
-    node = malloc(sizeof(*node));
+    node = ink_arena_allocate(arena, sizeof(*node));
     if (node == NULL)
         return NULL;
 
@@ -154,13 +157,14 @@ static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
 }
 
 static struct ink_syntax_seq *
-ink_seq_from_scratch(struct ink_scratch_buffer *scratch, size_t start_offset,
+ink_seq_from_scratch(struct ink_arena *arena,
+                     struct ink_scratch_buffer *scratch, size_t start_offset,
                      size_t end_offset)
 {
     struct ink_syntax_seq *seq = NULL;
 
     if (start_offset < end_offset) {
-        seq = ink_syntax_seq_new(scratch, start_offset, end_offset);
+        seq = ink_syntax_seq_new(arena, scratch, start_offset, end_offset);
 
         ink_scratch_shrink(scratch, start_offset);
     }
@@ -187,14 +191,16 @@ static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
 {
     ink_parse_next(parser);
 
-    return ink_syntax_node_new(INK_NODE_CONTENT_EXPR, NULL, NULL, NULL);
+    return ink_syntax_node_new(parser->arena, INK_NODE_CONTENT_EXPR, NULL, NULL,
+                               NULL);
 }
 
 static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *parser)
 {
+    struct ink_arena *arena = parser->arena;
+    struct ink_scratch_buffer *scratch = &parser->scratch;
     struct ink_syntax_node *node = NULL;
     struct ink_syntax_seq *seq = NULL;
-    struct ink_scratch_buffer *scratch = &parser->scratch;
     size_t scratch_offset = scratch->count;
 
     while (!ink_parse_check(parser, INK_TT_EOF) &&
@@ -203,9 +209,9 @@ static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *parser)
         ink_scratch_append(scratch, node);
     }
 
-    seq = ink_seq_from_scratch(scratch, scratch_offset, scratch->count);
+    seq = ink_seq_from_scratch(arena, scratch, scratch_offset, scratch->count);
 
-    return ink_syntax_node_new(INK_NODE_CONTENT_STMT, NULL, NULL, seq);
+    return ink_syntax_node_new(arena, INK_NODE_CONTENT_STMT, NULL, NULL, seq);
 }
 
 static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *parser)
@@ -220,9 +226,10 @@ static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *parser)
 
 static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
 {
+    struct ink_arena *arena = parser->arena;
+    struct ink_scratch_buffer *scratch = &parser->scratch;
     struct ink_syntax_node *node = NULL;
     struct ink_syntax_seq *seq = NULL;
-    struct ink_scratch_buffer *scratch = &parser->scratch;
     size_t scratch_offset = scratch->count;
 
     while (!ink_parse_check(parser, INK_TT_EOF)) {
@@ -230,16 +237,17 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
         ink_scratch_append(scratch, node);
     }
 
-    seq = ink_seq_from_scratch(scratch, scratch_offset, scratch->count);
+    seq = ink_seq_from_scratch(arena, scratch, scratch_offset, scratch->count);
 
-    return ink_syntax_node_new(INK_NODE_FILE, NULL, NULL, seq);
+    return ink_syntax_node_new(arena, INK_NODE_FILE, NULL, NULL, seq);
 }
 
 /**
  * Initialize the state of the parser.
  */
 static int ink_parser_initialize(struct ink_parser *parser,
-                                 struct ink_source *source)
+                                 struct ink_source *source,
+                                 struct ink_arena *arena)
 {
     struct ink_syntax_node **scratch;
     size_t scratch_capacity = INK_SCRATCH_MIN_COUNT * sizeof(scratch);
@@ -248,6 +256,7 @@ static int ink_parser_initialize(struct ink_parser *parser,
     if (scratch == NULL)
         return -1;
 
+    parser->arena = arena;
     parser->lexer.source = source;
     parser->lexer.start_offset = 0;
     parser->lexer.cursor_offset = 0;
@@ -271,11 +280,12 @@ static void ink_parser_cleanup(struct ink_parser *parser)
 /**
  * Parse a source file and output a syntax tree.
  */
-int ink_parse(struct ink_source *source, struct ink_syntax_node **tree)
+int ink_parse(struct ink_arena *arena, struct ink_source *source,
+              struct ink_syntax_node **tree)
 {
     struct ink_parser parser;
 
-    if (ink_parser_initialize(&parser, source) < 0)
+    if (ink_parser_initialize(&parser, source, arena) < 0)
         return -1;
 
     *tree = ink_parse_file(&parser);

@@ -124,6 +124,7 @@ void ink_arena_initialize(struct ink_arena *arena, size_t block_size,
     /* TODO(Brett): I am not sure if this is correct. Revisit this. */
     assert(alignment != 0 && !(alignment & (alignment - 1)));
     assert(block_size != 0 && !(block_size & (block_size - 1)));
+    assert(block_size >= alignment);
 
     arena->block_first = NULL;
     arena->block_current = NULL;

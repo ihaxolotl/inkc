@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "arena.h"
 #include "common.h"
 #include "parse.h"
 #include "source.h"
 
 int main(int argc, char *argv[])
 {
+    static const size_t arena_alignment = 8;
+    static const size_t arena_block_size = 8192;
     int rc;
     const char *filename;
+    struct ink_arena arena;
     struct ink_source source;
     struct ink_syntax_node *tree;
 
@@ -38,8 +42,11 @@ int main(int argc, char *argv[])
     }
 
     printf("Source file %s is %zu bytes\n", source.filename, source.length);
-    ink_parse(&source, &tree);
+
+    ink_arena_initialize(&arena, arena_block_size, arena_alignment);
+    ink_parse(&arena, &source, &tree);
     ink_syntax_node_print(tree);
     ink_source_free(&source);
+    ink_arena_release(&arena);
     return EXIT_SUCCESS;
 }
