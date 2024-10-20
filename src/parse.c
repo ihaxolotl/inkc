@@ -7,6 +7,7 @@
 #include "arena.h"
 #include "lex.h"
 #include "parse.h"
+#include "platform.h"
 
 #define INK_PARSE_DEPTH 128
 #define INK_SCRATCH_MIN_COUNT 16
@@ -252,7 +253,7 @@ static int ink_parser_initialize(struct ink_parser *parser,
     struct ink_syntax_node **scratch;
     size_t scratch_capacity = INK_SCRATCH_MIN_COUNT * sizeof(scratch);
 
-    scratch = malloc(scratch_capacity);
+    scratch = platform_mem_alloc(scratch_capacity);
     if (scratch == NULL)
         return -1;
 
@@ -273,7 +274,10 @@ static int ink_parser_initialize(struct ink_parser *parser,
  */
 static void ink_parser_cleanup(struct ink_parser *parser)
 {
-    free(parser->scratch.entries);
+    size_t mem_size =
+        sizeof(parser->scratch.entries) * parser->scratch.capacity;
+
+    platform_mem_dealloc(parser->scratch.entries, mem_size);
     memset(parser, 0, sizeof(*parser));
 }
 
