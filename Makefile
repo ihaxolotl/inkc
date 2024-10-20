@@ -11,7 +11,10 @@ CFLAGS  := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Werror -std=c99 \
            -g -O0
 LDFLAGS := -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined
 
-SRCS := src/main.c src/source.c src/lex.c
+SRCS := src/main.c    \
+        src/source.c  \
+        src/lex.c     \
+        src/parse.c
 
 all: $(BUILD_ROOT) $(BUILD_TARGET)
 

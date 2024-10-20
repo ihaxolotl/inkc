@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "common.h"
-#include "lex.h"
+#include "parse.h"
 #include "source.h"
 
 int main(int argc, char *argv[])
@@ -10,12 +10,7 @@ int main(int argc, char *argv[])
     int rc;
     const char *filename;
     struct ink_source source;
-    struct ink_token token;
-    struct ink_lexer lexer = {
-        .source = &source,
-        .start_offset = 0,
-        .cursor_offset = 0,
-    };
+    struct ink_syntax_node *tree;
 
     if (argc < 2) {
         fprintf(stderr, "Not enough arguments.\n");
@@ -43,12 +38,8 @@ int main(int argc, char *argv[])
     }
 
     printf("Source file %s is %zu bytes\n", source.filename, source.length);
-
-    do {
-        ink_token_next(&lexer, &token);
-        ink_token_print(&source, &token);
-    } while (token.type != INK_TT_EOF);
-
+    ink_parse(&source, &tree);
+    ink_syntax_node_print(tree);
     ink_source_free(&source);
     return EXIT_SUCCESS;
 }
