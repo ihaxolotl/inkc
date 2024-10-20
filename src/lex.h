@@ -7,12 +7,21 @@ extern "C" {
 
 struct ink_source;
 
+#define INK_TT(T)                                                              \
+    T(TT_EOF, "TT_EOF")                                                        \
+    T(TT_NL, "TT_NL")                                                          \
+    T(TT_LBRACE, "TT_LBRACE")                                                  \
+    T(TT_RBRACE, "TT_RBRACE")                                                  \
+    T(TT_PIPE, "TT_PIPE")                                                      \
+    T(TT_DQUOTE, "TT_DQUOTE")                                                  \
+    T(TT_STRING, "TT_STRING")                                                  \
+    T(TT_ERROR, "TT_ERROR")
+
+#define T(name, description) INK_##name,
 enum ink_token_type {
-    INK_TT_EOF,
-    INK_TT_NL,
-    INK_TT_STRING,
-    INK_TT_ERR,
+    INK_TT(T)
 };
+#undef T
 
 struct ink_token {
     enum ink_token_type type;
