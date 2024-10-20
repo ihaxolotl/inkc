@@ -23,6 +23,11 @@ const char *ink_token_type_strz(enum ink_token_type type)
     return INK_TT_STR[type];
 }
 
+static void ink_lex_next(struct ink_lexer *lexer)
+{
+    lexer->cursor_offset++;
+}
+
 void ink_token_print(struct ink_source *source, const struct ink_token *token)
 {
     const unsigned int start = token->start_offset;
@@ -68,7 +73,27 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             }
             case '\n': {
                 token->type = INK_TT_NL;
-                lexer->cursor_offset++;
+                ink_lex_next(lexer);
+                goto exit_loop;
+            }
+            case '"': {
+                token->type = INK_TT_DQUOTE;
+                ink_lex_next(lexer);
+                goto exit_loop;
+            }
+            case '|': {
+                token->type = INK_TT_PIPE;
+                ink_lex_next(lexer);
+                goto exit_loop;
+            }
+            case '{': {
+                token->type = INK_TT_LBRACE;
+                ink_lex_next(lexer);
+                goto exit_loop;
+            }
+            case '}': {
+                token->type = INK_TT_RBRACE;
+                ink_lex_next(lexer);
                 goto exit_loop;
             }
             default:
@@ -76,13 +101,13 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                     state = INK_LEX_STATE_CONTENT;
                 } else {
                     token->type = INK_TT_STRING;
-                    lexer->cursor_offset++;
+                    ink_lex_next(lexer);
                     goto exit_loop;
                 }
             }
         } break;
         case INK_LEX_STATE_CONTENT: {
-            if (c == '\0' || c == '\n' || !is_alpha(c)) {
+            if (!is_alpha(c)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }
