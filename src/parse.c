@@ -34,6 +34,74 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_node *node,
                                        int level);
 
 /**
+ * Reserve scratch space for a specified number of items.
+ */
+static int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
+                               size_t item_count)
+{
+    struct ink_syntax_node **storage;
+    size_t scratch_capacity = item_count * sizeof(storage);
+
+    storage = platform_mem_alloc(scratch_capacity);
+    if (scratch == NULL)
+        return -1;
+
+    scratch->count = 0;
+    scratch->capacity = scratch_capacity;
+    scratch->entries = storage;
+
+    return 0;
+}
+
+/**
+ * Shrink the parser's scratch storage down to a specified size.
+ *
+ * Re-allocation is not performed here. Therefore, subsequent allocations
+ * are amortized.
+ */
+static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
+{
+    assert(count <= scratch->capacity);
+
+    scratch->count = count;
+}
+
+/**
+ * Append a syntax tree node to the parser's scratch storage.
+ *
+ * These nodes can be retrieved later for creating sequences.
+ */
+static void ink_scratch_append(struct ink_scratch_buffer *scratch,
+                               struct ink_syntax_node *node)
+{
+    size_t capacity;
+
+    if (scratch->count + 1 > scratch->capacity) {
+        if (scratch->capacity < INK_SCRATCH_MIN_COUNT) {
+            capacity = INK_SCRATCH_MIN_COUNT;
+        } else {
+            capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
+        }
+
+        scratch->entries =
+            realloc(scratch->entries, capacity * sizeof(scratch->entries));
+        scratch->capacity = capacity;
+    }
+
+    scratch->entries[scratch->count++] = node;
+}
+
+/**
+ * Release memory for scratch storage.
+ */
+static void ink_scratch_cleanup(struct ink_scratch_buffer *scratch)
+{
+    size_t mem_size = sizeof(scratch->entries) * scratch->capacity;
+
+    platform_mem_dealloc(scratch->entries, mem_size);
+}
+
+/**
  * Create a syntax tree node sequence.
  */
 static struct ink_syntax_seq *
@@ -122,39 +190,6 @@ void ink_syntax_node_print(const struct ink_syntax_node *node)
         return;
 
     ink_syntax_node_print_walk(node, 0);
-}
-
-/**
- * Append a syntax tree node to the parser's scratch storage.
- *
- * These nodes can be retrieved later for creating sequences.
- */
-static void ink_scratch_append(struct ink_scratch_buffer *scratch,
-                               struct ink_syntax_node *node)
-{
-    size_t capacity;
-
-    if (scratch->count + 1 > scratch->capacity) {
-        if (scratch->capacity < INK_SCRATCH_MIN_COUNT) {
-            capacity = INK_SCRATCH_MIN_COUNT;
-        } else {
-            capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
-        }
-
-        scratch->entries =
-            realloc(scratch->entries, capacity * sizeof(scratch->entries));
-        scratch->capacity = capacity;
-    }
-
-    scratch->entries[scratch->count++] = node;
-}
-
-/**
- * Shrink the parser's scratch storage down to a previous size.
- */
-static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
-{
-    scratch->count = count;
 }
 
 static struct ink_syntax_seq *
@@ -250,20 +285,13 @@ static int ink_parser_initialize(struct ink_parser *parser,
                                  struct ink_source *source,
                                  struct ink_arena *arena)
 {
-    struct ink_syntax_node **scratch;
-    size_t scratch_capacity = INK_SCRATCH_MIN_COUNT * sizeof(scratch);
-
-    scratch = platform_mem_alloc(scratch_capacity);
-    if (scratch == NULL)
+    if (ink_scratch_reserve(&parser->scratch, INK_SCRATCH_MIN_COUNT) < 0)
         return -1;
 
     parser->arena = arena;
     parser->lexer.source = source;
     parser->lexer.start_offset = 0;
     parser->lexer.cursor_offset = 0;
-    parser->scratch.count = 0;
-    parser->scratch.capacity = INK_SCRATCH_MIN_COUNT;
-    parser->scratch.entries = scratch;
 
     ink_parse_next(parser);
     return 0;
@@ -274,10 +302,8 @@ static int ink_parser_initialize(struct ink_parser *parser,
  */
 static void ink_parser_cleanup(struct ink_parser *parser)
 {
-    size_t mem_size =
-        sizeof(parser->scratch.entries) * parser->scratch.capacity;
+    ink_scratch_cleanup(&parser->scratch);
 
-    platform_mem_dealloc(parser->scratch.entries, mem_size);
     memset(parser, 0, sizeof(*parser));
 }
 
