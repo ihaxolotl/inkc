@@ -19,13 +19,32 @@ struct ink_arena;
 struct ink_syntax_node;
 
 #define INK_NODE(T)                                                            \
-    T(NODE_FILE, "NODE_FILE")                                                  \
-    T(NODE_NUMBER_LITERAL, "NODE_NUMBER_LITERAL")                              \
-    T(NODE_STRING_LITERAL, "NODE_STRING_LITERAL")                              \
-    T(NODE_CONTENT_STMT, "NODE_CONTENT_STMT")                                  \
-    T(NODE_CONTENT_EXPR, "NODE_CONTENT_EXPR")                                  \
-    T(NODE_BRACE_EXPR, "NODE_BRACE_EXPR")                                      \
-    T(NODE_SEQUENCE_EXPR, "NODE_SEQUENCE_EXPR")
+    T(NODE_FILE, "File")                                                       \
+    T(NODE_ADD_EXPR, "AddExpr")                                                \
+    T(NODE_AND_EXPR, "AndExpr")                                                \
+    T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
+    T(NODE_BRACE_EXPR, "BraceExpr")                                            \
+    T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
+    T(NODE_CONTENT_STMT, "ContentStmt")                                        \
+    T(NODE_DIV_EXPR, "DivideExpr")                                             \
+    T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
+    T(NODE_FALSE_EXPR, "FalseExpr")                                            \
+    T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
+    T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
+    T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
+    T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
+    T(NODE_MUL_EXPR, "MultiplyExpr")                                           \
+    T(NODE_MOD_EXPR, "ModExpr")                                                \
+    T(NODE_NEGATE_EXPR, "NegateExpr")                                          \
+    T(NODE_NOT_EQUAL_EXPR, "LogicalInequalityExpr")                            \
+    T(NODE_NOT_EXPR, "NotExpr")                                                \
+    T(NODE_NUMBER_EXPR, "NumberExpr")                                          \
+    T(NODE_OR_EXPR, "OrExpr")                                                  \
+    T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
+    T(NODE_STRING_EXPR, "StringExpr")                                          \
+    T(NODE_SUB_EXPR, "SubtractExpr")                                           \
+    T(NODE_TRUE_EXPR, "TrueExpr")                                              \
+    T(NODE_INVALID, "Invalid")
 
 #define T(name, description) INK_##name,
 enum ink_syntax_node_type {
@@ -99,6 +118,9 @@ struct ink_syntax_tree {
     struct ink_token_buffer tokens;
     struct ink_syntax_node *root;
 };
+
+extern void ink_token_print(const struct ink_source *source,
+                            const struct ink_token *token);
 
 extern int ink_token_buffer_reserve(struct ink_token_buffer *stream,
                                     size_t count);

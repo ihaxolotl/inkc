@@ -63,8 +63,8 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     bytes = tree->source->bytes;
 
     switch (node->type) {
-    case INK_NODE_STRING_LITERAL:
-    case INK_NODE_NUMBER_LITERAL:
+    case INK_NODE_STRING_EXPR:
+    case INK_NODE_NUMBER_EXPR:
         if (node->start_token == node->end_token) {
             token_start = tree->tokens.entries[node->start_token];
             lexeme_length = token_start.end_offset - token_start.start_offset;

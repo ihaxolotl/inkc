@@ -63,6 +63,31 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 ink_scan_next(lexer);
                 goto exit_loop;
             }
+            case '+': {
+                token->type = INK_TT_PLUS;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case '-': {
+                token->type = INK_TT_MINUS;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case '*': {
+                token->type = INK_TT_STAR;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case '/': {
+                token->type = INK_TT_SLASH;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case '%': {
+                token->type = INK_TT_PERCENT;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
             case '|': {
                 token->type = INK_TT_PIPE;
                 ink_scan_next(lexer);
