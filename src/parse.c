@@ -314,6 +314,60 @@ static size_t ink_parser_expect(struct ink_parser *parser,
     return token_index;
 }
 
+/**
+ * TODO(Brett): Perhaps we could add an early return to ignore any
+ * UTF-8 encoded byte sequence, as no reserved words contain such things.
+ */
+static enum ink_token_type ink_parser_keyword(struct ink_parser *parser,
+                                              const struct ink_token *token)
+{
+    const unsigned char *source = parser->lexer.source->bytes;
+    const unsigned char *lexeme = source + token->start_offset;
+    size_t length = token->end_offset - token->start_offset;
+    enum ink_token_type type = token->type;
+
+    switch (length) {
+    case 2:
+        if (memcmp(lexeme, "or", length) == 0) {
+            type = INK_TT_KEYWORD_OR;
+        }
+        break;
+    case 3:
+        if (memcmp(lexeme, "and", length) == 0) {
+            type = INK_TT_KEYWORD_AND;
+        } else if (memcmp(lexeme, "mod", length) == 0) {
+            type = INK_TT_KEYWORD_MOD;
+        } else if (memcmp(lexeme, "not", length) == 0) {
+            type = INK_TT_KEYWORD_NOT;
+        }
+        break;
+    case 4:
+        if (memcmp(lexeme, "true", length) == 0) {
+            type = INK_TT_KEYWORD_TRUE;
+        }
+        break;
+    case 5:
+        if (memcmp(lexeme, "false", length) == 0) {
+            type = INK_TT_KEYWORD_FALSE;
+        }
+        break;
+    }
+    return type;
+}
+
+static bool ink_parser_try_keyword(struct ink_parser *parser,
+                                   enum ink_token_type type)
+{
+    struct ink_token *token = ink_parser_current_token(parser);
+    enum ink_token_type keyword_type = ink_parser_keyword(parser, token);
+
+    if (keyword_type == type) {
+        token->type = type;
+        return true;
+    }
+    return false;
+}
+
 static struct ink_syntax_node *
 ink_syntax_node_leaf(struct ink_parser *parser, enum ink_syntax_node_type type,
                      size_t token_start, size_t token_end)
@@ -383,6 +437,7 @@ static void ink_parser_cleanup(struct ink_parser *parser)
 static struct ink_syntax_node *ink_parse_true(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_false(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_number(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_string(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_sequence_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_string(struct ink_parser *);
@@ -419,10 +474,18 @@ static struct ink_syntax_node *ink_parse_number(struct ink_parser *parser)
                                 token_start);
 }
 
+static struct ink_syntax_node *ink_parse_string(struct ink_parser *parser)
+{
+    size_t token_start = ink_parser_expect(parser, INK_TT_STRING);
+
+    return ink_syntax_node_leaf(parser, INK_NODE_STRING_EXPR, token_start,
+                                token_start);
+}
+
 static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *parser)
 {
-    struct ink_syntax_node *lhs;
     size_t token_index;
+    struct ink_syntax_node *lhs;
     enum ink_token_type type = ink_parser_token_type(parser);
 
     switch (type) {
@@ -430,16 +493,16 @@ static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *parser)
     case INK_TT_IDENTIFIER:
         return parse_name_expr(parser);
     */
-    case INK_TT_KEYWORD_TRUE:
-        return ink_parse_true(parser);
-    case INK_TT_KEYWORD_FALSE:
-        return ink_parse_false(parser);
     case INK_TT_NUMBER:
         return ink_parse_number(parser);
-    /*
     case INK_TT_STRING:
-    return ink_parse_string(parser);
-    */
+        if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_TRUE)) {
+            return ink_parse_true(parser);
+        }
+        if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_FALSE)) {
+            return ink_parse_false(parser);
+        }
+        return ink_parse_string(parser);
     case INK_TT_LEFT_PAREN:
         ink_parser_advance(parser);
         lhs = ink_parse_expr(parser);
@@ -458,21 +521,19 @@ static struct ink_syntax_node *ink_parse_prefix_expr(struct ink_parser *parser)
 {
     size_t token_index;
     struct ink_syntax_node *lhs;
-    enum ink_token_type type = ink_parser_token_type(parser);
+    enum ink_token_type type;
 
-    switch (type) {
-    case INK_TT_MINUS:
-    case INK_TT_BANG:
-    case INK_TT_KEYWORD_NOT: {
+    if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_NOT) ||
+        ink_parser_check(parser, INK_TT_MINUS) ||
+        ink_parser_check(parser, INK_TT_BANG)) {
+        type = ink_parser_token_type(parser);
         token_index = ink_parser_advance(parser);
         lhs = ink_parse_prefix_expr(parser);
 
         return ink_syntax_node_unary(parser, ink_token_prefix_type(type),
                                      token_index, token_index, lhs);
     }
-    default:
-        return ink_parse_primary_expr(parser);
-    }
+    return ink_parse_primary_expr(parser);
 }
 
 static struct ink_syntax_node *ink_parse_infix_expr(struct ink_parser *parser,
@@ -487,6 +548,10 @@ static struct ink_syntax_node *ink_parse_infix_expr(struct ink_parser *parser,
     if (lhs == 0)
         lhs = ink_parse_prefix_expr(parser);
 
+    ink_parser_try_keyword(parser, INK_TT_KEYWORD_AND) ||
+        ink_parser_try_keyword(parser, INK_TT_KEYWORD_OR) ||
+        ink_parser_try_keyword(parser, INK_TT_KEYWORD_MOD);
+
     type = ink_parser_token_type(parser);
     tokprec = ink_binding_power(type);
 
@@ -495,6 +560,11 @@ static struct ink_syntax_node *ink_parse_infix_expr(struct ink_parser *parser,
         rhs = ink_parse_infix_expr(parser, 0, tokprec);
         lhs = ink_syntax_node_binary(parser, ink_token_infix_type(type), tokid,
                                      tokid, lhs, rhs);
+
+        ink_parser_try_keyword(parser, INK_TT_KEYWORD_AND) ||
+            ink_parser_try_keyword(parser, INK_TT_KEYWORD_OR) ||
+            ink_parser_try_keyword(parser, INK_TT_KEYWORD_MOD);
+
         type = ink_parser_token_type(parser);
         tokprec = ink_binding_power(type);
     }

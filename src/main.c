@@ -42,7 +42,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    printf("Source file %s is %zu bytes\n", source.filename, source.length);
+    printf("Source file %s is %zu bytes\n\n", source.filename, source.length);
+    printf("%s\n", source.bytes);
 
     ink_arena_initialize(&arena, arena_block_size, arena_alignment);
     ink_parse(&arena, &source, &syntax_tree);

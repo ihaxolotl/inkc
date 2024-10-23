@@ -23,22 +23,22 @@ int unix_load_file(const char *filename, unsigned char **bytes, size_t *length)
     if (lseek(fd, 0, SEEK_SET) == -1)
         goto err_file;
 
-    buf = unix_alloc(bufsz + 1);
+    buf = unix_alloc((size_t)bufsz + 1);
     if (buf == NULL)
         goto err_file;
 
-    nread = read(fd, buf, bufsz);
+    nread = read(fd, buf, (size_t)bufsz);
     if (nread != bufsz)
         goto err_memory;
 
     buf[bufsz] = '\0';
     *bytes = buf;
-    *length = bufsz;
+    *length = (size_t)bufsz;
 
     close(fd);
     return 0;
 err_memory:
-    unix_dealloc(buf, bufsz);
+    unix_dealloc(buf, (size_t)bufsz);
 err_file:
     close(fd);
     return -1;

@@ -7,8 +7,8 @@ Q       := @
 CC      := clang
 RM      := rm -rf
 MKDIR   := mkdir -p
-CFLAGS  := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Werror -std=c99 \
-           -g -O0
+CFLAGS  := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Werror \
+           -Wconversion -std=c99 -g -O0
 LDFLAGS := -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined
 
 SRCS := src/main.c             \

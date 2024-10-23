@@ -11,12 +11,12 @@ enum ink_lex_state {
     INK_LEX_STATE_WHITESPACE,
 };
 
-static bool ink_is_alpha(char c)
+static bool ink_is_alpha(unsigned char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-static bool ink_is_digit(char c)
+static bool ink_is_digit(unsigned char c)
 {
     return (c >= '0' && c <= '9');
 }
@@ -117,7 +117,7 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             break;
         }
         case INK_LEX_STATE_CONTENT: {
-            if (!ink_is_alpha(c) || !ink_is_digit(c)) {
+            if (!ink_is_alpha(c) && !ink_is_digit(c)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }

@@ -31,11 +31,11 @@ struct ink_source;
     T(TT_GREATER_EQUAL, "GreaterOrEqual")                                      \
     T(TT_GREATER_THAN, "GreaterThan")                                          \
     T(TT_KEYWORD_AND, "KeywordAnd")                                            \
-    T(TT_KEYWORD_FALSE, "KeywordAnd")                                          \
+    T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
     T(TT_KEYWORD_MOD, "KeywordMod")                                            \
     T(TT_KEYWORD_NOT, "KeywordNot")                                            \
     T(TT_KEYWORD_OR, "KeywordOr")                                              \
-    T(TT_KEYWORD_TRUE, "KeywordAnd")                                           \
+    T(TT_KEYWORD_TRUE, "KeywordTrue")                                          \
     T(TT_LEFT_BRACE, "LeftBrace")                                              \
     T(TT_LEFT_BRACKET, "LeftBracket")                                          \
     T(TT_LEFT_PAREN, "LeftParentheses")                                        \
