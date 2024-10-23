@@ -93,6 +93,26 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 ink_scan_next(lexer);
                 goto exit_loop;
             }
+            case '(': {
+                token->type = INK_TT_LEFT_PAREN;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case ')': {
+                token->type = INK_TT_RIGHT_PAREN;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case '[': {
+                token->type = INK_TT_LEFT_BRACKET;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
+            case ']': {
+                token->type = INK_TT_RIGHT_BRACKET;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
             case '{': {
                 token->type = INK_TT_LEFT_BRACE;
                 ink_scan_next(lexer);
