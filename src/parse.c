@@ -422,6 +422,8 @@ static int ink_parser_initialize(struct ink_parser *parser,
     parser->context_stack[0].token_index = 0;
     parser->context_stack[0].type = INK_PARSE_CONTENT;
 
+    ink_scratch_initialize(&parser->scratch);
+
     return 0;
 }
 

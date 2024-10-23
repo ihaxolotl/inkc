@@ -122,14 +122,18 @@ struct ink_syntax_tree {
 extern void ink_token_print(const struct ink_source *source,
                             const struct ink_token *token);
 
-extern int ink_token_buffer_reserve(struct ink_token_buffer *stream,
+extern void ink_token_buffer_initialize(struct ink_token_buffer *buffer);
+
+extern int ink_token_buffer_reserve(struct ink_token_buffer *buffer,
                                     size_t count);
-extern int ink_token_buffer_append(struct ink_token_buffer *stream,
+extern int ink_token_buffer_append(struct ink_token_buffer *buffer,
                                    struct ink_token token);
-extern void ink_token_buffer_cleanup(struct ink_token_buffer *stream);
+extern void ink_token_buffer_cleanup(struct ink_token_buffer *buffer);
 
 extern void ink_token_buffer_print(const struct ink_source *source,
                                    const struct ink_token_buffer *buffer);
+
+extern void ink_scratch_initialize(struct ink_scratch_buffer *scratch);
 
 extern int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
                                size_t item_count);

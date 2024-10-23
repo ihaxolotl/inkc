@@ -102,21 +102,31 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
         ink_syntax_node_print_walk(tree, tree->root, 0);
 }
 
+void ink_scratch_initialize(struct ink_scratch_buffer *scratch)
+{
+    scratch->count = 0;
+    scratch->capacity = 0;
+    scratch->entries = NULL;
+}
+
 /**
  * Reserve scratch space for a specified number of items.
  */
 int ink_scratch_reserve(struct ink_scratch_buffer *scratch, size_t item_count)
 {
-    struct ink_syntax_node **storage;
-    size_t scratch_capacity = item_count * sizeof(storage);
+    struct ink_syntax_node **entries = scratch->entries;
+    size_t old_capacity = scratch->capacity * sizeof(entries);
+    size_t new_capacity = item_count * sizeof(entries);
 
-    storage = platform_mem_alloc(scratch_capacity);
-    if (scratch == NULL)
+    entries = platform_mem_realloc(entries, old_capacity, new_capacity);
+    if (entries == NULL) {
+        scratch->entries = NULL;
         return -1;
+    }
 
-    scratch->count = 0;
-    scratch->capacity = scratch_capacity;
-    scratch->entries = storage;
+    scratch->count = scratch->count;
+    scratch->capacity = item_count;
+    scratch->entries = entries;
 
     return 0;
 }
@@ -187,20 +197,32 @@ struct ink_syntax_seq *ink_seq_from_scratch(struct ink_arena *arena,
     return seq;
 }
 
+void ink_token_buffer_initialize(struct ink_token_buffer *buffer)
+{
+    buffer->count = 0;
+    buffer->capacity = 0;
+    buffer->entries = NULL;
+}
+
 /**
  * Reserve storage space for the token stream.
  */
 int ink_token_buffer_reserve(struct ink_token_buffer *buffer, size_t item_count)
 {
-    struct ink_token *entries;
-    size_t capacity = item_count * sizeof(*entries);
+    struct ink_token *entries = buffer->entries;
+    size_t old_capacity = buffer->capacity * sizeof(*entries);
+    size_t new_capacity = item_count * sizeof(*entries);
 
-    entries = platform_mem_alloc(capacity);
-    if (entries == NULL)
+    assert(new_capacity > old_capacity);
+
+    entries = platform_mem_realloc(entries, old_capacity, new_capacity);
+    if (entries == NULL) {
+        buffer->entries = NULL;
         return -1;
+    }
 
-    buffer->count = 0;
-    buffer->capacity = capacity;
+    buffer->count = buffer->count;
+    buffer->capacity = item_count;
     buffer->entries = entries;
 
     return 0;
@@ -222,12 +244,14 @@ int ink_token_buffer_append(struct ink_token_buffer *buffer,
             capacity = buffer->capacity * INK_TOKEN_STREAM_GROWTH_FACTOR;
         }
 
-        old_size = buffer->capacity * sizeof(*buffer->entries);
-        new_size = capacity * sizeof(*buffer->entries);
+        old_size = buffer->capacity * sizeof(*entries);
+        new_size = capacity * sizeof(*entries);
 
         entries = platform_mem_realloc(buffer->entries, old_size, new_size);
-        if (entries == NULL)
+        if (entries == NULL) {
+            buffer->entries = NULL;
             return -1;
+        }
 
         buffer->capacity = capacity;
         buffer->entries = entries;
@@ -342,7 +366,10 @@ struct ink_syntax_seq *ink_syntax_seq_new(struct ink_arena *arena,
 int ink_syntax_tree_initialize(struct ink_source *source,
                                struct ink_syntax_tree *tree)
 {
-    if (ink_token_buffer_reserve(&tree->tokens, INK_TOKEN_STREAM_MIN_COUNT) < 0)
+    struct ink_token_buffer *tokens = &tree->tokens;
+
+    ink_token_buffer_initialize(tokens);
+    if (ink_token_buffer_reserve(tokens, INK_TOKEN_STREAM_MIN_COUNT) < 0)
         return -1;
 
     tree->source = source;
