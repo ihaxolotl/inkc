@@ -8,12 +8,21 @@
 #include "tree.h"
 
 #define T(name, description) description,
+static const char *INK_TT_STR[] = {INK_TT(T)};
+#undef T
+
+#define T(name, description) description,
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
 static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
                                        const struct ink_syntax_node *node,
                                        int level);
+
+static const char *ink_token_type_strz(enum ink_token_type type)
+{
+    return INK_TT_STR[type];
+}
 
 /**
  * Return a NULL-terminated string representing the type description of a
@@ -43,20 +52,37 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
                                        int level)
 {
     const char *type_str;
-    unsigned char *lexeme;
+    unsigned char *lexeme, *bytes;
     size_t lexeme_length;
-    struct ink_token token;
+    struct ink_token token_start, token_end;
 
     if (node == NULL)
         return;
 
-    token = tree->tokens.entries[node->main_token];
-    lexeme_length = token.end_offset - token.start_offset;
-    lexeme = tree->source->bytes + token.start_offset;
-
     type_str = ink_syntax_node_type_strz(node->type);
-    printf("%*s%s `%.*s`\n", level * 2, "", type_str, (int)lexeme_length,
-           lexeme);
+    bytes = tree->source->bytes;
+
+    switch (node->type) {
+    case INK_NODE_STRING_LITERAL:
+    case INK_NODE_NUMBER_LITERAL:
+        if (node->start_token == node->end_token) {
+            token_start = tree->tokens.entries[node->start_token];
+            lexeme_length = token_start.end_offset - token_start.start_offset;
+        } else {
+            token_start = tree->tokens.entries[node->start_token];
+            token_end = tree->tokens.entries[node->end_token];
+            lexeme_length = token_end.end_offset - token_start.start_offset;
+        }
+
+        lexeme = (unsigned char *)bytes + token_start.start_offset;
+
+        printf("%*s%s `%.*s`\n", level * 2, "", type_str, (int)lexeme_length,
+               lexeme);
+        break;
+    default:
+        printf("%*s%s\n", level * 2, "", type_str);
+        break;
+    }
 
     level++;
 
@@ -116,7 +142,7 @@ static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
 void ink_scratch_append(struct ink_scratch_buffer *scratch,
                         struct ink_syntax_node *node)
 {
-    size_t capacity;
+    size_t capacity, old_size, new_size;
 
     if (scratch->count + 1 > scratch->capacity) {
         if (scratch->capacity < INK_SCRATCH_MIN_COUNT) {
@@ -125,8 +151,11 @@ void ink_scratch_append(struct ink_scratch_buffer *scratch,
             capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
         }
 
+        old_size = scratch->capacity * sizeof(scratch->entries);
+        new_size = capacity * sizeof(scratch->entries);
+
         scratch->entries =
-            realloc(scratch->entries, capacity * sizeof(scratch->entries));
+            platform_mem_realloc(scratch->entries, old_size, new_size);
         scratch->capacity = capacity;
     }
 
@@ -161,7 +190,7 @@ struct ink_syntax_seq *ink_seq_from_scratch(struct ink_arena *arena,
 /**
  * Reserve storage space for the token stream.
  */
-int ink_token_stream_reserve(struct ink_token_stream *stream, size_t item_count)
+int ink_token_buffer_reserve(struct ink_token_buffer *buffer, size_t item_count)
 {
     struct ink_token *entries;
     size_t capacity = item_count * sizeof(*entries);
@@ -170,9 +199,9 @@ int ink_token_stream_reserve(struct ink_token_stream *stream, size_t item_count)
     if (entries == NULL)
         return -1;
 
-    stream->count = 0;
-    stream->capacity = capacity;
-    stream->entries = entries;
+    buffer->count = 0;
+    buffer->capacity = capacity;
+    buffer->entries = entries;
 
     return 0;
 }
@@ -180,43 +209,75 @@ int ink_token_stream_reserve(struct ink_token_stream *stream, size_t item_count)
 /**
  * Append a token to the token stream.
  */
-int ink_token_stream_append(struct ink_token_stream *stream,
+int ink_token_buffer_append(struct ink_token_buffer *buffer,
                             struct ink_token item)
 {
-    size_t capacity;
+    size_t capacity, old_size, new_size;
     struct ink_token *entries;
 
-    if (stream->count + 1 > stream->capacity) {
-        if (stream->capacity < INK_TOKEN_STREAM_MIN_COUNT) {
+    if (buffer->count + 1 > buffer->capacity) {
+        if (buffer->capacity < INK_TOKEN_STREAM_MIN_COUNT) {
             capacity = INK_TOKEN_STREAM_MIN_COUNT;
         } else {
-            capacity = stream->capacity * INK_TOKEN_STREAM_GROWTH_FACTOR;
+            capacity = buffer->capacity * INK_TOKEN_STREAM_GROWTH_FACTOR;
         }
 
-        /* TODO(Brett): Platform abstracted realloc. */
-        entries = realloc(stream->entries, capacity * sizeof(item));
+        old_size = buffer->capacity * sizeof(*buffer->entries);
+        new_size = capacity * sizeof(*buffer->entries);
+
+        entries = platform_mem_realloc(buffer->entries, old_size, new_size);
         if (entries == NULL)
             return -1;
 
-        stream->capacity = capacity;
-        stream->entries = entries;
+        buffer->capacity = capacity;
+        buffer->entries = entries;
     }
 
-    stream->entries[stream->count++] = item;
+    buffer->entries[buffer->count++] = item;
     return 0;
 }
 
 /**
  * Release the memory for the token stream.
  */
-void ink_token_stream_cleanup(struct ink_token_stream *stream)
+void ink_token_buffer_cleanup(struct ink_token_buffer *buffer)
 {
     size_t mem_size;
 
-    if (stream->capacity > 0) {
-        mem_size = sizeof(*stream->entries) * stream->capacity;
+    if (buffer->capacity > 0) {
+        mem_size = sizeof(*buffer->entries) * buffer->capacity;
 
-        platform_mem_dealloc(stream->entries, mem_size);
+        platform_mem_dealloc(buffer->entries, mem_size);
+    }
+}
+
+void ink_token_print(const struct ink_source *source,
+                     const struct ink_token *token)
+{
+    const unsigned int start = token->start_offset;
+    const unsigned int end = token->end_offset;
+
+    switch (token->type) {
+    case INK_TT_EOF:
+        printf("[DEBUG] %s(%u, %u): `\\0`\n", ink_token_type_strz(token->type),
+               start, end);
+        break;
+    case INK_TT_NL:
+        printf("[DEBUG] %s(%u, %u): `\\n`\n", ink_token_type_strz(token->type),
+               start, end);
+        break;
+    default:
+        printf("[DEBUG] %s(%u, %u): `%.*s`\n", ink_token_type_strz(token->type),
+               start, end, (int)(end - start), source->bytes + start);
+        break;
+    }
+}
+
+void ink_token_buffer_print(const struct ink_source *source,
+                            const struct ink_token_buffer *buffer)
+{
+    for (size_t i = 0; i < buffer->count; i++) {
+        ink_token_print(source, &buffer->entries[i]);
     }
 }
 
@@ -225,8 +286,9 @@ void ink_token_stream_cleanup(struct ink_token_stream *stream)
  */
 struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
+                    size_t start_token, size_t end_token,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    size_t main_token, struct ink_syntax_seq *seq)
+                    struct ink_syntax_seq *seq)
 {
     struct ink_syntax_node *node;
 
@@ -235,7 +297,8 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
         return NULL;
 
     node->type = type;
-    node->main_token = main_token;
+    node->start_token = start_token;
+    node->end_token = end_token;
     node->lhs = lhs;
     node->rhs = rhs;
     node->seq = seq;
@@ -278,7 +341,7 @@ struct ink_syntax_seq *ink_syntax_seq_new(struct ink_arena *arena,
 int ink_syntax_tree_initialize(struct ink_source *source,
                                struct ink_syntax_tree *tree)
 {
-    if (ink_token_stream_reserve(&tree->tokens, INK_TOKEN_STREAM_MIN_COUNT) < 0)
+    if (ink_token_buffer_reserve(&tree->tokens, INK_TOKEN_STREAM_MIN_COUNT) < 0)
         return -1;
 
     tree->source = source;
@@ -289,4 +352,5 @@ int ink_syntax_tree_initialize(struct ink_source *source,
 
 void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree)
 {
+    ink_token_buffer_cleanup(&tree->tokens);
 }

@@ -5,7 +5,7 @@
 /* TODO(Brett): Add a Win32 abstraction. */
 
 /**
- * Platform abstracted procedure for loading a file into a buffer of bytes.
+ * Request the platform to load a file into a buffer of bytes.
  */
 int platform_load_file(const char *filename, unsigned char **bytes,
                        size_t *length)
@@ -14,7 +14,7 @@ int platform_load_file(const char *filename, unsigned char **bytes,
 }
 
 /**
- * Invoke the system allocator to request memory.
+ * Request the platform to allocate memory.
  */
 void *platform_mem_alloc(size_t size)
 {
@@ -22,9 +22,17 @@ void *platform_mem_alloc(size_t size)
 }
 
 /**
- * Invoke the system allocator to release memory.
+ * Request the platform to resize a block of memory.
  */
-void platform_mem_dealloc(void *pointer, size_t size)
+void *platform_mem_realloc(void *address, size_t old_size, size_t new_size)
 {
-    unix_dealloc(pointer, size);
+    return unix_realloc(address, new_size);
+}
+
+/**
+ * Release memory from the system allocator.
+ */
+void platform_mem_dealloc(void *address, size_t size)
+{
+    unix_dealloc(address, size);
 }

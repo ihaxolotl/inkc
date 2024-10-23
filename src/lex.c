@@ -1,5 +1,5 @@
+#include <assert.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #include "lex.h"
 #include "source.h"
@@ -7,46 +7,23 @@
 enum ink_lex_state {
     INK_LEX_STATE_START,
     INK_LEX_STATE_CONTENT,
+    INK_LEX_STATE_DIGIT,
+    INK_LEX_STATE_WHITESPACE,
 };
 
-#define T(name, description) description,
-static const char *INK_TT_STR[] = {INK_TT(T)};
-#undef T
-
-static bool is_alpha(char c)
+static bool ink_is_alpha(char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-const char *ink_token_type_strz(enum ink_token_type type)
+static bool ink_is_digit(char c)
 {
-    return INK_TT_STR[type];
+    return (c >= '0' && c <= '9');
 }
 
-static void ink_lex_next(struct ink_lexer *lexer)
+static void ink_scan_next(struct ink_lexer *lexer)
 {
     lexer->cursor_offset++;
-}
-
-void ink_token_print(struct ink_source *source, const struct ink_token *token)
-{
-    const unsigned int start = token->start_offset;
-    const unsigned int end = token->end_offset;
-
-    switch (token->type) {
-    case INK_TT_EOF:
-        printf("[DEBUG] %s(%u, %u): `\\0`\n", ink_token_type_strz(token->type),
-               start, end);
-        break;
-    case INK_TT_NL:
-        printf("[DEBUG] %s(%u, %u): `\\n`\n", ink_token_type_strz(token->type),
-               start, end);
-        break;
-    default:
-        printf("[DEBUG] %s(%u, %u): `%.*s`\n", ink_token_type_strz(token->type),
-               start, end, (int)(end - start), source->bytes + start);
-        break;
-    }
 }
 
 void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
@@ -73,54 +50,78 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             }
             case '\n': {
                 token->type = INK_TT_NL;
-                ink_lex_next(lexer);
+                ink_scan_next(lexer);
                 goto exit_loop;
             }
+            case ' ':
+            case '\t': {
+                state = INK_LEX_STATE_WHITESPACE;
+                break;
+            }
             case '"': {
-                token->type = INK_TT_DQUOTE;
-                ink_lex_next(lexer);
+                token->type = INK_TT_DOUBLE_QUOTE;
+                ink_scan_next(lexer);
                 goto exit_loop;
             }
             case '|': {
                 token->type = INK_TT_PIPE;
-                ink_lex_next(lexer);
+                ink_scan_next(lexer);
                 goto exit_loop;
             }
             case '{': {
-                token->type = INK_TT_LBRACE;
-                ink_lex_next(lexer);
+                token->type = INK_TT_LEFT_BRACE;
+                ink_scan_next(lexer);
                 goto exit_loop;
             }
             case '}': {
-                token->type = INK_TT_RBRACE;
-                ink_lex_next(lexer);
+                token->type = INK_TT_RIGHT_BRACE;
+                ink_scan_next(lexer);
                 goto exit_loop;
             }
             default:
-                if (is_alpha(c)) {
+                if (ink_is_alpha(c)) {
                     state = INK_LEX_STATE_CONTENT;
+                } else if (ink_is_digit(c)) {
+                    state = INK_LEX_STATE_DIGIT;
                 } else {
                     token->type = INK_TT_STRING;
-                    ink_lex_next(lexer);
+                    ink_scan_next(lexer);
                     goto exit_loop;
                 }
             }
-        } break;
+            break;
+        }
         case INK_LEX_STATE_CONTENT: {
-            if (!is_alpha(c)) {
+            if (!ink_is_alpha(c) || !ink_is_digit(c)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }
             break;
+        }
+        case INK_LEX_STATE_DIGIT: {
+            if (!ink_is_digit(c)) {
+                token->type = INK_TT_NUMBER;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_STATE_WHITESPACE: {
+            switch (c) {
+            case ' ':
+            case '\t':
+                break;
+            default:
+                token->type = INK_TT_WHITESPACE;
+                goto exit_loop;
+            }
         }
         default:
             /* Unreachable */
             break;
         }
 
-        lexer->cursor_offset++;
+        ink_scan_next(lexer);
     }
-
 exit_loop:
     token->start_offset = lexer->start_offset;
     token->end_offset = lexer->cursor_offset;

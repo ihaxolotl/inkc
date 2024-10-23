@@ -20,9 +20,12 @@ struct ink_syntax_node;
 
 #define INK_NODE(T)                                                            \
     T(NODE_FILE, "NODE_FILE")                                                  \
+    T(NODE_NUMBER_LITERAL, "NODE_NUMBER_LITERAL")                              \
+    T(NODE_STRING_LITERAL, "NODE_STRING_LITERAL")                              \
     T(NODE_CONTENT_STMT, "NODE_CONTENT_STMT")                                  \
     T(NODE_CONTENT_EXPR, "NODE_CONTENT_EXPR")                                  \
-    T(NODE_BRACE_EXPR, "NODE_BRACE_EXPR")
+    T(NODE_BRACE_EXPR, "NODE_BRACE_EXPR")                                      \
+    T(NODE_SEQUENCE_EXPR, "NODE_SEQUENCE_EXPR")
 
 #define T(name, description) INK_##name,
 enum ink_syntax_node_type {
@@ -51,19 +54,23 @@ struct ink_syntax_seq {
 };
 
 /**
- * Syntax tree node
+ * Syntax tree node.
+ *
+ * Nodes do not directly store token information, instead opting to reference
+ * them by index. A single node can span a range of tokens within the tokenized
+ * buffer.
  */
 struct ink_syntax_node {
     /* Type of the syntax tree node */
     enum ink_syntax_node_type type;
 
-    /* Main token for the grammar production. Token information can be
-     * retrieved by using this value as an index into the syntax tree's token
-     * stream.
-     */
-    size_t main_token;
+    /* Index into the tokenized buffer for the starting token. */
+    size_t start_token;
 
-    /* Left-hand size for the grammar production. */
+    /* Index into the tokenized buffer for the closing token. */
+    size_t end_token;
+
+    /* Left-hand side for the grammar production. */
     struct ink_syntax_node *lhs;
 
     /* Right-hand side for the grammar production. */
@@ -74,11 +81,9 @@ struct ink_syntax_node {
 };
 
 /**
- * Token stream.
- *
- * Contains a buffer of tokens.
+ * Tokenized buffer.
  */
-struct ink_token_stream {
+struct ink_token_buffer {
     size_t count;
     size_t capacity;
     struct ink_token *entries;
@@ -88,47 +93,44 @@ struct ink_token_stream {
  * Syntax Tree.
  *
  * The syntax tree's memory is arranged for reasonably efficient storage.
- * Indirection through array indexes for tokens.
  */
 struct ink_syntax_tree {
     struct ink_source *source;
-    struct ink_token_stream tokens;
+    struct ink_token_buffer tokens;
     struct ink_syntax_node *root;
 };
 
-extern int ink_token_stream_reserve(struct ink_token_stream *stream,
+extern int ink_token_buffer_reserve(struct ink_token_buffer *stream,
                                     size_t count);
-extern int ink_token_stream_append(struct ink_token_stream *stream,
+extern int ink_token_buffer_append(struct ink_token_buffer *stream,
                                    struct ink_token token);
-extern void ink_token_stream_cleanup(struct ink_token_stream *stream);
+extern void ink_token_buffer_cleanup(struct ink_token_buffer *stream);
+
+extern void ink_token_buffer_print(const struct ink_source *source,
+                                   const struct ink_token_buffer *buffer);
 
 extern int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
                                size_t item_count);
-
 extern void ink_scratch_append(struct ink_scratch_buffer *scratch,
                                struct ink_syntax_node *node);
-
 extern void ink_scratch_cleanup(struct ink_scratch_buffer *scratch);
 
 extern struct ink_syntax_seq *
 ink_seq_from_scratch(struct ink_arena *arena,
                      struct ink_scratch_buffer *scratch, size_t start_offset,
                      size_t end_offset);
-
 extern struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
+                    size_t token_start, size_t token_end,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    size_t main_token, struct ink_syntax_seq *seq);
-
+                    struct ink_syntax_seq *seq);
 extern struct ink_syntax_seq *
 ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,
                    size_t start_offset, size_t end_offset);
 
 extern int ink_syntax_tree_initialize(struct ink_source *source,
                                       struct ink_syntax_tree *tree);
-
 extern void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree);
-
 extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree);
 
 #ifdef __cplusplus
