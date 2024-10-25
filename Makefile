@@ -12,6 +12,7 @@ CFLAGS  := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Werror \
 LDFLAGS := -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined
 
 SRCS := src/main.c             \
+        src/util.c             \
         src/unix.c             \
         src/platform.c         \
         src/arena.c            \

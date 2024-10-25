@@ -3,6 +3,7 @@
 
 #include "lex.h"
 #include "source.h"
+#include "util.h"
 
 enum ink_lex_state {
     INK_LEX_STATE_START,
@@ -10,16 +11,6 @@ enum ink_lex_state {
     INK_LEX_STATE_DIGIT,
     INK_LEX_STATE_WHITESPACE,
 };
-
-static bool ink_is_alpha(unsigned char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-static bool ink_is_digit(unsigned char c)
-{
-    return (c >= '0' && c <= '9');
-}
 
 static void ink_scan_next(struct ink_lexer *lexer)
 {

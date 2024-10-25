@@ -30,6 +30,7 @@ struct ink_source;
     T(TT_GLUE, "Glue")                                                         \
     T(TT_GREATER_EQUAL, "GreaterOrEqual")                                      \
     T(TT_GREATER_THAN, "GreaterThan")                                          \
+    T(TT_IDENTIFIER, "Identifier")                                             \
     T(TT_KEYWORD_AND, "KeywordAnd")                                            \
     T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
     T(TT_KEYWORD_MOD, "KeywordMod")                                            \

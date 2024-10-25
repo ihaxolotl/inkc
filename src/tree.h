@@ -23,9 +23,17 @@ struct ink_syntax_node;
     T(NODE_ADD_EXPR, "AddExpr")                                                \
     T(NODE_AND_EXPR, "AndExpr")                                                \
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
+    T(NODE_BLOCK_STMT, "BlockStmt")                                            \
     T(NODE_BRACE_EXPR, "BraceExpr")                                            \
+    T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
+    T(NODE_CHOICE_PLUS_BRANCH, "ChoicePlusBranch")                             \
+    T(NODE_CHOICE_STAR_BRANCH, "ChoiceStarBranch")                             \
+    T(NODE_CHOICE_CONTENT_EXPR, "ChoiceContentExpr")                           \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
+    T(NODE_LABELLED_CHOICE_BRANCH, "LabelledChoiceBranch")                     \
+    T(NODE_CONDITIONAL_CHOICE_BRANCH, "ConditionalChoiceBranch")               \
+    T(NODE_IDENTIFIER_EXPR, "IdentifierExpr")                                  \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_FALSE_EXPR, "FalseExpr")                                            \
@@ -119,22 +127,21 @@ struct ink_syntax_tree {
     struct ink_syntax_node *root;
 };
 
+extern const char *ink_token_type_strz(enum ink_token_type type);
+extern const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type);
 extern void ink_token_print(const struct ink_source *source,
                             const struct ink_token *token);
 
 extern void ink_token_buffer_initialize(struct ink_token_buffer *buffer);
-
 extern int ink_token_buffer_reserve(struct ink_token_buffer *buffer,
                                     size_t count);
 extern int ink_token_buffer_append(struct ink_token_buffer *buffer,
                                    struct ink_token token);
 extern void ink_token_buffer_cleanup(struct ink_token_buffer *buffer);
-
 extern void ink_token_buffer_print(const struct ink_source *source,
                                    const struct ink_token_buffer *buffer);
 
 extern void ink_scratch_initialize(struct ink_scratch_buffer *scratch);
-
 extern int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
                                size_t item_count);
 extern void ink_scratch_append(struct ink_scratch_buffer *scratch,
