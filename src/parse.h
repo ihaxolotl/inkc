@@ -9,7 +9,7 @@ struct ink_arena;
 struct ink_source;
 struct ink_syntax_tree;
 
-extern int ink_parse(struct ink_arena *arena, struct ink_source *source,
+extern int ink_parse(struct ink_arena *arena, const struct ink_source *source,
                      struct ink_syntax_tree *tree);
 
 #ifdef __cplusplus

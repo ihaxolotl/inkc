@@ -122,7 +122,7 @@ struct ink_token_buffer {
  * The syntax tree's memory is arranged for reasonably efficient storage.
  */
 struct ink_syntax_tree {
-    struct ink_source *source;
+    const struct ink_source *source;
     struct ink_token_buffer tokens;
     struct ink_syntax_node *root;
 };
@@ -161,7 +161,7 @@ extern struct ink_syntax_seq *
 ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,
                    size_t start_offset, size_t end_offset);
 
-extern int ink_syntax_tree_initialize(struct ink_source *source,
+extern int ink_syntax_tree_initialize(const struct ink_source *source,
                                       struct ink_syntax_tree *tree);
 extern void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree);
 extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree);

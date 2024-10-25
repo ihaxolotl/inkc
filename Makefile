@@ -13,6 +13,7 @@ LDFLAGS := -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined
 
 SRCS := src/main.c             \
         src/util.c             \
+        src/logging.c          \
         src/unix.c             \
         src/platform.c         \
         src/arena.c            \

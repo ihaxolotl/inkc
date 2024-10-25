@@ -78,7 +78,7 @@ struct ink_token {
 };
 
 struct ink_lexer {
-    struct ink_source *source;
+    const struct ink_source *source;
     size_t cursor_offset;
     size_t start_offset;
 };

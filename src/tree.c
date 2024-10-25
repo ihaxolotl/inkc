@@ -376,7 +376,7 @@ struct ink_syntax_seq *ink_syntax_seq_new(struct ink_arena *arena,
  *
  * Storage space for the token buffer will be reserved for later use here.
  */
-int ink_syntax_tree_initialize(struct ink_source *source,
+int ink_syntax_tree_initialize(const struct ink_source *source,
                                struct ink_syntax_tree *tree)
 {
     struct ink_token_buffer *tokens = &tree->tokens;
