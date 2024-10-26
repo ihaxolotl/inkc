@@ -37,6 +37,8 @@ struct ink_syntax_node;
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_FALSE_EXPR, "FalseExpr")                                            \
+    T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
+    T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \

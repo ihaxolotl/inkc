@@ -56,6 +56,9 @@ struct ink_parser {
     /* Flag to control tracing output */
     bool tracing;
 
+    /* Stolen from CPython. May adjust. */
+    int pending;
+
     /* Index of the current token within the tokenized buffer */
     size_t token_index;
     size_t context_depth;
@@ -303,10 +306,12 @@ static void ink_parser_trace(struct ink_parser *parser, const char *rule_name)
     const char *context_type = ink_parse_context_type_strz(context->type);
     const char *token_type = ink_token_type_strz(token->type);
 
-    ink_trace("Entering %s(Context=%s, TokenType=%s, TokenIndex: %zu, "
-              "Level: %zu)",
-              rule_name, context_type, token_type, parser->token_index,
-              parser->level_stack[parser->level_depth]);
+    if (parser->tracing) {
+        ink_trace("Entering %s(Context=%s, TokenType=%s, TokenIndex: %zu, "
+                  "Level: %zu)",
+                  rule_name, context_type, token_type, parser->token_index,
+                  parser->level_stack[parser->level_depth]);
+    }
 }
 
 /**
@@ -697,7 +702,8 @@ static int ink_parser_initialize(struct ink_parser *parser,
     parser->lexer.start_offset = 0;
     parser->lexer.cursor_offset = 0;
     parser->panic_mode = false;
-    parser->tracing = true;
+    parser->tracing = false;
+    parser->pending = 0;
     parser->token_index = 0;
     parser->context_depth = 0;
     parser->level_depth = 0;
@@ -728,14 +734,15 @@ static struct ink_syntax_node *ink_parse_sequence_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_string(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_content(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_prefix_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_infix_expr(struct ink_parser *,
                                                     struct ink_syntax_node *,
                                                     enum ink_precedence);
 static struct ink_syntax_node *ink_parse_expr(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *);
 
 static struct ink_syntax_node *ink_parse_true(struct ink_parser *parser)
@@ -987,7 +994,7 @@ static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
                                     parser->token_index, scratch_offset);
 }
 
-static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *parser)
+static struct ink_syntax_node *ink_parse_content(struct ink_parser *parser)
 {
     struct ink_syntax_node *lhs = NULL;
     const size_t token_start = parser->token_index;
@@ -1040,6 +1047,7 @@ ink_parse_choice_branch(struct ink_parser *parser,
     const size_t token_start = parser->token_index;
 
     ink_parser_trace(parser, __func__);
+    ink_parser_eat_nesting(parser, ink_parser_token_type(parser));
 
     /* ink_parser_push_context(parser, INK_PARSE_CHOICE); */
     expr = ink_parse_choice_content(parser);
@@ -1053,70 +1061,88 @@ ink_parse_choice_branch(struct ink_parser *parser,
                                   parser->token_index, expr, body);
 }
 
-static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *parser)
+static struct ink_syntax_node *ink_parse_choice(struct ink_parser *parser)
 {
-    struct ink_syntax_node *stmt;
+    const size_t scratch_offset = parser->scratch.count;
+    const size_t token_start = parser->token_index;
 
-    ink_parser_trace(parser, __func__);
-    stmt = ink_parse_content_stmt(parser);
+    while (!ink_parser_check(parser, INK_TT_EOF)) {
+        const enum ink_token_type token_type = ink_parser_token_type(parser);
+        const enum ink_syntax_node_type branch_type =
+            ink_branch_type(token_type);
+        struct ink_syntax_node *node =
+            ink_parse_choice_branch(parser, branch_type);
 
-    while (ink_parser_check(parser, INK_TT_NL)) {
-        ink_parser_advance(parser);
+        ink_scratch_append(&parser->scratch, node);
+
+        if (parser->pending != 0)
+            break;
     }
-    return stmt;
+
+    parser->pending++;
+
+    return ink_syntax_node_sequence(parser, INK_NODE_CHOICE_STMT, token_start,
+                                    parser->token_index, scratch_offset);
+}
+
+/**
+ * Block delimiters are context-sensitive.
+ * Opening new blocks is simple. Closing them is more tricky.
+ */
+static struct ink_syntax_node *
+ink_parse_block_delimited(struct ink_parser *parser)
+{
+    const size_t token_start = parser->token_index;
+    const enum ink_token_type token_type = ink_parser_token_type(parser);
+
+    if (ink_parser_check(parser, INK_TT_STAR) ||
+        ink_parser_check(parser, INK_TT_PLUS)) {
+        const size_t level = ink_parser_eat_nesting(parser, token_type);
+
+        ink_parser_rewind(parser, token_start);
+
+        if (level > parser->level_stack[parser->level_depth]) {
+            if (parser->level_depth + 1 >= INK_PARSE_DEPTH) {
+                ink_parser_error(parser, "Level nesting is too deep.");
+                return NULL;
+            }
+
+            parser->pending++;
+            parser->level_depth++;
+            parser->level_stack[parser->level_depth] = level;
+        } else if (level < parser->level_stack[parser->level_depth]) {
+            while (parser->level_depth > 0 &&
+                   level < parser->level_stack[parser->level_depth]) {
+                parser->pending--;
+                parser->level_depth--;
+            }
+        }
+        if (parser->pending > 0) {
+            parser->pending--;
+
+            return ink_parse_choice(parser);
+        }
+        return NULL;
+    }
+    return ink_parse_content(parser);
 }
 
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *parser)
 {
     const size_t scratch_offset = parser->scratch.count;
     const size_t token_start = parser->token_index;
-    const size_t level = parser->level_stack[parser->level_depth];
 
     ink_parser_trace(parser, __func__);
 
     while (!ink_parser_check(parser, INK_TT_EOF)) {
-        enum ink_token_type token_type;
-        size_t token_index = parser->token_index;
-        size_t branch_level = 0;
         struct ink_syntax_node *node = NULL;
 
         ink_parser_eat(parser, INK_TT_WHITESPACE);
 
-        if (!ink_parser_check(parser, INK_TT_STAR) &&
-            !ink_parser_check(parser, INK_TT_PLUS)) {
-            node = ink_parse_stmt(parser);
-            ink_scratch_append(&parser->scratch, node);
-            continue;
-        }
-
-        token_type = ink_parser_token_type(parser);
-        branch_level = ink_parser_eat_nesting(parser, token_type);
-
-        if (branch_level > parser->level_stack[parser->level_depth]) {
-            if (parser->level_depth + 1 >= INK_PARSE_DEPTH) {
-                ink_parser_error(parser, "Level nesting is too deep.");
-                break;
-            }
-
-            parser->level_depth++;
-            parser->level_stack[parser->level_depth] = branch_level;
-        } else if (branch_level < parser->level_stack[parser->level_depth]) {
-            while (parser->level_depth > 0 &&
-                   branch_level < parser->level_stack[parser->level_depth]) {
-                parser->level_depth--;
-            }
-            /*
-            if (branch_level != parser->level_stack[parser->level_depth]) {
-                assert(false);
-            }
-            */
-        }
-        if (level >= parser->level_stack[parser->level_depth]) {
-            ink_parser_rewind(parser, token_index);
+        node = ink_parse_block_delimited(parser);
+        if (node == NULL)
             break;
-        }
 
-        node = ink_parse_choice_branch(parser, ink_branch_type(token_type));
         ink_scratch_append(&parser->scratch, node);
     }
     return ink_syntax_node_sequence(parser, INK_NODE_BLOCK_STMT, token_start,
