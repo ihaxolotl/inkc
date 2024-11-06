@@ -86,7 +86,7 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     switch (node->type) {
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
-
+    case INK_NODE_IDENTIFIER_EXPR:
         printf("%s(LeadingToken: %s(`%.*s`) [%zu])\n", node_type_str,
                token_type_str, (int)lexeme_length, lexeme, node->start_token);
         break;
@@ -111,101 +111,6 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
 {
     if (tree->root)
         ink_syntax_node_print_walk(tree, tree->root, 0);
-}
-
-void ink_scratch_initialize(struct ink_scratch_buffer *scratch)
-{
-    scratch->count = 0;
-    scratch->capacity = 0;
-    scratch->entries = NULL;
-}
-
-/**
- * Reserve scratch space for a specified number of items.
- */
-int ink_scratch_reserve(struct ink_scratch_buffer *scratch, size_t item_count)
-{
-    struct ink_syntax_node **entries = scratch->entries;
-    size_t old_capacity = scratch->capacity * sizeof(entries);
-    size_t new_capacity = item_count * sizeof(entries);
-
-    entries = platform_mem_realloc(entries, old_capacity, new_capacity);
-    if (entries == NULL) {
-        scratch->entries = NULL;
-        return -1;
-    }
-
-    scratch->count = scratch->count;
-    scratch->capacity = item_count;
-    scratch->entries = entries;
-
-    return 0;
-}
-
-/**
- * Shrink the parser's scratch storage down to a specified size.
- *
- * Re-allocation is not performed here. Therefore, subsequent allocations
- * are amortized.
- */
-static void ink_scratch_shrink(struct ink_scratch_buffer *scratch, size_t count)
-{
-    assert(count <= scratch->capacity);
-
-    scratch->count = count;
-}
-
-/**
- * Append a syntax tree node to the parser's scratch storage.
- *
- * These nodes can be retrieved later for creating sequences.
- */
-void ink_scratch_append(struct ink_scratch_buffer *scratch,
-                        struct ink_syntax_node *node)
-{
-    size_t capacity, old_size, new_size;
-
-    if (scratch->count + 1 > scratch->capacity) {
-        if (scratch->capacity < INK_SCRATCH_MIN_COUNT) {
-            capacity = INK_SCRATCH_MIN_COUNT;
-        } else {
-            capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
-        }
-
-        old_size = scratch->capacity * sizeof(scratch->entries);
-        new_size = capacity * sizeof(scratch->entries);
-
-        scratch->entries =
-            platform_mem_realloc(scratch->entries, old_size, new_size);
-        scratch->capacity = capacity;
-    }
-
-    scratch->entries[scratch->count++] = node;
-}
-
-/**
- * Release memory for scratch storage.
- */
-void ink_scratch_cleanup(struct ink_scratch_buffer *scratch)
-{
-    size_t mem_size = sizeof(scratch->entries) * scratch->capacity;
-
-    platform_mem_dealloc(scratch->entries, mem_size);
-}
-
-struct ink_syntax_seq *ink_seq_from_scratch(struct ink_arena *arena,
-                                            struct ink_scratch_buffer *scratch,
-                                            size_t start_offset,
-                                            size_t end_offset)
-{
-    struct ink_syntax_seq *seq = NULL;
-
-    if (start_offset < end_offset) {
-        seq = ink_syntax_seq_new(arena, scratch, start_offset, end_offset);
-
-        ink_scratch_shrink(scratch, start_offset);
-    }
-    return seq;
 }
 
 void ink_token_buffer_initialize(struct ink_token_buffer *buffer)
@@ -342,33 +247,6 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
     node->seq = seq;
 
     return node;
-}
-
-/**
- * Create a syntax tree node sequence.
- */
-struct ink_syntax_seq *ink_syntax_seq_new(struct ink_arena *arena,
-                                          struct ink_scratch_buffer *scratch,
-                                          size_t start_offset,
-                                          size_t end_offset)
-{
-    struct ink_syntax_seq *seq;
-    size_t seq_index = 0;
-    size_t span = end_offset - start_offset;
-
-    assert(span > 0);
-
-    seq = ink_arena_allocate(arena, sizeof(*seq) + span * sizeof(seq->nodes));
-    if (seq == NULL)
-        return NULL;
-
-    seq->count = span;
-
-    for (size_t i = start_offset; i < end_offset; i++) {
-        seq->nodes[seq_index] = scratch->entries[i];
-        seq_index++;
-    }
-    return seq;
 }
 
 /**

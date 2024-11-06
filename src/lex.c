@@ -54,6 +54,11 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 ink_scan_next(lexer);
                 goto exit_loop;
             }
+            case '=': {
+                token->type = INK_TT_EQUAL;
+                ink_scan_next(lexer);
+                goto exit_loop;
+            }
             case '+': {
                 token->type = INK_TT_PLUS;
                 ink_scan_next(lexer);

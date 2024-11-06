@@ -46,10 +46,15 @@ int main(int argc, char *argv[])
     printf("%s\n", source.bytes);
 
     ink_arena_initialize(&arena, arena_block_size, arena_alignment);
-    ink_parse(&arena, &source, &syntax_tree);
 
+    rc = ink_syntax_tree_initialize(&source, &syntax_tree);
+    if (rc < 0)
+        goto cleanup;
+
+    ink_parse(&arena, &source, &syntax_tree);
     ink_token_buffer_print(&source, &syntax_tree.tokens);
     ink_syntax_tree_print(&syntax_tree);
+cleanup:
     ink_syntax_tree_cleanup(&syntax_tree);
     ink_arena_release(&arena);
     ink_source_free(&source);

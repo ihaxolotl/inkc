@@ -29,6 +29,7 @@ struct ink_syntax_node;
     T(NODE_CHOICE_PLUS_BRANCH, "ChoicePlusBranch")                             \
     T(NODE_CHOICE_STAR_BRANCH, "ChoiceStarBranch")                             \
     T(NODE_CHOICE_CONTENT_EXPR, "ChoiceContentExpr")                           \
+    T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
     T(NODE_LABELLED_CHOICE_BRANCH, "LabelledChoiceBranch")                     \
@@ -54,6 +55,7 @@ struct ink_syntax_node;
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
     T(NODE_TRUE_EXPR, "TrueExpr")                                              \
+    T(NODE_VAR_DECL, "VarDecl")                                                \
     T(NODE_INVALID, "Invalid")
 
 #define T(name, description) INK_##name,
@@ -61,18 +63,6 @@ enum ink_syntax_node_type {
     INK_NODE(T)
 };
 #undef T
-
-/**
- * Scratch buffer for syntax tree nodes.
- *
- * Used to assist in the creation of syntax tree node sequences, avoiding the
- * need for a dynamic array.
- */
-struct ink_scratch_buffer {
-    size_t count;
-    size_t capacity;
-    struct ink_syntax_node **entries;
-};
 
 /**
  * Sequence of syntax tree nodes.
@@ -143,25 +133,11 @@ extern void ink_token_buffer_cleanup(struct ink_token_buffer *buffer);
 extern void ink_token_buffer_print(const struct ink_source *source,
                                    const struct ink_token_buffer *buffer);
 
-extern void ink_scratch_initialize(struct ink_scratch_buffer *scratch);
-extern int ink_scratch_reserve(struct ink_scratch_buffer *scratch,
-                               size_t item_count);
-extern void ink_scratch_append(struct ink_scratch_buffer *scratch,
-                               struct ink_syntax_node *node);
-extern void ink_scratch_cleanup(struct ink_scratch_buffer *scratch);
-
-extern struct ink_syntax_seq *
-ink_seq_from_scratch(struct ink_arena *arena,
-                     struct ink_scratch_buffer *scratch, size_t start_offset,
-                     size_t end_offset);
 extern struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
                     size_t token_start, size_t token_end,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
                     struct ink_syntax_seq *seq);
-extern struct ink_syntax_seq *
-ink_syntax_seq_new(struct ink_arena *arena, struct ink_scratch_buffer *scratch,
-                   size_t start_offset, size_t end_offset);
 
 extern int ink_syntax_tree_initialize(const struct ink_source *source,
                                       struct ink_syntax_tree *tree);
