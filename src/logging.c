@@ -23,6 +23,15 @@ void ink_log(enum ink_log_level log_level, const char *fmt, va_list args)
     fprintf(stdout, "\n");
 }
 
+void ink_error(const char *fmt, ...)
+{
+    va_list vargs;
+
+    va_start(vargs, fmt);
+    ink_log(INK_LOG_LEVEL_ERROR, fmt, vargs);
+    va_end(vargs);
+}
+
 void ink_trace(const char *fmt, ...)
 {
     va_list vargs;

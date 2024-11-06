@@ -16,6 +16,7 @@ enum ink_log_level {
 extern void ink_log(enum ink_log_level log_level, const char *fmt,
                     va_list args);
 extern void ink_trace(const char *format, ...);
+extern void ink_error(const char *format, ...);
 
 #ifdef __cplusplus
 }

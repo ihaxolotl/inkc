@@ -3,6 +3,7 @@
 
 #include "arena.h"
 #include "common.h"
+#include "logging.h"
 #include "parse.h"
 #include "source.h"
 #include "tree.h"
@@ -18,7 +19,7 @@ int main(int argc, char *argv[])
     struct ink_syntax_tree syntax_tree;
 
     if (argc < 2) {
-        fprintf(stderr, "Not enough arguments.\n");
+        ink_error("Not enough arguments.");
         return EXIT_FAILURE;
     }
 
@@ -28,22 +29,20 @@ int main(int argc, char *argv[])
     if (rc < 0) {
         switch (-rc) {
         case INK_E_OS: {
-            fprintf(stderr, "[ERROR] OS Error.\n");
+            ink_error("[ERROR] Could not open file `%s`. OS Error.", filename);
             break;
         }
         case INK_E_FILE: {
-            fprintf(stderr, "[ERROR] %s is not an ink script.\n", filename);
+            ink_error("[ERROR] Could not open file `%s`. Not an ink script.",
+                      filename);
             break;
         }
         default:
-            fprintf(stderr, "[ERROR] Unknown error.\n");
+            ink_error("[ERROR] Unknown error.");
             break;
         }
         return EXIT_FAILURE;
     }
-
-    printf("Source file %s is %zu bytes\n\n", source.filename, source.length);
-    printf("%s\n", source.bytes);
 
     ink_arena_initialize(&arena, arena_block_size, arena_alignment);
 
