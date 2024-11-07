@@ -6,10 +6,14 @@
 #include "util.h"
 
 enum ink_lex_state {
-    INK_LEX_STATE_START,
-    INK_LEX_STATE_CONTENT,
-    INK_LEX_STATE_DIGIT,
-    INK_LEX_STATE_WHITESPACE,
+    INK_LEX_START,
+    INK_LEX_CONTENT,
+    INK_LEX_DIGIT,
+    INK_LEX_SLASH,
+    INK_LEX_COMMENT_LINE,
+    INK_LEX_COMMENT_BLOCK,
+    INK_LEX_COMMENT_BLOCK_STAR,
+    INK_LEX_WHITESPACE,
 };
 
 static void ink_scan_next(struct ink_lexer *lexer)
@@ -19,19 +23,18 @@ static void ink_scan_next(struct ink_lexer *lexer)
 
 void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
 {
-    unsigned char c;
-    enum ink_lex_state state = INK_LEX_STATE_START;
+    enum ink_lex_state state = INK_LEX_START;
     const struct ink_source *source = lexer->source;
 
     for (;;) {
-        c = source->bytes[lexer->cursor_offset];
+        const unsigned char c = source->bytes[lexer->cursor_offset];
 
         if (lexer->cursor_offset >= source->length) {
             token->type = INK_TT_EOF;
             break;
         }
         switch (state) {
-        case INK_LEX_STATE_START: {
+        case INK_LEX_START: {
             lexer->start_offset = lexer->cursor_offset;
 
             switch (c) {
@@ -46,7 +49,7 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             }
             case ' ':
             case '\t': {
-                state = INK_LEX_STATE_WHITESPACE;
+                state = INK_LEX_WHITESPACE;
                 break;
             }
             case '"': {
@@ -75,9 +78,8 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 goto exit_loop;
             }
             case '/': {
-                token->type = INK_TT_SLASH;
-                ink_scan_next(lexer);
-                goto exit_loop;
+                state = INK_LEX_SLASH;
+                break;
             }
             case '%': {
                 token->type = INK_TT_PERCENT;
@@ -121,9 +123,9 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             }
             default:
                 if (ink_is_alpha(c)) {
-                    state = INK_LEX_STATE_CONTENT;
+                    state = INK_LEX_CONTENT;
                 } else if (ink_is_digit(c)) {
-                    state = INK_LEX_STATE_DIGIT;
+                    state = INK_LEX_DIGIT;
                 } else {
                     token->type = INK_TT_STRING;
                     ink_scan_next(lexer);
@@ -132,21 +134,75 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             }
             break;
         }
-        case INK_LEX_STATE_CONTENT: {
+        case INK_LEX_CONTENT: {
             if (!ink_is_alpha(c) && !ink_is_digit(c)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }
             break;
         }
-        case INK_LEX_STATE_DIGIT: {
+        case INK_LEX_DIGIT: {
             if (!ink_is_digit(c)) {
                 token->type = INK_TT_NUMBER;
                 goto exit_loop;
             }
             break;
         }
-        case INK_LEX_STATE_WHITESPACE: {
+        case INK_LEX_SLASH: {
+            switch (c) {
+            case '/': {
+                state = INK_LEX_COMMENT_LINE;
+                break;
+            }
+            case '*': {
+                state = INK_LEX_COMMENT_BLOCK;
+                break;
+            }
+            default:
+                token->type = INK_TT_SLASH;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_LINE: {
+            switch (c) {
+            case '\0':
+            case '\n':
+                state = INK_LEX_START;
+                continue;
+            default:
+                break;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_BLOCK: {
+            switch (c) {
+            case '\0':
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            case '*':
+                state = INK_LEX_COMMENT_BLOCK_STAR;
+                break;
+            default:
+                break;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_BLOCK_STAR: {
+            switch (c) {
+            case '\0':
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            case '/':
+                state = INK_LEX_START;
+                break;
+            default:
+                state = INK_LEX_COMMENT_BLOCK;
+                break;
+            }
+            break;
+        }
+        case INK_LEX_WHITESPACE: {
             switch (c) {
             case ' ':
             case '\t':
@@ -155,6 +211,7 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 token->type = INK_TT_WHITESPACE;
                 goto exit_loop;
             }
+            break;
         }
         default:
             /* Unreachable */
