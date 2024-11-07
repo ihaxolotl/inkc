@@ -22,24 +22,11 @@ enum ink_precedence {
     INK_PREC_FACTOR,
 };
 
-enum ink_parse_context_type {
-    INK_PARSE_CONTENT,
-    INK_PARSE_EXPRESSION,
-    INK_PARSE_BRACE,
-    INK_PARSE_CHOICE,
-};
-
-struct ink_parse_context {
-    enum ink_parse_context_type type;
-    const enum ink_token_type *delims;
-    size_t token_index;
-};
-
 /**
  * Scratch buffer for syntax tree nodes.
  *
  * Used to assist in the creation of syntax tree node sequences, avoiding the
- * need for a dynamic array.
+ * need for a dynamically-resizable array.
  */
 struct ink_scratch_buffer {
     size_t count;
@@ -47,32 +34,72 @@ struct ink_scratch_buffer {
     struct ink_syntax_node **entries;
 };
 
+enum ink_parse_context_type {
+    INK_PARSE_CONTENT,
+    INK_PARSE_EXPRESSION,
+    INK_PARSE_BRACE,
+    INK_PARSE_CHOICE,
+};
+
 /**
- * Parsing state.
+ * Context-relative parsing state.
+ *
+ * A list of delimiters for a string of content is maintained based on
+ * the context type.
+ */
+struct ink_parse_context {
+    enum ink_parse_context_type type;
+    const enum ink_token_type *delims;
+    size_t token_index;
+};
+
+/**
+ * Ink parsing state.
+ *
+ * The goal of this parser is to provide a faster, simpler, and more
+ * portable alternative to Inkle's canonical implementation of Ink.
+ *
+ * General tokenization is performed on-demand, with tokens cached for later
+ * use. Some grammar rules may change token types in-place depending on the
+ * current context, though this is only allowed to happen once per token.
+ * When backtracking is required, the parser's `token_index` can be rewound to a
+ * previously saved value, waiving the need for retokenization.
+ *
+ * New syntax tree nodes are created with indexes into the tokenenized buffer,
+ * `tokens`. To create nodes with a variable number of children, references to
+ * intermediate parsing results are stored within a scratch buffer before a
+ * node sequence is properly allocated. The size of this buffer grows and
+ * shrinks dynamically as nodes are added to and removed from it.
+ *
+ * To transition between grammatical contexts, a stack of context-relative
+ * state information is maintained. A stack of "indentation" levels is also
+ * maintained to handle context-sensitive block delimiters.
+ *
+ *
+ * TODO(Brett): Optimize backtracking with memoization.
+ *
+ * TODO(Brett): Decide if the stacks should be dynamically-sized.
+ *
+ * TODO(Brett): Describe the error recovery strategy.
+ *
+ * TODO(Brett): Describe expression parsing.
+ *
+ * TODO(Brett): Describe why we didn't use a PEG parser.
+ *
+ * TODO(Brett): Maybe create a bit field if more flags are required.
+ *
+ * TODO(Brett): Determine if `pending` is actually required in its current form.
+ *              The preceived need for it arose from diving into the CPython
+ *              lexer and its handling of indentation-based block delimiters.
  */
 struct ink_parser {
-    /* Memory arena for syntax tree nodes */
     struct ink_arena *arena;
-
-    /* Tokenized buffer */
     struct ink_token_buffer *tokens;
-
-    /* Tokenizer state */
     struct ink_lexer lexer;
-
-    /* Scratch storage for intermediate parsing results. */
     struct ink_scratch_buffer scratch;
-
-    /* Flag to control error handling */
     bool panic_mode;
-
-    /* Flag to control tracing output */
     bool tracing;
-
-    /* Stolen from CPython. May adjust. */
     int pending;
-
-    /* Index of the current token within the tokenized buffer */
     size_t token_index;
     size_t context_depth;
     size_t level_depth;
@@ -80,9 +107,6 @@ struct ink_parser {
     struct ink_parse_context context_stack[INK_PARSE_DEPTH];
 };
 
-/**
- * Table of parsing context type descriptions.
- */
 static const char *INK_CONTEXT_TYPE_STR[] = {
     [INK_PARSE_CONTENT] = "Content",
     [INK_PARSE_EXPRESSION] = "Expression",
@@ -90,26 +114,16 @@ static const char *INK_CONTEXT_TYPE_STR[] = {
     [INK_PARSE_CHOICE] = "Choice",
 };
 
-/**
- * Delimiters for content strings within the default parsing context.
- */
 static const enum ink_token_type INK_CONTENT_DELIMS[] = {
     INK_TT_LEFT_BRACE,
     INK_TT_RIGHT_BRACE,
     INK_TT_EOF,
 };
 
-/**
- * Delimiters for content strings within the parsing context for expressions.
- */
 static const enum ink_token_type INK_EXPRESSION_DELIMS[] = {
     INK_TT_EOF,
 };
 
-/**
- * Delimiters for content strings within the parsing context for string
- * interpolations.
- */
 static const enum ink_token_type INK_BRACE_DELIMS[] = {
     INK_TT_LEFT_BRACE,
     INK_TT_RIGHT_BRACE,
@@ -117,10 +131,6 @@ static const enum ink_token_type INK_BRACE_DELIMS[] = {
     INK_TT_EOF,
 };
 
-/**
- * Delimiters for content strings within the parsing context for choice
- * branches.
- */
 static const enum ink_token_type INK_CHOICE_DELIMS[] = {
     INK_TT_LEFT_BRACE,    INK_TT_RIGHT_BRACE, INK_TT_LEFT_BRACKET,
     INK_TT_RIGHT_BRACKET, INK_TT_EOF,
