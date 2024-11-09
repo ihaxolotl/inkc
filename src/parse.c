@@ -484,15 +484,18 @@ int ink_parser_cache_insert(struct ink_parser_cache *cache, size_t token_index,
 #define INK_PARSER_MEMOIZE(node, rule, ...)                                    \
     do {                                                                       \
         int rc;                                                                \
+        size_t token_index = parser->token_index;                              \
+                                                                               \
         if (parser->flags & INK_PARSER_F_CACHING) {                            \
-            rc = ink_parser_cache_lookup(&parser->cache, parser->token_index,  \
+            rc = ink_parser_cache_lookup(&parser->cache, token_index,          \
                                          (void *)rule, &node);                 \
             if (rc < 0) {                                                      \
                 node = INK_DISPATCH(rule, __VA_ARGS__);                        \
-                ink_parser_cache_insert(&parser->cache, parser->token_index,   \
+                ink_parser_cache_insert(&parser->cache, token_index,           \
                                         (void *)rule, node);                   \
             } else {                                                           \
                 ink_trace("Parser cache hit!");                                \
+                parser->token_index = node->end_token;                         \
             }                                                                  \
         } else {                                                               \
             node = INK_DISPATCH(rule, __VA_ARGS__);                            \
