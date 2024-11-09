@@ -30,6 +30,7 @@ enum ink_parser_context_type {
     INK_PARSE_EXPRESSION,
     INK_PARSE_BRACE,
     INK_PARSE_CHOICE,
+    INK_PARSE_STRING,
 };
 
 /**
@@ -45,8 +46,8 @@ struct ink_parser_context {
 };
 
 struct ink_parser_cache_key {
-    size_t token_index;
     void *rule_address;
+    size_t token_index;
 };
 
 struct ink_parser_cache_entry {
@@ -152,10 +153,9 @@ static struct ink_syntax_node *ink_parse_var(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_const(struct ink_parser *);
 
 static const char *INK_CONTEXT_TYPE_STR[] = {
-    [INK_PARSE_CONTENT] = "Content",
-    [INK_PARSE_EXPRESSION] = "Expression",
-    [INK_PARSE_BRACE] = "Brace",
-    [INK_PARSE_CHOICE] = "Choice",
+    [INK_PARSE_CONTENT] = "Content", [INK_PARSE_EXPRESSION] = "Expression",
+    [INK_PARSE_BRACE] = "Brace",     [INK_PARSE_CHOICE] = "Choice",
+    [INK_PARSE_STRING] = "String",
 };
 
 static const enum ink_token_type INK_CONTENT_DELIMS[] = {
@@ -165,7 +165,8 @@ static const enum ink_token_type INK_CONTENT_DELIMS[] = {
 };
 
 static const enum ink_token_type INK_EXPRESSION_DELIMS[] = {
-    INK_TT_EOF,
+    INK_TT_DOUBLE_QUOTE, INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE,
+    INK_TT_NL,           INK_TT_EOF,
 };
 
 static const enum ink_token_type INK_BRACE_DELIMS[] = {
@@ -178,6 +179,11 @@ static const enum ink_token_type INK_BRACE_DELIMS[] = {
 static const enum ink_token_type INK_CHOICE_DELIMS[] = {
     INK_TT_LEFT_BRACE,    INK_TT_RIGHT_BRACE, INK_TT_LEFT_BRACKET,
     INK_TT_RIGHT_BRACKET, INK_TT_EOF,
+};
+
+static const enum ink_token_type INK_STRING_DELIMS[] = {
+    INK_TT_DOUBLE_QUOTE, INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE,
+    INK_TT_NL,           INK_TT_EOF,
 };
 
 /**
@@ -289,18 +295,17 @@ static void ink_parser_cache_cleanup(struct ink_parser_cache *cache)
 }
 
 /**
- * TODO(Brett: Inline?
+ * TODO(Brett): Inline?
  */
-static unsigned int
-ink_parser_cache_key_hash(const struct ink_parser_cache_key *key)
+static unsigned int ink_parser_cache_key_hash(struct ink_parser_cache_key key)
 {
-    const size_t length = sizeof(*key);
-    const unsigned char *chars = (unsigned char *)key;
+    const size_t length = sizeof(key);
+    const unsigned char *bytes = (unsigned char *)&key;
     const unsigned int fnv_prime = 0x01000193;
     unsigned int hash = 0x811c9dc5;
 
     for (size_t i = 0; i < length; i++) {
-        hash = hash ^ chars[i];
+        hash = hash ^ bytes[i];
         hash = hash * fnv_prime;
     }
     return hash;
@@ -346,8 +351,7 @@ ink_parser_cache_key_compare(const struct ink_parser_cache_key *a,
 
 static struct ink_parser_cache_entry *
 ink_parser_cache_find_slot(struct ink_parser_cache_entry *entries,
-                           size_t capacity,
-                           const struct ink_parser_cache_key *key)
+                           size_t capacity, struct ink_parser_cache_key key)
 {
     size_t i = ink_parser_cache_key_hash(key) & (capacity - 1);
 
@@ -355,7 +359,7 @@ ink_parser_cache_find_slot(struct ink_parser_cache_entry *entries,
         struct ink_parser_cache_entry *slot = &entries[i];
 
         if (!ink_parser_cache_entry_is_set(slot) ||
-            ink_parser_cache_key_compare(key, &slot->key)) {
+            ink_parser_cache_key_compare(&key, &slot->key)) {
             return slot;
         }
 
@@ -373,7 +377,7 @@ static int ink_parser_cache_resize(struct ink_parser_cache *cache)
 
     new_entries = malloc(new_size);
     if (new_entries == NULL) {
-        return -1;
+        return -INK_E_PARSE_PANIC;
     }
 
     memset(new_entries, 0, new_size);
@@ -384,7 +388,7 @@ static int ink_parser_cache_resize(struct ink_parser_cache *cache)
 
         if (ink_parser_cache_entry_is_set(src_entry)) {
             dst_entry = ink_parser_cache_find_slot(new_entries, new_capacity,
-                                                   &src_entry->key);
+                                                   src_entry->key);
             dst_entry->key = src_entry->key;
             dst_entry->value = src_entry->value;
             new_count++;
@@ -396,7 +400,7 @@ static int ink_parser_cache_resize(struct ink_parser_cache *cache)
     cache->count = new_count;
     cache->capacity = new_capacity;
     cache->entries = new_entries;
-    return 0;
+    return INK_E_OK;
 }
 
 /**
@@ -416,7 +420,7 @@ static int ink_parser_cache_lookup(const struct ink_parser_cache *cache,
         return -INK_E_PARSE_PANIC;
     }
 
-    entry = ink_parser_cache_find_slot(cache->entries, cache->capacity, &key);
+    entry = ink_parser_cache_find_slot(cache->entries, cache->capacity, key);
     if (!ink_parser_cache_entry_is_set(entry)) {
         return -INK_E_PARSE_PANIC;
     }
@@ -442,7 +446,7 @@ int ink_parser_cache_insert(struct ink_parser_cache *cache, size_t token_index,
         ink_parser_cache_resize(cache);
     }
 
-    entry = ink_parser_cache_find_slot(cache->entries, cache->capacity, &key);
+    entry = ink_parser_cache_find_slot(cache->entries, cache->capacity, key);
     if (!ink_parser_cache_entry_is_set(entry)) {
         ink_parser_cache_entry_set(entry, &key, value);
         cache->count++;
@@ -828,17 +832,27 @@ static void ink_parser_set_context(struct ink_parser_context *context,
     context->token_index = token_index;
 
     switch (context->type) {
-    case INK_PARSE_CONTENT:
+    case INK_PARSE_CONTENT: {
         context->delims = INK_CONTENT_DELIMS;
         break;
-    case INK_PARSE_EXPRESSION:
+    }
+    case INK_PARSE_EXPRESSION: {
         context->delims = INK_EXPRESSION_DELIMS;
         break;
-    case INK_PARSE_BRACE:
+    }
+    case INK_PARSE_BRACE: {
         context->delims = INK_BRACE_DELIMS;
         break;
-    case INK_PARSE_CHOICE:
+    }
+    case INK_PARSE_CHOICE: {
         context->delims = INK_CHOICE_DELIMS;
+        break;
+    }
+    case INK_PARSE_STRING: {
+        context->delims = INK_STRING_DELIMS;
+        break;
+    }
+    default:
         break;
     }
 }
@@ -1174,10 +1188,46 @@ static struct ink_syntax_node *ink_parse_number(struct ink_parser *parser)
 
 static struct ink_syntax_node *ink_parse_string(struct ink_parser *parser)
 {
-    const size_t token_start = ink_parser_expect(parser, INK_TT_STRING);
+    size_t token_end;
+    const size_t token_start = parser->token_index;
 
-    return ink_parser_create_leaf(parser, INK_NODE_STRING_EXPR, token_start,
-                                  token_start);
+    while (!ink_context_delim(parser)) {
+        ink_parser_advance(parser);
+    }
+
+    token_end = parser->token_index;
+
+    if (token_start != token_end) {
+        token_end--;
+    }
+    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, token_start,
+                                  token_end);
+}
+
+static struct ink_syntax_node *ink_parse_string_expr(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t scratch_offset = parser->scratch.count;
+    const size_t token_start = ink_parser_expect(parser, INK_TT_DOUBLE_QUOTE);
+    size_t token_end;
+
+    do {
+        if (!ink_context_delim(parser)) {
+            INK_PARSER_RULE(node, ink_parse_string, parser);
+        } else if (ink_parser_check(parser, INK_TT_LEFT_BRACE)) {
+            INK_PARSER_RULE(node, ink_parse_brace_expr, parser);
+        } else {
+            break;
+        }
+
+        ink_parser_scratch_append(&parser->scratch, node);
+    } while (!ink_parser_check(parser, INK_TT_EOF) &&
+             !ink_parser_check(parser, INK_TT_DOUBLE_QUOTE));
+
+    token_end = ink_parser_expect(parser, INK_TT_DOUBLE_QUOTE);
+
+    return ink_parser_create_sequence(parser, INK_NODE_STRING_EXPR, token_start,
+                                      token_end, scratch_offset);
 }
 
 static struct ink_syntax_node *ink_parse_identifier(struct ink_parser *parser)
@@ -1212,8 +1262,12 @@ static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *parser)
             INK_PARSER_RULE(node, ink_parse_identifier, parser);
             break;
         }
-
-        INK_PARSER_RULE(node, ink_parse_string, parser);
+        break;
+    }
+    case INK_TT_DOUBLE_QUOTE: {
+        ink_parser_push_context(parser, INK_PARSE_STRING);
+        INK_PARSER_RULE(node, ink_parse_string_expr, parser);
+        ink_parser_pop_context(parser);
         break;
     }
     case INK_TT_LEFT_PAREN: {

@@ -84,6 +84,7 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     }
 
     switch (node->type) {
+    case INK_NODE_STRING_LITERAL:
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:

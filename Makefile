@@ -18,7 +18,7 @@ CFLAGS  := -Wall                       \
 
 LDFLAGS := -fno-omit-frame-pointer     \
            -fsanitize=address          \
-           -fsanitize=undefined
+           -fsanitize=undefined        \
 
 SRCS := src/main.c                     \
         src/util.c                     \

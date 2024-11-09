@@ -53,6 +53,7 @@ struct ink_syntax_node;
     T(NODE_OR_EXPR, "OrExpr")                                                  \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
+    T(NODE_STRING_LITERAL, "StringLiteral")                                    \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
     T(NODE_TRUE_EXPR, "TrueExpr")                                              \
     T(NODE_VAR_DECL, "VarDecl")                                                \
