@@ -88,15 +88,11 @@ struct ink_parser_cache {
  * state information is maintained. A stack of "indentation" levels is also
  * maintained to handle context-sensitive block delimiters.
  *
- * TODO(Brett): Optimize backtracking with memoization.
- *
  * TODO(Brett): Decide if the stacks should be dynamically-sized.
  *
  * TODO(Brett): Describe the error recovery strategy.
  *
  * TODO(Brett): Describe expression parsing.
- *
- * TODO(Brett): Describe why we didn't use a PEG parser.
  *
  * TODO(Brett): Determine if `pending` is actually required in its current form.
  *              The preceived need for it arose from diving into the CPython
