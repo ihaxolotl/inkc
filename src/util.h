@@ -9,6 +9,7 @@ extern "C" {
 
 extern bool ink_is_alpha(unsigned char c);
 extern bool ink_is_digit(unsigned char c);
+extern bool ink_is_identifier(unsigned char c);
 
 #ifdef __cplusplus
 }

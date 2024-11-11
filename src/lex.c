@@ -137,7 +137,7 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             break;
         }
         case INK_LEX_CONTENT: {
-            if (!ink_is_alpha(c) && !ink_is_digit(c)) {
+            if (!ink_is_identifier(c)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }
