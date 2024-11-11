@@ -14,6 +14,7 @@ enum ink_lex_state {
     INK_LEX_COMMENT_BLOCK,
     INK_LEX_COMMENT_BLOCK_STAR,
     INK_LEX_WHITESPACE,
+    INK_LEX_NEWLINE,
 };
 
 static void ink_scan_next(struct ink_lexer *lexer)
@@ -23,11 +24,12 @@ static void ink_scan_next(struct ink_lexer *lexer)
 
 void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
 {
+    unsigned char c;
     enum ink_lex_state state = INK_LEX_START;
     const struct ink_source *source = lexer->source;
 
     for (;;) {
-        const unsigned char c = source->bytes[lexer->cursor_offset];
+        c = source->bytes[lexer->cursor_offset];
 
         if (lexer->cursor_offset >= source->length) {
             token->type = INK_TT_EOF;
@@ -43,9 +45,8 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                 goto exit_loop;
             }
             case '\n': {
-                token->type = INK_TT_NL;
-                ink_scan_next(lexer);
-                goto exit_loop;
+                state = INK_LEX_NEWLINE;
+                break;
             }
             case ' ':
             case '\t': {
@@ -131,6 +132,7 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
                     ink_scan_next(lexer);
                     goto exit_loop;
                 }
+                break;
             }
             break;
         }
@@ -166,10 +168,15 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
         }
         case INK_LEX_COMMENT_LINE: {
             switch (c) {
-            case '\0':
-            case '\n':
+            case '\0': {
                 state = INK_LEX_START;
-                continue;
+                break;
+            }
+            case '\n': {
+                state = INK_LEX_START;
+                lexer->is_line_start = true;
+                break;
+            }
             default:
                 break;
             }
@@ -208,8 +215,25 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
             case '\t':
                 break;
             default:
+                if (lexer->is_line_start) {
+                    state = INK_LEX_START;
+                    break;
+                }
                 token->type = INK_TT_WHITESPACE;
                 goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_NEWLINE: {
+            if (c != '\n') {
+                if (lexer->is_line_start) {
+                    lexer->is_line_start = false;
+                    state = INK_LEX_START;
+                    continue;
+                } else {
+                    token->type = INK_TT_NL;
+                    goto exit_loop;
+                }
             }
             break;
         }
@@ -221,6 +245,10 @@ void ink_token_next(struct ink_lexer *lexer, struct ink_token *token)
         ink_scan_next(lexer);
     }
 exit_loop:
+    if (lexer->is_line_start) {
+        lexer->is_line_start = false;
+    }
+
     token->start_offset = lexer->start_offset;
     token->end_offset = lexer->cursor_offset;
 }

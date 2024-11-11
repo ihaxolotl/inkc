@@ -157,6 +157,7 @@ static const char *INK_CONTEXT_TYPE_STR[] = {
 static const enum ink_token_type INK_CONTENT_DELIMS[] = {
     INK_TT_LEFT_BRACE,
     INK_TT_RIGHT_BRACE,
+    INK_TT_NL,
     INK_TT_EOF,
 };
 
@@ -166,15 +167,12 @@ static const enum ink_token_type INK_EXPRESSION_DELIMS[] = {
 };
 
 static const enum ink_token_type INK_BRACE_DELIMS[] = {
-    INK_TT_LEFT_BRACE,
-    INK_TT_RIGHT_BRACE,
-    INK_TT_PIPE,
-    INK_TT_EOF,
+    INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE, INK_TT_PIPE, INK_TT_NL, INK_TT_EOF,
 };
 
 static const enum ink_token_type INK_CHOICE_DELIMS[] = {
     INK_TT_LEFT_BRACE,    INK_TT_RIGHT_BRACE, INK_TT_LEFT_BRACKET,
-    INK_TT_RIGHT_BRACKET, INK_TT_EOF,
+    INK_TT_RIGHT_BRACKET, INK_TT_NL,          INK_TT_EOF,
 };
 
 static const enum ink_token_type INK_STRING_DELIMS[] = {
@@ -907,6 +905,9 @@ static bool ink_context_delim(struct ink_parser *parser)
 {
     const struct ink_parser_context *context = ink_parser_context(parser);
 
+    if (ink_parser_check(parser, INK_TT_EOF)) {
+        return true;
+    }
     for (size_t i = 0; context->delims[i] != INK_TT_EOF; i++) {
         if (ink_parser_check(parser, context->delims[i])) {
             return true;
@@ -1134,6 +1135,7 @@ static int ink_parser_initialize(struct ink_parser *parser,
     parser->arena = arena;
     parser->tokens = &tree->tokens;
     parser->lexer.source = source;
+    parser->lexer.is_line_start = true;
     parser->lexer.start_offset = 0;
     parser->lexer.cursor_offset = 0;
     parser->panic_mode = false;

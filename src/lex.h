@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #define INK_PARSE_DEPTH 128
@@ -81,6 +82,7 @@ struct ink_token {
 
 struct ink_lexer {
     const struct ink_source *source;
+    bool is_line_start;
     size_t cursor_offset;
     size_t start_offset;
 };

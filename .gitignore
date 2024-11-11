@@ -3,10 +3,13 @@
 #
 
 # Directories
+.cache/
 dist/
+__pycache__/
 
 # Temporary Files / Logs
 *.log
+.gdb_history
 
 # Prerequisites
 *.d
