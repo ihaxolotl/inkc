@@ -6,9 +6,9 @@ This document describes the current state of Ink language compatibility, as dete
 - [ ] I002: Fogg comforts Passepartout
 - [ ] I003: Tunnel to death
 - [ ] I004: Print number as English
-- [ ] I005: Const variable
+- [x] I005: Const variable
 - [ ] I006: Multiple constant references
-- [ ] I007: Set non existant variable
+- [x] I007: Set non existant variable
 - [ ] I008: Temp global conflict
 - [ ] I009: Temp usage in options
 - [ ] I010: Temp not found
@@ -23,7 +23,7 @@ This document describes the current state of Ink language compatibility, as dete
 - [ ] I019: End of content
 - [ ] I020: Escape Character
 - [ ] I021: Identifiers can start with numbers
-- [ ] I022: Quote character significance
+- [x] I022: Quote character significance
 - [ ] I023: Whitespace
 - [ ] I024: Includes
 - [ ] I025: Nested Includes
