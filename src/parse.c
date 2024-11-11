@@ -1367,7 +1367,7 @@ ink_parse_content_string(struct ink_parser *parser)
     if (token_start != token_end) {
         token_end--;
     }
-    return ink_parser_create_leaf(parser, INK_NODE_STRING_EXPR, token_start,
+    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, token_start,
                                   token_end);
 }
 
