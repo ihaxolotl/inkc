@@ -52,6 +52,225 @@ This document describes the current state of Ink language compatibility, as dete
 - [ ] I048: Simple glue
 - [ ] I049: Strings in choices
 - [ ] I050: String contains
-... lots more ...
+- [ ] I051: String constants
+- [ ] I052: String type coercion
+- [ ] I053: Tunnel onwards divert override
+- [ ] I054: Basic tunnel
+- [ ] I055: Same line divert is inline
+- [ ] I056: Divert targets with parameters
+- [ ] I057: Tunnel onwards after tunnel
+- [ ] I058: Compare divert targets
+- [ ] I059: Tunnel vs thread behaviour
+- [ ] I060: Tunnel onwards divert after with arg
+- [ ] I061: Divert in conditional
+- [ ] I062: Complex tunnels
+- [ ] I063: Divert to weave points
+- [ ] I064: Done stops thread
+- [ ] I065: Tunnel onwards with param default choice
+- [ ] I066: Path to self
+- [ ] I067: List save load
+- [ ] I068: List range
+- [ ] I069: More list operations
+- [ ] I070: List mixed items
+- [ ] I071: List basic operations
+- [ ] I072: Empty list origin after assignment
+- [ ] I073: Empty list origin
+- [ ] I074: List random
+- [ ] I075: Clean callstack reset on path choice
+- [ ] I076: Call stack evaluation
+- [ ] I077: Fallback choice on thread
+- [ ] I078: Choice with brackets only
+- [ ] I079: Once only choices can link back to self
+- [ ] I080: Has read on choice
+- [ ] I081: Gather choice same line
+- [ ] I082: Choice diverts to done
+- [ ] I083: Choice thread forking
+- [ ] I084: Sticky choices stay sticky
+- [ ] I085: Logic in choices
+- [ ] I086: Default simple gather
+- [ ] I087: Non text in choice inner content
+- [ ] I088: Conditional choices
+- [ ] I089: Once only choices with own content
+- [ ] I090: Various default choices
+- [ ] I091: Choice count
+- [ ] I092: Should not gather due to choice
+- [ ] I093: Default choices
+- [ ] I094: Print num
+- [ ] I095: Multiline logic with glue
+- [ ] I096: Nested pass by reference
+- [ ] I097: Logic lines with newlines
+- [ ] I098: Knot thread interaction 2
+- [ ] I099: Tags
+- [ ] I100: Tags on choice
+- [ ] I101: Thread in logic
+- [ ] I102: Top flow terminator should not kill thread choices
+- [ ] I103: Thread done
+- [ ] I104: Multi thread
+- [ ] I105: List comparison
+- [ ] I106: All sequence types
+- [ ] I107: Shuffle stack muddying
+- [ ] I108: Blanks in inline sequences
+- [ ] I109: Gather read count with initial sequence
+- [ ] I110: Leading newline multiline sequence
+- [ ] I111: Empty sequence content
+- [ ] I112: All switch branches fail is clean
+- [ ] I113: Else branches
+- [ ] I114: Conditionals
+- [ ] I115: Empty multiline conditional branch
+- [ ] I116: Trivial condition
+- [ ] I117: Factorial recursive
+- [ ] I118: Literal unary
+- [ ] I119: Basic string literals
+- [ ] I120: Evaluating ink functions from game
+- [ ] I121: Arithmetic
+- [ ] I122: Evaluation stack leaks
+- [ ] I123: Factorial by reference
+- [ ] I124: Evaluating ink functions from game 2
+- [ ] I125: Increment
+- [ ] I126: Evaluating function variable state bug
+- [ ] I127: Variable observer
+- [ ] I128: Knot stitch gather counts
+- [ ] I129: Knot do not gather
+- [ ] I130: Knot thread interaction
+- [ ] I131: Knot and variable with same name
+- [ ] I132: Comparing diverts
+- [ ] I133: Float printing precision
+- [ ] I134: Native bools
+- [ ] I135: Bools can be coerced
 
 ## Code Generation
+- [ ] I001: Minimal Story
+- [ ] I002: Fogg comforts Passepartout
+- [ ] I003: Tunnel to death
+- [ ] I004: Print number as English
+- [ ] I005: Const variable
+- [ ] I006: Multiple constant references
+- [ ] I007: Set non existant variable
+- [ ] I008: Temp global conflict
+- [ ] I009: Temp usage in options
+- [ ] I010: Temp not found
+- [ ] I011: Temporaries at global scope
+- [ ] I012: Variable declaration in conditional
+- [ ] I013: Variable divert target
+- [ ] I014: Variable swap recurse
+- [ ] I015: Variable tunnel
+- [ ] I016: Empty
+- [ ] I017: End
+- [ ] I018: End, the return of the end
+- [ ] I019: End of content
+- [ ] I020: Escape Character
+- [ ] I021: Identifiers can start with numbers
+- [ ] I022: Quote character significance
+- [ ] I023: Whitespace
+- [ ] I024: Includes
+- [ ] I025: Nested Includes
+- [ ] I026: Floor, ceiling and casts
+- [ ] I027: Read count across callstack
+- [ ] I028: Read count accross threads
+- [ ] I029: Read count dot seperated path
+- [ ] I030: Nested turns since
+- [ ] I031: Read count variable target
+- [ ] I032: List comparison
+- [ ] I033: Newline consistency, the first
+- [ ] I034: Newline consistency, the second
+- [ ] I035: Newline consistency, the third
+- [ ] I036: Newlines with string eval
+- [ ] I037: Newline at start of multiline conditional
+- [ ] I038: Conditional choice in weave
+- [ ] I039: Conditional choice in weave, the second
+- [ ] I040: Unbalanced weave indentation
+- [ ] I041: Weave gathers
+- [ ] I042: Weave options
+- [ ] I043: Weaves within sequence
+- [ ] I044: Implicit inline glue c
+- [ ] I045: Implicit inline glue b
+- [ ] I046: Left right glue matching
+- [ ] I047: Implicit inline glue
+- [ ] I048: Simple glue
+- [ ] I049: Strings in choices
+- [ ] I050: String contains
+- [ ] I051: String constants
+- [ ] I052: String type coercion
+- [ ] I053: Tunnel onwards divert override
+- [ ] I054: Basic tunnel
+- [ ] I055: Same line divert is inline
+- [ ] I056: Divert targets with parameters
+- [ ] I057: Tunnel onwards after tunnel
+- [ ] I058: Compare divert targets
+- [ ] I059: Tunnel vs thread behaviour
+- [ ] I060: Tunnel onwards divert after with arg
+- [ ] I061: Divert in conditional
+- [ ] I062: Complex tunnels
+- [ ] I063: Divert to weave points
+- [ ] I064: Done stops thread
+- [ ] I065: Tunnel onwards with param default choice
+- [ ] I066: Path to self
+- [ ] I067: List save load
+- [ ] I068: List range
+- [ ] I069: More list operations
+- [ ] I070: List mixed items
+- [ ] I071: List basic operations
+- [ ] I072: Empty list origin after assignment
+- [ ] I073: Empty list origin
+- [ ] I074: List random
+- [ ] I075: Clean callstack reset on path choice
+- [ ] I076: Call stack evaluation
+- [ ] I077: Fallback choice on thread
+- [ ] I078: Choice with brackets only
+- [ ] I079: Once only choices can link back to self
+- [ ] I080: Has read on choice
+- [ ] I081: Gather choice same line
+- [ ] I082: Choice diverts to done
+- [ ] I083: Choice thread forking
+- [ ] I084: Sticky choices stay sticky
+- [ ] I085: Logic in choices
+- [ ] I086: Default simple gather
+- [ ] I087: Non text in choice inner content
+- [ ] I088: Conditional choices
+- [ ] I089: Once only choices with own content
+- [ ] I090: Various default choices
+- [ ] I091: Choice count
+- [ ] I092: Should not gather due to choice
+- [ ] I093: Default choices
+- [ ] I094: Print num
+- [ ] I095: Multiline logic with glue
+- [ ] I096: Nested pass by reference
+- [ ] I097: Logic lines with newlines
+- [ ] I098: Knot thread interaction 2
+- [ ] I099: Tags
+- [ ] I100: Tags on choice
+- [ ] I101: Thread in logic
+- [ ] I102: Top flow terminator should not kill thread choices
+- [ ] I103: Thread done
+- [ ] I104: Multi thread
+- [ ] I105: List comparison
+- [ ] I106: All sequence types
+- [ ] I107: Shuffle stack muddying
+- [ ] I108: Blanks in inline sequences
+- [ ] I109: Gather read count with initial sequence
+- [ ] I110: Leading newline multiline sequence
+- [ ] I111: Empty sequence content
+- [ ] I112: All switch branches fail is clean
+- [ ] I113: Else branches
+- [ ] I114: Conditionals
+- [ ] I115: Empty multiline conditional branch
+- [ ] I116: Trivial condition
+- [ ] I117: Factorial recursive
+- [ ] I118: Literal unary
+- [ ] I119: Basic string literals
+- [ ] I120: Evaluating ink functions from game
+- [ ] I121: Arithmetic
+- [ ] I122: Evaluation stack leaks
+- [ ] I123: Factorial by reference
+- [ ] I124: Evaluating ink functions from game 2
+- [ ] I125: Increment
+- [ ] I126: Evaluating function variable state bug
+- [ ] I127: Variable observer
+- [ ] I128: Knot stitch gather counts
+- [ ] I129: Knot do not gather
+- [ ] I130: Knot thread interaction
+- [ ] I131: Knot and variable with same name
+- [ ] I132: Comparing diverts
+- [ ] I133: Float printing precision
+- [ ] I134: Native bools
+- [ ] I135: Bools can be coerced
