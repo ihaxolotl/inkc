@@ -6,12 +6,17 @@
 
 #include "arena.h"
 #include "common.h"
-#include "lex.h"
 #include "logging.h"
 #include "parse.h"
 #include "platform.h"
 #include "tree.h"
-#include "util.h"
+
+struct ink_scanner {
+    const struct ink_source *source;
+    bool is_line_start;
+    size_t cursor_offset;
+    size_t start_offset;
+};
 
 /**
  * Scratch buffer for syntax tree nodes.
@@ -96,14 +101,14 @@ struct ink_parser_cache {
  *
  * TODO(Brett): Determine if `pending` is actually required in its current form.
  *              The preceived need for it arose from diving into the CPython
- *              lexer and its handling of indentation-based block delimiters.
+ *              scanner and its handling of indentation-based block delimiters.
  *
  * TODO(Brett): Add a logger v-table to the parser.
  */
 struct ink_parser {
     struct ink_arena *arena;
     struct ink_token_buffer *tokens;
-    struct ink_lexer lexer;
+    struct ink_scanner scanner;
     struct ink_parser_scratch scratch;
     struct ink_parser_cache cache;
     int flags;
@@ -179,6 +184,269 @@ static const enum ink_token_type INK_STRING_DELIMS[] = {
     INK_TT_DOUBLE_QUOTE, INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE,
     INK_TT_NL,           INK_TT_EOF,
 };
+
+enum ink_lex_state {
+    INK_LEX_START,
+    INK_LEX_CONTENT,
+    INK_LEX_DIGIT,
+    INK_LEX_SLASH,
+    INK_LEX_COMMENT_LINE,
+    INK_LEX_COMMENT_BLOCK,
+    INK_LEX_COMMENT_BLOCK_STAR,
+    INK_LEX_WHITESPACE,
+    INK_LEX_NEWLINE,
+};
+
+static bool ink_is_alpha(unsigned char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static bool ink_is_digit(unsigned char c)
+{
+    return (c >= '0' && c <= '9');
+}
+
+static bool ink_is_identifier(unsigned char c)
+{
+    return ink_is_alpha(c) || ink_is_digit(c) || c == '_';
+}
+
+static void ink_scan_next(struct ink_scanner *scanner)
+{
+    scanner->cursor_offset++;
+}
+
+void ink_token_next(struct ink_scanner *scanner, struct ink_token *token)
+{
+    unsigned char c;
+    enum ink_lex_state state = INK_LEX_START;
+    const struct ink_source *source = scanner->source;
+
+    for (;;) {
+        c = source->bytes[scanner->cursor_offset];
+
+        if (scanner->cursor_offset >= source->length) {
+            token->type = INK_TT_EOF;
+            break;
+        }
+        switch (state) {
+        case INK_LEX_START: {
+            scanner->start_offset = scanner->cursor_offset;
+
+            switch (c) {
+            case '\0': {
+                token->type = INK_TT_EOF;
+                goto exit_loop;
+            }
+            case '\n': {
+                state = INK_LEX_NEWLINE;
+                break;
+            }
+            case ' ':
+            case '\t': {
+                state = INK_LEX_WHITESPACE;
+                break;
+            }
+            case '"': {
+                token->type = INK_TT_DOUBLE_QUOTE;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '=': {
+                token->type = INK_TT_EQUAL;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '+': {
+                token->type = INK_TT_PLUS;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '-': {
+                token->type = INK_TT_MINUS;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '*': {
+                token->type = INK_TT_STAR;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '/': {
+                state = INK_LEX_SLASH;
+                break;
+            }
+            case '%': {
+                token->type = INK_TT_PERCENT;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '|': {
+                token->type = INK_TT_PIPE;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '(': {
+                token->type = INK_TT_LEFT_PAREN;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case ')': {
+                token->type = INK_TT_RIGHT_PAREN;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '[': {
+                token->type = INK_TT_LEFT_BRACKET;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case ']': {
+                token->type = INK_TT_RIGHT_BRACKET;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '{': {
+                token->type = INK_TT_LEFT_BRACE;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case '}': {
+                token->type = INK_TT_RIGHT_BRACE;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            default:
+                if (ink_is_alpha(c)) {
+                    state = INK_LEX_CONTENT;
+                } else if (ink_is_digit(c)) {
+                    state = INK_LEX_DIGIT;
+                } else {
+                    token->type = INK_TT_STRING;
+                    ink_scan_next(scanner);
+                    goto exit_loop;
+                }
+                break;
+            }
+            break;
+        }
+        case INK_LEX_CONTENT: {
+            if (!ink_is_identifier(c)) {
+                token->type = INK_TT_STRING;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_DIGIT: {
+            if (!ink_is_digit(c)) {
+                token->type = INK_TT_NUMBER;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_SLASH: {
+            switch (c) {
+            case '/': {
+                state = INK_LEX_COMMENT_LINE;
+                break;
+            }
+            case '*': {
+                state = INK_LEX_COMMENT_BLOCK;
+                break;
+            }
+            default:
+                token->type = INK_TT_SLASH;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_LINE: {
+            switch (c) {
+            case '\0': {
+                state = INK_LEX_START;
+                break;
+            }
+            case '\n': {
+                state = INK_LEX_START;
+                scanner->is_line_start = true;
+                break;
+            }
+            default:
+                break;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_BLOCK: {
+            switch (c) {
+            case '\0':
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            case '*':
+                state = INK_LEX_COMMENT_BLOCK_STAR;
+                break;
+            default:
+                break;
+            }
+            break;
+        }
+        case INK_LEX_COMMENT_BLOCK_STAR: {
+            switch (c) {
+            case '\0':
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            case '/':
+                state = INK_LEX_START;
+                break;
+            default:
+                state = INK_LEX_COMMENT_BLOCK;
+                break;
+            }
+            break;
+        }
+        case INK_LEX_WHITESPACE: {
+            switch (c) {
+            case ' ':
+            case '\t':
+                break;
+            default:
+                if (scanner->is_line_start) {
+                    state = INK_LEX_START;
+                    break;
+                }
+                token->type = INK_TT_WHITESPACE;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_NEWLINE: {
+            if (c != '\n') {
+                if (scanner->is_line_start) {
+                    scanner->is_line_start = false;
+                    state = INK_LEX_START;
+                    continue;
+                } else {
+                    token->type = INK_TT_NL;
+                    goto exit_loop;
+                }
+            }
+            break;
+        }
+        default:
+            /* Unreachable */
+            break;
+        }
+
+        ink_scan_next(scanner);
+    }
+exit_loop:
+    if (scanner->is_line_start) {
+        scanner->is_line_start = false;
+    }
+
+    token->start_offset = scanner->start_offset;
+    token->end_offset = scanner->cursor_offset;
+}
 
 /**
  * Initialize the parser's scratch storage.
@@ -754,7 +1022,7 @@ static void ink_parser_next_token(struct ink_parser *parser)
 {
     struct ink_token next;
 
-    ink_token_next(&parser->lexer, &next);
+    ink_token_next(&parser->scanner, &next);
     ink_token_buffer_append(parser->tokens, next);
 }
 
@@ -930,13 +1198,13 @@ static void *ink_parser_error(struct ink_parser *parser, const char *format,
 
     parser->panic_mode = true;
 
-    ink_token_print(parser->lexer.source, ink_parser_current_token(parser));
+    ink_token_print(parser->scanner.source, ink_parser_current_token(parser));
 
     return NULL;
 }
 
 /**
- * Advance the parser by retrieving the next token from the lexer.
+ * Advance the parser by retrieving the next token from the scanner.
  */
 static size_t ink_parser_advance(struct ink_parser *parser)
 {
@@ -1011,7 +1279,7 @@ static size_t ink_parser_expect(struct ink_parser *parser,
 static enum ink_token_type ink_parser_keyword(struct ink_parser *parser,
                                               const struct ink_token *token)
 {
-    const unsigned char *source = parser->lexer.source->bytes;
+    const unsigned char *source = parser->scanner.source->bytes;
     const unsigned char *lexeme = source + token->start_offset;
     const size_t length = token->end_offset - token->start_offset;
     enum ink_token_type type = token->type;
@@ -1057,7 +1325,7 @@ static enum ink_token_type ink_parser_keyword(struct ink_parser *parser,
 static bool ink_parser_identifier(const struct ink_parser *parser,
                                   const struct ink_token *token)
 {
-    const unsigned char *source = parser->lexer.source->bytes;
+    const unsigned char *source = parser->scanner.source->bytes;
     const unsigned char *lexeme = source + token->start_offset;
     const size_t length = token->end_offset - token->start_offset;
 
@@ -1135,10 +1403,10 @@ static int ink_parser_initialize(struct ink_parser *parser,
 {
     parser->arena = arena;
     parser->tokens = &tree->tokens;
-    parser->lexer.source = source;
-    parser->lexer.is_line_start = true;
-    parser->lexer.start_offset = 0;
-    parser->lexer.cursor_offset = 0;
+    parser->scanner.source = source;
+    parser->scanner.is_line_start = true;
+    parser->scanner.start_offset = 0;
+    parser->scanner.cursor_offset = 0;
     parser->panic_mode = false;
     parser->flags = flags;
     parser->pending = 0;

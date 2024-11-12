@@ -21,14 +21,12 @@ LDFLAGS := -fno-omit-frame-pointer     \
            -fsanitize=undefined        \
 
 SRCS := src/main.c                     \
-        src/util.c                     \
         src/logging.c                  \
         src/unix.c                     \
         src/platform.c                 \
         src/arena.c                    \
         src/source.c                   \
         src/tree.c                     \
-        src/lex.c                      \
         src/parse.c
 
 all: $(BUILD_ROOT) $(BUILD_TARGET)
