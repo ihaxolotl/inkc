@@ -1508,7 +1508,6 @@ static struct ink_syntax_node *ink_parse_string_expr(struct ink_parser *parser)
     struct ink_syntax_node *node = NULL;
     const size_t scratch_offset = parser->scratch.count;
     const size_t source_start = ink_parser_expect(parser, INK_TT_DOUBLE_QUOTE);
-    size_t source_end;
 
     do {
         if (!ink_context_delim(parser)) {
@@ -1523,9 +1522,10 @@ static struct ink_syntax_node *ink_parse_string_expr(struct ink_parser *parser)
     } while (!ink_parser_check(parser, INK_TT_EOF) &&
              !ink_parser_check(parser, INK_TT_DOUBLE_QUOTE));
 
-    source_end = ink_parser_expect(parser, INK_TT_DOUBLE_QUOTE);
+    ink_parser_expect(parser, INK_TT_DOUBLE_QUOTE);
     return ink_parser_create_sequence(parser, INK_NODE_STRING_EXPR,
-                                      source_start, source_end, scratch_offset);
+                                      source_start, parser->current_offset,
+                                      scratch_offset);
 }
 
 static struct ink_syntax_node *ink_parse_identifier(struct ink_parser *parser)
@@ -1562,6 +1562,7 @@ static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *parser)
     case INK_TT_DOUBLE_QUOTE: {
         ink_parser_push_context(parser, INK_PARSE_STRING);
         INK_PARSER_RULE(node, ink_parse_string_expr, parser);
+        ink_parser_eat(parser, INK_TT_WHITESPACE);
         ink_parser_pop_context(parser);
         break;
     }
