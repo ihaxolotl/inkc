@@ -1,17 +1,17 @@
 // RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
 
-// CHECK: File(LeadingToken: KeywordVar [0])
-// CHECK-NEXT: --BlockStmt(LeadingToken: KeywordVar [0])
-// CHECK-NEXT: ----VarDecl(LeadingToken: KeywordVar [0])
-// CHECK-NEXT: ------IdentifierExpr(LeadingToken: Identifier(`x`) [2])
-// CHECK-NEXT: ------IdentifierExpr(LeadingToken: Identifier(`c`) [6])
-// CHECK-NEXT: ----ConstDecl(LeadingToken: KeywordConst [8])
-// CHECK-NEXT: ------IdentifierExpr(LeadingToken: Identifier(`c`) [10])
-// CHECK-NEXT: ------NumberExpr(LeadingToken: Number(`5`) [14])
-// CHECK-NEXT: ----ContentStmt(LeadingToken: LeftBrace [16])
-// CHECK-NEXT: ------ContentExpr(LeadingToken: LeftBrace [16])
-// CHECK-NEXT: --------BraceExpr(LeadingToken: LeftBrace [16])
-// CHECK-NEXT: ----------IdentifierExpr(LeadingToken: Identifier(`x`) [17])
+// CHECK: File
+// CHECK-NEXT: --BlockStmt
+// CHECK-NEXT: ----VarDecl
+// CHECK-NEXT: ------IdentifierExpr `x `
+// CHECK-NEXT: ------IdentifierExpr `c`
+// CHECK-NEXT: ----ConstDecl
+// CHECK-NEXT: ------IdentifierExpr `c `
+// CHECK-NEXT: ------NumberExpr `5`
+// CHECK-NEXT: ----ContentStmt
+// CHECK-NEXT: ------ContentExpr
+// CHECK-NEXT: --------BraceExpr
+// CHECK-NEXT: ----------IdentifierExpr `x`
 
 VAR x = c
 CONST c = 5

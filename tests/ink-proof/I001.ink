@@ -1,9 +1,9 @@
 // RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
 
-// CHECK: File(LeadingToken: String [0])
-// CHECK-NEXT: --BlockStmt(LeadingToken: String [0])
-// CHECK-NEXT: ----ContentStmt(LeadingToken: String [0])
-// CHECK-NEXT: ------ContentExpr(LeadingToken: String [0])
-// CHECK-NEXT: --------StringLiteral(LeadingToken: String(`Hello, world!`) [0])
+// CHECK: File
+// CHECK-NEXT: --BlockStmt
+// CHECK-NEXT: ----ContentStmt
+// CHECK-NEXT: ------ContentExpr
+// CHECK-NEXT: --------StringLiteral `Hello, world!`
 
 Hello, world!

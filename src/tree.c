@@ -72,13 +72,11 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
-        printf("%s(Lexeme: `%.*s`, StartPosition: %zu, EndPosition: %zu)\n",
-               node_type_str, (int)lexeme_length, lexeme, node->start_offset,
-               node->end_offset);
+        printf("%s `%.*s`\n", node_type_str, (int)lexeme_length, lexeme);
         break;
     default:
-        printf("%s(StartPosition: %zu, EndPosition: %zu)\n", node_type_str,
-               node->start_offset, node->end_offset);
+        printf("%s\n", node_type_str);
+        break;
     }
 
     level++;
