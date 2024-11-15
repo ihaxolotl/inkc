@@ -51,36 +51,20 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
                                        const struct ink_syntax_node *node,
                                        int level)
 {
-    const char *node_type_str, *token_type_str;
+    const char *node_type_str;
     const unsigned char *lexeme, *bytes;
     size_t lexeme_length;
-    struct ink_token token_start, token_end;
-    const unsigned char empty[] = "\\n";
 
     if (node == NULL)
         return;
 
     bytes = tree->source->bytes;
-    token_start = tree->tokens.entries[node->start_token];
     node_type_str = ink_syntax_node_type_strz(node->type);
-    token_type_str = ink_token_type_strz(token_start.type);
-
-    if (token_start.type == INK_TT_NL) {
-        lexeme = empty;
-        lexeme_length = 2;
-    } else {
-        if (node->start_token == node->end_token) {
-            lexeme_length = token_start.end_offset - token_start.start_offset;
-        } else {
-            token_end = tree->tokens.entries[node->end_token];
-            lexeme_length = token_end.end_offset - token_start.start_offset;
-        }
-        lexeme = (unsigned char *)bytes + token_start.start_offset;
-    }
+    lexeme_length = node->end_offset - node->start_offset;
+    lexeme = bytes + node->start_offset;
 
     for (int i = 0; i < level; i++) {
-        putchar('-');
-        putchar('-');
+        printf("--");
     }
 
     switch (node->type) {
@@ -88,12 +72,13 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
-        printf("%s(LeadingToken: %s(`%.*s`) [%zu])\n", node_type_str,
-               token_type_str, (int)lexeme_length, lexeme, node->start_token);
+        printf("%s(Lexeme: `%.*s`, StartPosition: %zu, EndPosition: %zu)\n",
+               node_type_str, (int)lexeme_length, lexeme, node->start_offset,
+               node->end_offset);
         break;
     default:
-        printf("%s(LeadingToken: %s [%zu])\n", node_type_str, token_type_str,
-               node->start_token);
+        printf("%s(StartPosition: %zu, EndPosition: %zu)\n", node_type_str,
+               node->start_offset, node->end_offset);
     }
 
     level++;
@@ -228,21 +213,21 @@ void ink_token_buffer_print(const struct ink_source *source,
  */
 struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
-                    size_t start_token, size_t end_token,
+                    size_t start_offset, size_t end_offset,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
                     struct ink_syntax_seq *seq)
 {
     struct ink_syntax_node *node;
 
-    assert(start_token <= end_token);
+    assert(start_offset <= end_offset);
 
     node = ink_arena_allocate(arena, sizeof(*node));
     if (node == NULL)
         return NULL;
 
     node->type = type;
-    node->start_token = start_token;
-    node->end_token = end_token;
+    node->start_offset = start_offset;
+    node->end_offset = end_offset;
     node->lhs = lhs;
     node->rhs = rhs;
     node->seq = seq;

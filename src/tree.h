@@ -80,6 +80,12 @@ enum ink_token_type {
 };
 #undef T
 
+struct ink_token {
+    enum ink_token_type type;
+    size_t start_offset;
+    size_t end_offset;
+};
+
 #define INK_NODE(T)                                                            \
     T(NODE_FILE, "File")                                                       \
     T(NODE_ADD_EXPR, "AddExpr")                                                \
@@ -127,12 +133,6 @@ enum ink_syntax_node_type {
 };
 #undef T
 
-struct ink_token {
-    enum ink_token_type type;
-    size_t start_offset;
-    size_t end_offset;
-};
-
 /**
  * Sequence of syntax tree nodes.
  */
@@ -145,26 +145,27 @@ struct ink_syntax_seq {
  * Syntax tree node.
  *
  * Nodes do not directly store token information, instead opting to reference
- * them by index. A single node can span a range of tokens within the tokenized
- * buffer.
+ * source positions by index.
+ *
+ * TODO(Brett): Pack node data to reduce node size?
  */
 struct ink_syntax_node {
     /* Type of the syntax tree node */
     enum ink_syntax_node_type type;
 
-    /* Index into the tokenized buffer for the starting token. */
-    size_t start_token;
+    /* Starting offset within the source buffer */
+    size_t start_offset;
 
-    /* Index into the tokenized buffer for the closing token. */
-    size_t end_token;
+    /* Ending offset within the source buffer */
+    size_t end_offset;
 
-    /* Left-hand side for the grammar production. */
+    /* Left-hand side */
     struct ink_syntax_node *lhs;
 
-    /* Right-hand side for the grammar production. */
+    /* Right-hand side */
     struct ink_syntax_node *rhs;
 
-    /* TODO(Brett): Temporary? */
+    /* Sequence of children */
     struct ink_syntax_seq *seq;
 };
 
@@ -180,7 +181,8 @@ struct ink_token_buffer {
 /**
  * Syntax Tree.
  *
- * The syntax tree's memory is arranged for reasonably efficient storage.
+ * The syntax tree's memory is arranged for reasonably efficient
+ * storage.
  */
 struct ink_syntax_tree {
     const struct ink_source *source;
@@ -204,7 +206,7 @@ extern void ink_token_buffer_print(const struct ink_source *source,
 
 extern struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
-                    size_t token_start, size_t token_end,
+                    size_t start_offset, size_t end_offset,
                     struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
                     struct ink_syntax_seq *seq);
 
