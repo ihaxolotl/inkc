@@ -135,8 +135,8 @@ This document describes the current state of Ink language compatibility, as dete
 - [ ] I131: Knot and variable with same name
 - [ ] I132: Comparing diverts
 - [ ] I133: Float printing precision
-- [ ] I134: Native bools
-- [ ] I135: Bools can be coerced
+- [x] I134: Native bools
+- [x] I135: Bools can be coerced
 
 ## Code Generation
 - [ ] I001: Minimal Story

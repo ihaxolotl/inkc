@@ -188,6 +188,7 @@ enum ink_lex_state {
     INK_LEX_START,
     INK_LEX_SLASH,
     INK_LEX_EQUAL,
+    INK_LEX_BANG,
     INK_LEX_LESS_THAN,
     INK_LEX_GREATER_THAN,
     INK_LEX_WORD,
@@ -307,9 +308,8 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
                 break;
             }
             case '!': {
-                token->type = INK_TT_BANG;
-                ink_scan_next(scanner);
-                goto exit_loop;
+                state = INK_LEX_BANG;
+                break;
             }
             case '"': {
                 token->type = INK_TT_DOUBLE_QUOTE;
@@ -431,6 +431,17 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
             token->type = INK_TT_EQUAL;
             goto exit_loop;
         }
+        case INK_LEX_BANG: {
+            if (c == '=') {
+                token->type = INK_TT_BANG_EQUAL;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+
+            token->type = INK_TT_BANG;
+            goto exit_loop;
+        }
+
         case INK_LEX_LESS_THAN: {
             if (c == '=') {
                 token->type = INK_TT_LESS_EQUAL;
