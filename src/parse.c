@@ -194,6 +194,8 @@ enum ink_lex_state {
     INK_LEX_WORD,
     INK_LEX_IDENTIFIER,
     INK_LEX_NUMBER,
+    INK_LEX_NUMBER_DOT,
+    INK_LEX_NUMBER_DECIMAL,
     INK_LEX_WHITESPACE,
     INK_LEX_COMMENT_LINE,
     INK_LEX_COMMENT_BLOCK,
@@ -344,6 +346,11 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
                 ink_scan_next(scanner);
                 goto exit_loop;
             }
+            case '?': {
+                token->type = INK_TT_QUESTION;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
             case '|': {
                 token->type = INK_TT_PIPE;
                 ink_scan_next(scanner);
@@ -470,6 +477,24 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
             break;
         }
         case INK_LEX_NUMBER: {
+            if (c == '.') {
+                state = INK_LEX_NUMBER_DOT;
+            } else if (!ink_is_digit(c)) {
+                token->type = INK_TT_NUMBER;
+                goto exit_loop;
+            }
+            break;
+        }
+        case INK_LEX_NUMBER_DOT: {
+            if (!ink_is_digit(c)) {
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            } else {
+                state = INK_LEX_NUMBER_DECIMAL;
+            }
+            break;
+        }
+        case INK_LEX_NUMBER_DECIMAL: {
             if (!ink_is_digit(c)) {
                 token->type = INK_TT_NUMBER;
                 goto exit_loop;
@@ -975,6 +1000,8 @@ ink_token_infix_type(enum ink_token_type type)
         return INK_NODE_MUL_EXPR;
     case INK_TT_SLASH:
         return INK_NODE_DIV_EXPR;
+    case INK_TT_QUESTION:
+        return INK_NODE_CONTAINS_EXPR;
     case INK_TT_EQUAL:
         return INK_NODE_ASSIGN_EXPR;
     case INK_TT_EQUAL_EQUAL:
@@ -1012,6 +1039,7 @@ static inline enum ink_precedence ink_binding_power(enum ink_token_type type)
     case INK_TT_LESS_THAN:
     case INK_TT_GREATER_EQUAL:
     case INK_TT_GREATER_THAN:
+    case INK_TT_QUESTION:
         return INK_PREC_COMPARISON;
     case INK_TT_PLUS:
     case INK_TT_MINUS:
@@ -1838,7 +1866,13 @@ static struct ink_syntax_node *ink_parse_var(struct ink_parser *parser)
     ink_parser_expect(parser, INK_TT_EQUAL);
     INK_PARSER_RULE(rhs, ink_parse_expr, parser);
     ink_parser_pop_context(parser);
-    ink_parser_expect(parser, INK_TT_NL);
+
+    if (!ink_parser_check(parser, INK_TT_EOF) &&
+        !ink_parser_check(parser, INK_TT_NL)) {
+        ink_parser_error(parser, "Expected new line!");
+    }
+
+    ink_parser_advance(parser);
     return ink_parser_create_binary(parser, INK_NODE_VAR_DECL, source_start,
                                     parser->current_offset, lhs, rhs);
 }
@@ -1855,7 +1889,13 @@ static struct ink_syntax_node *ink_parse_const(struct ink_parser *parser)
     ink_parser_expect(parser, INK_TT_EQUAL);
     INK_PARSER_RULE(rhs, ink_parse_expr, parser);
     ink_parser_pop_context(parser);
-    ink_parser_expect(parser, INK_TT_NL);
+
+    if (!ink_parser_check(parser, INK_TT_EOF) &&
+        !ink_parser_check(parser, INK_TT_NL)) {
+        ink_parser_error(parser, "Expected new line!");
+    }
+
+    ink_parser_advance(parser);
     return ink_parser_create_binary(parser, INK_NODE_CONST_DECL, source_start,
                                     parser->current_offset, lhs, rhs);
 }
