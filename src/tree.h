@@ -41,11 +41,14 @@ struct ink_syntax_node;
     T(TT_KEYWORD_AND, "KeywordAnd")                                            \
     T(TT_KEYWORD_CONST, "KeywordConst")                                        \
     T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
+    T(TT_KEYWORD_FUNCTION, "KeywordFunction")                                  \
     T(TT_KEYWORD_MOD, "KeywordMod")                                            \
     T(TT_KEYWORD_NOT, "KeywordNot")                                            \
     T(TT_KEYWORD_OR, "KeywordOr")                                              \
+    T(TT_KEYWORD_RETURN, "KeywordReturn")                                      \
     T(TT_KEYWORD_TRUE, "KeywordTrue")                                          \
     T(TT_KEYWORD_VAR, "KeywordVar")                                            \
+    T(TT_LEFT_ARROW, "LeftArrow")                                              \
     T(TT_LEFT_BRACE, "LeftBrace")                                              \
     T(TT_LEFT_BRACKET, "LeftBracket")                                          \
     T(TT_LEFT_PAREN, "LeftParentheses")                                        \
@@ -90,9 +93,11 @@ struct ink_token {
     T(NODE_FILE, "File")                                                       \
     T(NODE_ADD_EXPR, "AddExpr")                                                \
     T(NODE_AND_EXPR, "AndExpr")                                                \
+    T(NODE_ARG_LIST, "ArgumentList")                                           \
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
     T(NODE_BLOCK_STMT, "BlockStmt")                                            \
     T(NODE_BRACE_EXPR, "BraceExpr")                                            \
+    T(NODE_CALL_EXPR, "CallExpr")                                              \
     T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_PLUS_BRANCH, "ChoicePlusBranch")                             \
     T(NODE_CHOICE_STAR_BRANCH, "ChoiceStarBranch")                             \
@@ -105,12 +110,16 @@ struct ink_token {
     T(NODE_CONDITIONAL_CHOICE_BRANCH, "ConditionalChoiceBranch")               \
     T(NODE_IDENTIFIER_EXPR, "IdentifierExpr")                                  \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
+    T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
+    T(NODE_EXPR_STMT, "ExprStmt")                                              \
     T(NODE_FALSE_EXPR, "FalseExpr")                                            \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
+    T(NODE_KNOT_DECL, "KnotDecl")                                              \
+    T(NODE_KNOT_PROTO, "KnotPrototype")                                        \
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
     T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
     T(NODE_MUL_EXPR, "MultiplyExpr")                                           \
@@ -120,10 +129,13 @@ struct ink_token {
     T(NODE_NOT_EXPR, "NotExpr")                                                \
     T(NODE_NUMBER_EXPR, "NumberExpr")                                          \
     T(NODE_OR_EXPR, "OrExpr")                                                  \
+    T(NODE_PARAM_LIST, "ParameterList")                                        \
+    T(NODE_RETURN_STMT, "ReturnStmt")                                          \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_STRING_LITERAL, "StringLiteral")                                    \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
+    T(NODE_THREAD_EXPR, "ThreadExpr")                                          \
     T(NODE_TRUE_EXPR, "TrueExpr")                                              \
     T(NODE_VAR_DECL, "VarDecl")                                                \
     T(NODE_INVALID, "Invalid")
