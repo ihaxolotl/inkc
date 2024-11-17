@@ -95,6 +95,7 @@ static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
                                        const char *prefix,
                                        const char **pointers)
 {
+    char output[1024];
     const char *node_type_str = ink_syntax_node_type_strz(node->type);
     const unsigned char *bytes = tree->source->bytes;
     const unsigned char *lexeme = bytes + node->start_offset;
@@ -107,13 +108,19 @@ static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
     case INK_NODE_IDENTIFIER_EXPR:
     case INK_NODE_PARAM_DECL:
     case INK_NODE_REF_PARAM_DECL:
-        printf("%s%s%s `%.*s`\n", prefix, pointers[0], node_type_str,
-               (int)lexeme_length, lexeme);
+        snprintf(output, sizeof(output), "%s `%.*s`", node_type_str,
+                 (int)lexeme_length, lexeme);
+        break;
+    case INK_NODE_FILE:
+        snprintf(output, sizeof(output), "%s \"%s\"", node_type_str,
+                 tree->source->filename);
         break;
     default:
-        printf("%s%s%s\n", prefix, pointers[0], node_type_str);
+        snprintf(output, sizeof(output), "%s", node_type_str);
         break;
     }
+
+    printf("%s%s%s\n", prefix, pointers[0], output);
 }
 
 /**
