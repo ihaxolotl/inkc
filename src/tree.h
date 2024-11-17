@@ -35,7 +35,7 @@ struct ink_syntax_node;
     T(TT_GLUE, "Glue")                                                         \
     T(TT_GREATER_EQUAL, "GreaterOrEqual")                                      \
     T(TT_GREATER_THAN, "GreaterThan")                                          \
-    T(TT_IDENTIFIER, "Identifier")                                             \
+    T(TT_IDENTIFIER, "Name")                                                   \
     T(TT_KEYWORD_AND, "KeywordAnd")                                            \
     T(TT_KEYWORD_CONST, "KeywordConst")                                        \
     T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
@@ -109,12 +109,12 @@ struct ink_token {
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
     T(NODE_LABELLED_CHOICE_BRANCH, "LabelledChoiceBranch")                     \
     T(NODE_CONDITIONAL_CHOICE_BRANCH, "ConditionalChoiceBranch")               \
-    T(NODE_IDENTIFIER_EXPR, "IdentifierExpr")                                  \
+    T(NODE_IDENTIFIER_EXPR, "Name")                                            \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_EXPR_STMT, "ExprStmt")                                              \
-    T(NODE_FALSE_EXPR, "FalseExpr")                                            \
+    T(NODE_FALSE_EXPR, "False")                                                \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
@@ -128,7 +128,7 @@ struct ink_token {
     T(NODE_NEGATE_EXPR, "NegateExpr")                                          \
     T(NODE_NOT_EQUAL_EXPR, "LogicalInequalityExpr")                            \
     T(NODE_NOT_EXPR, "NotExpr")                                                \
-    T(NODE_NUMBER_EXPR, "NumberExpr")                                          \
+    T(NODE_NUMBER_EXPR, "NumberLiteral")                                       \
     T(NODE_OR_EXPR, "OrExpr")                                                  \
     T(NODE_PARAM_LIST, "ParameterList")                                        \
     T(NODE_PARAM_DECL, "ParamDecl")                                            \
@@ -139,7 +139,7 @@ struct ink_token {
     T(NODE_STRING_LITERAL, "StringLiteral")                                    \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
     T(NODE_THREAD_EXPR, "ThreadExpr")                                          \
-    T(NODE_TRUE_EXPR, "TrueExpr")                                              \
+    T(NODE_TRUE_EXPR, "True")                                                  \
     T(NODE_VAR_DECL, "VarDecl")                                                \
     T(NODE_INVALID, "Invalid")
 

@@ -1,17 +1,16 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------StringLiteral `My name is "`
-// CHECK-NEXT: --------BraceExpr
-// CHECK-NEXT: ----------StringExpr `"J{"o"}e"`
-// CHECK-NEXT: ------------StringLiteral `J`
-// CHECK-NEXT: ------------BraceExpr
-// CHECK-NEXT: --------------StringExpr `"o"`
-// CHECK-NEXT: ----------------StringLiteral `o`
-// CHECK-NEXT: ------------StringLiteral `e`
-// CHECK-NEXT: --------StringLiteral `"`
+// CHECK: File "STDIN"
+// CHECK: `-- BlockStmt
+// CHECK:     `-- ContentStmt
+// CHECK:         +-- StringLiteral `My name is "`
+// CHECK:         +-- BraceExpr
+// CHECK:         |   `-- StringExpr `"J{"o"}e"`
+// CHECK:         |       +-- StringLiteral `J`
+// CHECK:         |       +-- BraceExpr
+// CHECK:         |       |   `-- StringExpr `"o"`
+// CHECK:         |       |       `-- StringLiteral `o`
+// CHECK:         |       `-- StringLiteral `e`
+// CHECK:         `-- StringLiteral `"`
 
 My name is "{"J{"o"}e"}"

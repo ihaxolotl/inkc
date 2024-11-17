@@ -1,29 +1,24 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------DivertExpr
-// CHECK-NEXT: ----------IdentifierExpr `test`
-// CHECK-NEXT: --KnotDecl
-// CHECK-NEXT: ----KnotPrototype
-// CHECK-NEXT: ------IdentifierExpr `test`
-// CHECK-NEXT: ----BlockStmt
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------StringLiteral `hello`
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------DivertExpr
-// CHECK-NEXT: ------------IdentifierExpr `END`
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------StringLiteral `world`
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------DivertExpr
-// CHECK-NEXT: ------------IdentifierExpr `END`
+// CHECK: File "STDIN"
+// CHECK: +-- BlockStmt
+// CHECK: |   `-- ContentStmt
+// CHECK: |       `-- DivertExpr
+// CHECK: |           `-- Name `test`
+// CHECK: `-- KnotDecl
+// CHECK:     +-- KnotPrototype
+// CHECK:     |   `-- Name `test `
+// CHECK:     `-- BlockStmt
+// CHECK:         +-- ContentStmt
+// CHECK:         |   `-- StringLiteral `hello`
+// CHECK:         +-- ContentStmt
+// CHECK:         |   `-- DivertExpr
+// CHECK:         |       `-- Name `END`
+// CHECK:         +-- ContentStmt
+// CHECK:         |   `-- StringLiteral `world`
+// CHECK:         `-- ContentStmt
+// CHECK:             `-- DivertExpr
+// CHECK:                 `-- Name `END`
 
 -> test
 == test ==

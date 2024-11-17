@@ -1,18 +1,15 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----KnotDecl
-// CHECK-NEXT: ------KnotPrototype
-// CHECK-NEXT: --------IdentifierExpr `test`
-// CHECK-NEXT: ------BlockStmt
-// CHECK-NEXT: --------ContentStmt
-// CHECK-NEXT: ----------ContentExpr
-// CHECK-NEXT: ------------StringLiteral `Content`
-// CHECK-NEXT: --------ContentStmt
-// CHECK-NEXT: ----------ContentExpr
-// CHECK-NEXT: ------------DivertExpr
-// CHECK-NEXT: --------------IdentifierExpr `END`
+// CHECK: File "STDIN"
+// CHECK: `-- KnotDecl
+// CHECK:     +-- KnotPrototype
+// CHECK:     |   `-- Name `test `
+// CHECK:     `-- BlockStmt
+// CHECK:         +-- ContentStmt
+// CHECK:         |   `-- StringLiteral `Content`
+// CHECK:         `-- ContentStmt
+// CHECK:             `-- DivertExpr
+// CHECK:                 `-- Name `END`
 
 == test ==
 Content

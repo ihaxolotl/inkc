@@ -1,9 +1,8 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------StringLiteral `Hello, world!`
+// CHECK: File "STDIN"
+// CHECK: `-- BlockStmt
+// CHECK:    `-- ContentStmt
+// CHECK:        `-- StringLiteral `Hello, world!`
 
 Hello, world!
