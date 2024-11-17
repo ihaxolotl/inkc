@@ -72,6 +72,8 @@ static void ink_syntax_node_print_walk(const struct ink_syntax_tree *tree,
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_PARAM_DECL:
+    case INK_NODE_REF_PARAM_DECL:
         printf("%s `%.*s`\n", node_type_str, (int)lexeme_length, lexeme);
         break;
     default:

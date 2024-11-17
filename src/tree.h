@@ -133,6 +133,8 @@ struct ink_token {
     T(NODE_NUMBER_EXPR, "NumberExpr")                                          \
     T(NODE_OR_EXPR, "OrExpr")                                                  \
     T(NODE_PARAM_LIST, "ParameterList")                                        \
+    T(NODE_PARAM_DECL, "ParamDecl")                                            \
+    T(NODE_REF_PARAM_DECL, "RefParamDecl")                                     \
     T(NODE_RETURN_STMT, "ReturnStmt")                                          \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
