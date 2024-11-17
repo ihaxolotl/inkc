@@ -1465,14 +1465,20 @@ static enum ink_token_type ink_parser_keyword(struct ink_parser *parser,
             type = INK_TT_KEYWORD_MOD;
         } else if (memcmp(lexeme, "not", length) == 0) {
             type = INK_TT_KEYWORD_NOT;
+        } else if (memcmp(lexeme, "ref", length) == 0) {
+            type = INK_TT_KEYWORD_REF;
         } else if (memcmp(lexeme, "VAR", length) == 0) {
             type = INK_TT_KEYWORD_VAR;
         }
         break;
     }
     case 4: {
-        if (memcmp(lexeme, "true", length) == 0) {
+        if (memcmp(lexeme, "temp", length) == 0) {
+            type = INK_TT_KEYWORD_TEMP;
+        } else if (memcmp(lexeme, "true", length) == 0) {
             type = INK_TT_KEYWORD_TRUE;
+        } else if (memcmp(lexeme, "LIST", length) == 0) {
+            type = INK_TT_KEYWORD_LIST;
         }
         break;
     }

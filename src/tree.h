@@ -42,10 +42,13 @@ struct ink_syntax_node;
     T(TT_KEYWORD_CONST, "KeywordConst")                                        \
     T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
     T(TT_KEYWORD_FUNCTION, "KeywordFunction")                                  \
+    T(TT_KEYWORD_LIST, "KeywordList")                                          \
     T(TT_KEYWORD_MOD, "KeywordMod")                                            \
     T(TT_KEYWORD_NOT, "KeywordNot")                                            \
     T(TT_KEYWORD_OR, "KeywordOr")                                              \
+    T(TT_KEYWORD_REF, "KeywordRef")                                            \
     T(TT_KEYWORD_RETURN, "KeywordReturn")                                      \
+    T(TT_KEYWORD_TEMP, "KeywordTemp")                                          \
     T(TT_KEYWORD_TRUE, "KeywordTrue")                                          \
     T(TT_KEYWORD_VAR, "KeywordVar")                                            \
     T(TT_LEFT_ARROW, "LeftArrow")                                              \
