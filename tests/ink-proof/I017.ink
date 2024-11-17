@@ -4,14 +4,12 @@
 // CHECK: `-- BlockStmt
 // CHECK:     +-- ContentStmt
 // CHECK:     |   `-- StringLiteral `hello`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- DivertExpr
-// CHECK:     |       `-- Name `END`
+// CHECK:     +-- DivertStmt
+// CHECK:     |   `-- Name `END`
 // CHECK:     +-- ContentStmt
 // CHECK:     |   `-- StringLiteral `world`
-// CHECK:     `-- ContentStmt
-// CHECK:         `-- DivertExpr
-// CHECK:             `-- Name `END`
+// CHECK:     `-- DivertStmt
+// CHECK:         `-- Name `END`
 
 hello
 -> END

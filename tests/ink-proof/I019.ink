@@ -7,7 +7,7 @@
 // CHECK:     `-- BlockStmt
 // CHECK:         +-- ContentStmt
 // CHECK:         |   `-- StringLiteral `Content`
-// CHECK:         `-- ContentStmt
+// CHECK:         `-- DivertStmt
 // CHECK:             `-- DivertExpr
 // CHECK:                 `-- Name `END`
 

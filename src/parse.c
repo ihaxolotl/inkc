@@ -224,6 +224,7 @@ static struct ink_syntax_node *ink_parse_thread_expr(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_return_stmt(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *);
@@ -1765,11 +1766,7 @@ static struct ink_syntax_node *ink_parse_divert_expr(struct ink_parser *parser)
 
     ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
     ink_parser_expect(parser, INK_TT_RIGHT_ARROW);
-
-    if (ink_parser_check(parser, INK_TT_IDENTIFIER)) {
-        node = ink_parse_name_expr(parser);
-    }
-
+    node = ink_parse_name_expr(parser);
     ink_parser_pop_context(parser);
     return ink_parser_create_unary(parser, INK_NODE_DIVERT_EXPR, source_start,
                                    parser->current_offset, node);
@@ -1911,6 +1908,17 @@ static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
         INK_PARSER_RULE(node, ink_parse_thread_expr, parser);
     }
     return node;
+}
+
+static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t source_start = parser->current_offset;
+
+    INK_PARSER_RULE(node, ink_parse_divert_expr, parser);
+    ink_parser_expect_stmt_end(parser);
+    return ink_parser_create_unary(parser, INK_NODE_DIVERT_STMT, source_start,
+                                   parser->current_offset, node);
 }
 
 static struct ink_syntax_node *ink_parse_content(struct ink_parser *parser)
@@ -2217,6 +2225,10 @@ ink_parse_block_delimited(struct ink_parser *parser)
         }
         case INK_TT_TILDE: {
             INK_PARSER_RULE(node, ink_parse_expr_stmt, parser);
+            break;
+        }
+        case INK_TT_RIGHT_ARROW: {
+            INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
             break;
         }
         default:

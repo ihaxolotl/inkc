@@ -112,6 +112,7 @@ struct ink_token {
     T(NODE_IDENTIFIER_EXPR, "Name")                                            \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
+    T(NODE_DIVERT_STMT, "DivertStmt")                                          \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_EXPR_STMT, "ExprStmt")                                              \
     T(NODE_FALSE_EXPR, "False")                                                \

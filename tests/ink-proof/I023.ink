@@ -2,7 +2,7 @@
 
 // CHECK: File "STDIN"
 // CHECK: +-- BlockStmt
-// CHECK: |   `-- ContentStmt
+// CHECK: |   `-- DivertStmt
 // CHECK: |       `-- DivertExpr
 // CHECK: |           `-- Name `firstKnot`
 // CHECK: +-- KnotDecl
@@ -11,7 +11,7 @@
 // CHECK: |   `-- BlockStmt
 // CHECK: |       +-- ContentStmt
 // CHECK: |       |   `-- StringLiteral `Hello!`
-// CHECK: |       `-- ContentStmt
+// CHECK: |       `-- DivertStmt
 // CHECK: |           `-- DivertExpr
 // CHECK: |               `-- Name `anotherKnot`
 // CHECK: `-- KnotDecl
@@ -20,7 +20,7 @@
 // CHECK:     `-- BlockStmt
 // CHECK:         +-- ContentStmt
 // CHECK:         |   `-- StringLiteral `World.`
-// CHECK:         `-- ContentStmt
+// CHECK:         `-- DivertStmt
 // CHECK:             `-- DivertExpr
 // CHECK:                 `-- Name `END`
 
