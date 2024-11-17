@@ -10,8 +10,6 @@ extern "C" {
 #include "source.h"
 
 #define INK_PARSE_DEPTH 128
-#define INK_TOKEN_STREAM_MIN_COUNT 16
-#define INK_TOKEN_STREAM_GROWTH_FACTOR 2
 #define INK_SCRATCH_MIN_COUNT 16
 #define INK_SCRATCH_GROWTH_FACTOR 2
 
@@ -188,15 +186,6 @@ struct ink_syntax_node {
 };
 
 /**
- * Tokenized buffer.
- */
-struct ink_token_buffer {
-    size_t count;
-    size_t capacity;
-    struct ink_token *entries;
-};
-
-/**
  * Syntax Tree.
  *
  * The syntax tree's memory is arranged for reasonably efficient
@@ -204,7 +193,6 @@ struct ink_token_buffer {
  */
 struct ink_syntax_tree {
     const struct ink_source *source;
-    struct ink_token_buffer tokens;
     struct ink_syntax_node *root;
 };
 
@@ -212,15 +200,6 @@ extern const char *ink_token_type_strz(enum ink_token_type type);
 extern const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type);
 extern void ink_token_print(const struct ink_source *source,
                             const struct ink_token *token);
-
-extern void ink_token_buffer_initialize(struct ink_token_buffer *buffer);
-extern int ink_token_buffer_reserve(struct ink_token_buffer *buffer,
-                                    size_t count);
-extern int ink_token_buffer_append(struct ink_token_buffer *buffer,
-                                   struct ink_token token);
-extern void ink_token_buffer_cleanup(struct ink_token_buffer *buffer);
-extern void ink_token_buffer_print(const struct ink_source *source,
-                                   const struct ink_token_buffer *buffer);
 
 extern struct ink_syntax_node *
 ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
