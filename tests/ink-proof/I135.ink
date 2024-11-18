@@ -1,23 +1,21 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------BraceExpr
-// CHECK-NEXT: ----------AddExpr
-// CHECK-NEXT: ------------LogicalEqualityExpr
-// CHECK-NEXT: --------------NumberExpr `1 `
-// CHECK-NEXT: --------------NumberExpr `1`
-// CHECK-NEXT: ------------NumberExpr `1 `
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------BraceExpr
-// CHECK-NEXT: ----------SubtractExpr
-// CHECK-NEXT: ------------LogicalInequalityExpr
-// CHECK-NEXT: --------------NumberExpr `1 `
-// CHECK-NEXT: --------------NumberExpr `1`
-// CHECK-NEXT: ------------NumberExpr `1 `
+// CHECK: File "STDIN"
+// CHECK: `-- BlockStmt
+// CHECK:     +-- ContentStmt
+// CHECK:     |   `-- BraceExpr
+// CHECK:     |       `-- AddExpr
+// CHECK:     |           +-- LogicalEqualityExpr
+// CHECK:     |           |   +-- NumberLiteral `1 `
+// CHECK:     |           |   `-- NumberLiteral `1`
+// CHECK:     |           `-- NumberLiteral `1 `
+// CHECK:     `-- ContentStmt
+// CHECK:         `-- BraceExpr
+// CHECK:             `-- SubtractExpr
+// CHECK:                 +-- LogicalInequalityExpr
+// CHECK:                 |   +-- NumberLiteral `1 `
+// CHECK:                 |   `-- NumberLiteral `1`
+// CHECK:                 `-- NumberLiteral `1 `
 
 { (1 == 1) + 1 }
 { (1 != 1) - 1 }

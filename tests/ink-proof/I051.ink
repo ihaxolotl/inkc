@@ -1,18 +1,17 @@
 // RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------BraceExpr
-// CHECK-NEXT: ----------IdentifierExpr `x`
-// CHECK-NEXT: ----VarDecl
-// CHECK-NEXT: ------IdentifierExpr `x `
-// CHECK-NEXT: ------IdentifierExpr `kX`
-// CHECK-NEXT: ----ConstDecl
-// CHECK-NEXT: ------IdentifierExpr `kX `
-// CHECK-NEXT: ------StringExpr `"hi"`
-// CHECK-NEXT: --------StringLiteral `hi`
+// CHECK: File "STDIN"
+// CHECK: `-- BlockStmt
+// CHECK:     +-- ContentStmt
+// CHECK:     |   `-- BraceExpr
+// CHECK:     |       `-- Name `x`
+// CHECK:     +-- VarDecl
+// CHECK:     |   +-- Name `x `
+// CHECK:     |   `-- Name `kX`
+// CHECK:     `-- ConstDecl
+// CHECK:         +-- Name `kX `
+// CHECK:         `-- StringExpr `"hi"`
+// CHECK:             `-- StringLiteral `hi`
 
 {x}
 VAR x = kX

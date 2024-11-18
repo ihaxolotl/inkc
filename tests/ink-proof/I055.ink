@@ -1,31 +1,27 @@
-// RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File
-// CHECK-NEXT: --BlockStmt
-// CHECK-NEXT: ----ContentStmt
-// CHECK-NEXT: ------ContentExpr
-// CHECK-NEXT: --------DivertExpr
-// CHECK-NEXT: ----------IdentifierExpr `hurry_home`
-// CHECK-NEXT: --KnotDecl
-// CHECK-NEXT: ----KnotPrototype
-// CHECK-NEXT: ------IdentifierExpr `hurry_home`
-// CHECK-NEXT: ----BlockStmt
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------StringLiteral `We hurried home to Savile Row `
-// CHECK-NEXT: ----------DivertExpr
-// CHECK-NEXT: ------------IdentifierExpr `as_fast_as_we_could`
-// CHECK-NEXT: --KnotDecl
-// CHECK-NEXT: ----KnotPrototype
-// CHECK-NEXT: ------IdentifierExpr `as_fast_as_we_could`
-// CHECK-NEXT: ----BlockStmt
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------StringLiteral `as fast as we could.`
-// CHECK-NEXT: ------ContentStmt
-// CHECK-NEXT: --------ContentExpr
-// CHECK-NEXT: ----------DivertExpr
-// CHECK-NEXT: ------------IdentifierExpr `DONE`
+// CHECK: File "STDIN"
+// CHECK: +-- BlockStmt
+// CHECK: |   `-- DivertStmt
+// CHECK: |       `-- DivertExpr
+// CHECK: |           `-- Name `hurry_home`
+// CHECK: +-- KnotDecl
+// CHECK: |   +-- KnotPrototype
+// CHECK: |   |   `-- Name `hurry_home `
+// CHECK: |   `-- BlockStmt
+// CHECK: |       `-- ContentStmt
+// CHECK: |           +-- StringLiteral `We hurried home to Savile Row `
+// CHECK: |           `-- DivertExpr
+// CHECK: |               `-- Name `as_fast_as_we_could`
+// CHECK: `-- KnotDecl
+// CHECK:     +-- KnotPrototype
+// CHECK:     |   `-- Name `as_fast_as_we_could `
+// CHECK:     `-- BlockStmt
+// CHECK:         +-- ContentStmt
+// CHECK:         |   `-- StringLiteral `as fast as we could.`
+// CHECK:         `-- DivertStmt
+// CHECK:             `-- DivertExpr
+// CHECK:                 `-- Name `DONE`
 
 -> hurry_home
 === hurry_home ===
