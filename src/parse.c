@@ -932,63 +932,6 @@ ink_seq_from_scratch(struct ink_arena *arena,
 }
 
 /**
- * Create a new syntax tree node.
- */
-static inline struct ink_syntax_node *
-ink_parser_create_node(struct ink_parser *parser,
-                       enum ink_syntax_node_type type, size_t source_start,
-                       size_t source_end, struct ink_syntax_node *lhs,
-                       struct ink_syntax_node *rhs, struct ink_syntax_seq *seq)
-{
-    return ink_syntax_node_new(parser->arena, type, source_start, source_end,
-                               lhs, rhs, seq);
-}
-
-static inline struct ink_syntax_node *
-ink_parser_create_leaf(struct ink_parser *parser,
-                       enum ink_syntax_node_type type, size_t source_start,
-                       size_t source_end)
-{
-    return ink_parser_create_node(parser, type, source_start, source_end, NULL,
-                                  NULL, NULL);
-}
-
-static inline struct ink_syntax_node *
-ink_parser_create_unary(struct ink_parser *parser,
-                        enum ink_syntax_node_type type, size_t source_start,
-                        size_t source_end, struct ink_syntax_node *lhs)
-{
-    return ink_parser_create_node(parser, type, source_start, source_end, lhs,
-                                  NULL, NULL);
-}
-
-static inline struct ink_syntax_node *
-ink_parser_create_binary(struct ink_parser *parser,
-                         enum ink_syntax_node_type type, size_t source_start,
-                         size_t source_end, struct ink_syntax_node *lhs,
-                         struct ink_syntax_node *rhs)
-{
-    return ink_parser_create_node(parser, type, source_start, source_end, lhs,
-                                  rhs, NULL);
-}
-
-static inline struct ink_syntax_node *
-ink_parser_create_sequence(struct ink_parser *parser,
-                           enum ink_syntax_node_type type, size_t source_start,
-                           size_t source_end, size_t scratch_offset)
-{
-    struct ink_syntax_seq *seq = NULL;
-
-    if (parser->scratch.count != scratch_offset) {
-        seq = ink_seq_from_scratch(parser->arena, &parser->scratch,
-                                   scratch_offset, parser->scratch.count);
-        /* TODO(Brett): Handle and log error. */
-    }
-    return ink_parser_create_node(parser, type, source_start, source_end, NULL,
-                                  NULL, seq);
-}
-
-/**
  * Return a description of the current parsing context.
  */
 static inline const char *
@@ -1335,8 +1278,67 @@ static void *ink_parser_error(struct ink_parser *parser, const char *format,
     parser->panic_mode = true;
 
     ink_token_print(parser->scanner.source, ink_parser_current_token(parser));
-
     return NULL;
+}
+
+/**
+ * Create a new syntax tree node.
+ */
+static inline struct ink_syntax_node *
+ink_parser_create_node(struct ink_parser *parser,
+                       enum ink_syntax_node_type type, size_t source_start,
+                       size_t source_end, struct ink_syntax_node *lhs,
+                       struct ink_syntax_node *rhs, struct ink_syntax_seq *seq)
+{
+    if (type == INK_NODE_INVALID) {
+        ink_parser_error(parser, "Invalid parse!");
+    }
+    return ink_syntax_node_new(parser->arena, type, source_start, source_end,
+                               lhs, rhs, seq);
+}
+
+static inline struct ink_syntax_node *
+ink_parser_create_leaf(struct ink_parser *parser,
+                       enum ink_syntax_node_type type, size_t source_start,
+                       size_t source_end)
+{
+    return ink_parser_create_node(parser, type, source_start, source_end, NULL,
+                                  NULL, NULL);
+}
+
+static inline struct ink_syntax_node *
+ink_parser_create_unary(struct ink_parser *parser,
+                        enum ink_syntax_node_type type, size_t source_start,
+                        size_t source_end, struct ink_syntax_node *lhs)
+{
+    return ink_parser_create_node(parser, type, source_start, source_end, lhs,
+                                  NULL, NULL);
+}
+
+static inline struct ink_syntax_node *
+ink_parser_create_binary(struct ink_parser *parser,
+                         enum ink_syntax_node_type type, size_t source_start,
+                         size_t source_end, struct ink_syntax_node *lhs,
+                         struct ink_syntax_node *rhs)
+{
+    return ink_parser_create_node(parser, type, source_start, source_end, lhs,
+                                  rhs, NULL);
+}
+
+static inline struct ink_syntax_node *
+ink_parser_create_sequence(struct ink_parser *parser,
+                           enum ink_syntax_node_type type, size_t source_start,
+                           size_t source_end, size_t scratch_offset)
+{
+    struct ink_syntax_seq *seq = NULL;
+
+    if (parser->scratch.count != scratch_offset) {
+        seq = ink_seq_from_scratch(parser->arena, &parser->scratch,
+                                   scratch_offset, parser->scratch.count);
+        /* TODO(Brett): Handle and log error. */
+    }
+    return ink_parser_create_node(parser, type, source_start, source_end, NULL,
+                                  NULL, seq);
 }
 
 static enum ink_token_type ink_parser_keyword(struct ink_parser *parser,
