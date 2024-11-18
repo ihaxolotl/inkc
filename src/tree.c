@@ -151,10 +151,16 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
         const char **pointers = i == nodes.count - 1 ? INK_SYNTAX_TREE_FINAL
                                                      : INK_SYNTAX_TREE_INNER;
 
-        ink_syntax_tree_print_node(tree, nodes.entries[i], prefix, pointers);
         snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, pointers[1]);
-        ink_syntax_tree_print_walk(tree, nodes.entries[i], new_prefix,
-                                   pointers);
+
+        if (nodes.entries[i]) {
+            ink_syntax_tree_print_node(tree, nodes.entries[i], prefix,
+                                       pointers);
+            ink_syntax_tree_print_walk(tree, nodes.entries[i], new_prefix,
+                                       pointers);
+        } else {
+            printf("%s%sNullNode\n", prefix, pointers[0]);
+        }
     }
 
     ink_node_buffer_cleanup(&nodes);

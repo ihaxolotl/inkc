@@ -1980,13 +1980,22 @@ ink_parse_choice_content(struct ink_parser *parser)
     ink_parser_scratch_append(&parser->scratch, node);
 
     if (ink_parser_check(parser, INK_TT_LEFT_BRACKET)) {
+        ink_parser_advance(parser);
         INK_PARSER_RULE(node, ink_parse_content_string, parser);
         ink_parser_scratch_append(&parser->scratch, node);
         ink_parser_expect(parser, INK_TT_RIGHT_BRACKET);
-    }
 
-    INK_PARSER_RULE(node, ink_parse_content_string, parser);
-    ink_parser_scratch_append(&parser->scratch, node);
+        if (!ink_context_delim(parser)) {
+            INK_PARSER_RULE(node, ink_parse_content_string, parser);
+            ink_parser_scratch_append(&parser->scratch, node);
+        } else {
+            ink_parser_scratch_append(&parser->scratch, NULL);
+        }
+
+    } else {
+        ink_parser_scratch_append(&parser->scratch, NULL);
+        ink_parser_scratch_append(&parser->scratch, NULL);
+    }
     return ink_parser_create_sequence(parser, INK_NODE_CHOICE_CONTENT_EXPR,
                                       source_start, parser->current_offset,
                                       scratch_offset);
@@ -2001,9 +2010,9 @@ ink_parse_choice_branch(struct ink_parser *parser,
     const size_t source_start = parser->current_offset;
 
     ink_parser_eat_nesting(parser, ink_parser_token_type(parser), true);
-    /* ink_parser_push_context(parser, INK_PARSE_CHOICE); */
+    ink_parser_push_context(parser, INK_PARSE_CHOICE);
     INK_PARSER_RULE(expr, ink_parse_choice_content, parser);
-    /* ink_parser_pop_context(parser); */
+    ink_parser_pop_context(parser);
 
     if (ink_parser_check(parser, INK_TT_NL)) {
         ink_parser_advance(parser);
@@ -2138,8 +2147,8 @@ static struct ink_syntax_node *ink_parse_knot_proto(struct ink_parser *parser)
         rhs = ink_parse_parameter_list(parser);
     }
 
-    /* NOTE(Brett): Checking for `==` as a separate token is a hack, but I don't
-     * have any brighter ideas.
+    /* NOTE(Brett): Checking for `==` as a separate token is a hack, but
+     * I don't have any brighter ideas.
      */
     while (ink_parser_check(parser, INK_TT_EQUAL) ||
            ink_parser_check(parser, INK_TT_EQUAL_EQUAL)) {
@@ -2227,6 +2236,7 @@ ink_parse_block_delimited(struct ink_parser *parser)
                 ink_parser_eat_nesting(parser, token_type, true);
 
             ink_parser_rewind(parser, source_start);
+            ink_parser_advance(parser);
 
             if (level > parser->level_stack[parser->level_depth]) {
                 if (parser->level_depth + 1 >= INK_PARSE_DEPTH) {
