@@ -1,18 +1,19 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: `-- BlockStmt
-// CHECK:     +-- VarDecl
-// CHECK:     |   +-- Name `x `
-// CHECK:     |   `-- NumberLiteral `5`
-// CHECK:     +-- TempStmt
-// CHECK:     |   +-- Name `y `
-// CHECK:     |   `-- NumberLiteral `4`
-// CHECK:     `-- ContentStmt
-// CHECK:         +-- BraceExpr
-// CHECK:         |   `-- Name `x`
-// CHECK:         `-- BraceExpr
-// CHECK:             `-- Name `y`
+// CHECK-NEXT: `--BlockStmt
+// CHECK-NEXT:    +--VarDecl
+// CHECK-NEXT:    |  +--Name `x `
+// CHECK-NEXT:    |  `--NumberLiteral `5`
+// CHECK-NEXT:    +--TempStmt
+// CHECK-NEXT:    |  +--Name `y `
+// CHECK-NEXT:    |  `--NumberLiteral `4`
+// CHECK-NEXT:    `--ContentStmt
+// CHECK-NEXT:       `--ContentExpr
+// CHECK-NEXT:          +--BraceExpr
+// CHECK-NEXT:          |  `--Name `x`
+// CHECK-NEXT:          `--BraceExpr
+// CHECK-NEXT:             `--Name `y`
 
 VAR x = 5
 ~ temp y = 4

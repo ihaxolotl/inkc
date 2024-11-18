@@ -1,48 +1,55 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: `-- BlockStmt
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- AddExpr
-// CHECK:     |           +-- MultiplyExpr
-// CHECK:     |           |   +-- NumberLiteral `2 `
-// CHECK:     |           |   `-- NumberLiteral `3 `
-// CHECK:     |           `-- MultiplyExpr
-// CHECK:     |               +-- NumberLiteral `5 `
-// CHECK:     |               `-- NumberLiteral `6 `
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- ModExpr
-// CHECK:     |           +-- NumberLiteral `8 `
-// CHECK:     |           `-- NumberLiteral `3`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- ModExpr
-// CHECK:     |           +-- NumberLiteral `13 `
-// CHECK:     |           `-- NumberLiteral `5`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- DivideExpr
-// CHECK:     |           +-- NumberLiteral `7 `
-// CHECK:     |           `-- NumberLiteral `3 `
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- DivideExpr
-// CHECK:     |           +-- NumberLiteral `5 `
-// CHECK:     |           `-- NumberLiteral `2.0 `
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- SubtractExpr
-// CHECK:     |           +-- NumberLiteral `10 `
-// CHECK:     |           `-- NumberLiteral `2 `
-// CHECK:     `-- ContentStmt
-// CHECK:         `-- BraceExpr
-// CHECK:             `-- MultiplyExpr
-// CHECK:                 +-- NumberLiteral `2 `
-// CHECK:                 `-- SubtractExpr
-// CHECK:                     +-- NumberLiteral `5`
-// CHECK:                     `-- NumberLiteral `1`
+// CHECK-NEXT: `--BlockStmt
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--AddExpr
+// CHECK-NEXT:    |           +--MultiplyExpr
+// CHECK-NEXT:    |           |  +--NumberLiteral `2 `
+// CHECK-NEXT:    |           |  `--NumberLiteral `3 `
+// CHECK-NEXT:    |           `--MultiplyExpr
+// CHECK-NEXT:    |              +--NumberLiteral `5 `
+// CHECK-NEXT:    |              `--NumberLiteral `6 `
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--ModExpr
+// CHECK-NEXT:    |           +--NumberLiteral `8 `
+// CHECK-NEXT:    |           `--NumberLiteral `3`
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--ModExpr
+// CHECK-NEXT:    |           +--NumberLiteral `13 `
+// CHECK-NEXT:    |           `--NumberLiteral `5`
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--DivideExpr
+// CHECK-NEXT:    |           +--NumberLiteral `7 `
+// CHECK-NEXT:    |           `--NumberLiteral `3 `
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--DivideExpr
+// CHECK-NEXT:    |           +--NumberLiteral `5 `
+// CHECK-NEXT:    |           `--NumberLiteral `2.0 `
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--SubtractExpr
+// CHECK-NEXT:    |           +--NumberLiteral `10 `
+// CHECK-NEXT:    |           `--NumberLiteral `2 `
+// CHECK-NEXT:    `--ContentStmt
+// CHECK-NEXT:       `--ContentExpr
+// CHECK-NEXT:          `--BraceExpr
+// CHECK-NEXT:             `--MultiplyExpr
+// CHECK-NEXT:                +--NumberLiteral `2 `
+// CHECK-NEXT:                `--SubtractExpr
+// CHECK-NEXT:                   +--NumberLiteral `5`
+// CHECK-NEXT:                   `--NumberLiteral `1`
 
 { 2 * 3 + 5 * 6 }
 {8 mod 3}

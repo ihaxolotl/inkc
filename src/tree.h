@@ -103,6 +103,7 @@ struct ink_token {
     T(NODE_CHOICE_PLUS_BRANCH, "ChoicePlusBranch")                             \
     T(NODE_CHOICE_STAR_BRANCH, "ChoiceStarBranch")                             \
     T(NODE_CHOICE_CONTENT_EXPR, "ChoiceContentExpr")                           \
+    T(NODE_CONDITIONAL_STMT, "ConditionalStmt")                                \
     T(NODE_CONTAINS_EXPR, "ContainsExpr")                                      \
     T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \

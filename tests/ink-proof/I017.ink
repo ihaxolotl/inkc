@@ -1,15 +1,19 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: `-- BlockStmt
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- StringLiteral `hello`
-// CHECK:     +-- DivertStmt
-// CHECK:     |   `-- Name `END`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- StringLiteral `world`
-// CHECK:     `-- DivertStmt
-// CHECK:         `-- Name `END`
+// CHECK-NEXT: `--BlockStmt
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--StringLiteral `hello`
+// CHECK-NEXT:    +--DivertStmt
+// CHECK-NEXT:    |  `--DivertExpr
+// CHECK-NEXT:    |     `--Name `END`
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--StringLiteral `world`
+// CHECK-NEXT:    `--DivertStmt
+// CHECK-NEXT:       `--DivertExpr
+// CHECK-NEXT:          `--Name `END`
 
 hello
 -> END

@@ -209,24 +209,26 @@ static struct ink_syntax_node *ink_parse_false(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_number(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_string(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_identifier(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_sequence_expr(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_string(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_content(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_prefix_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_infix_expr(struct ink_parser *,
                                                     struct ink_syntax_node *,
                                                     enum ink_precedence);
-static struct ink_syntax_node *ink_parse_divert_expr(struct ink_parser *parser);
-static struct ink_syntax_node *ink_parse_thread_expr(struct ink_parser *parser);
+static struct ink_syntax_node *ink_parse_divert_expr(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_thread_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_expr(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_temp_stmt(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_return_stmt(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser);
-static struct ink_syntax_node *ink_parse_temp_stmt(struct ink_parser *parser);
-static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser);
+static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *);
+static struct ink_syntax_node *
+ink_parse_sequence_expr(struct ink_parser *, struct ink_syntax_node *);
+static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *);
@@ -252,8 +254,8 @@ static const enum ink_token_type INK_EXPRESSION_DELIMS[] = {
 
 static const enum ink_token_type INK_BRACE_DELIMS[] = {
     INK_TT_LEFT_BRACE,  INK_TT_LEFT_ARROW, INK_TT_RIGHT_BRACE,
-    INK_TT_RIGHT_ARROW, INK_TT_PIPE,       INK_TT_NL,
-    INK_TT_EOF,
+    INK_TT_RIGHT_ARROW, INK_TT_PIPE,       INK_TT_COLON,
+    INK_TT_NL,          INK_TT_EOF,
 };
 
 static const enum ink_token_type INK_CHOICE_DELIMS[] = {
@@ -322,6 +324,11 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
             }
             case '~': {
                 token->type = INK_TT_TILDE;
+                ink_scan_next(scanner);
+                goto exit_loop;
+            }
+            case ':': {
+                token->type = INK_TT_COLON;
                 ink_scan_next(scanner);
                 goto exit_loop;
             }
@@ -1613,6 +1620,28 @@ static struct ink_syntax_node *ink_parse_identifier(struct ink_parser *parser)
     return ink_parser_create_leaf(parser, INK_NODE_IDENTIFIER_EXPR,
                                   source_start, parser->current_offset);
 }
+static struct ink_syntax_node *ink_parse_string(struct ink_parser *parser)
+{
+    const size_t source_start = parser->current_offset;
+
+    while (!ink_context_delim(parser)) {
+        ink_parser_advance(parser);
+    }
+    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, source_start,
+                                  parser->current_offset);
+}
+
+static struct ink_syntax_node *
+ink_parse_content_string(struct ink_parser *parser)
+{
+    const size_t source_start = parser->current_offset;
+
+    while (!ink_context_delim(parser)) {
+        ink_parser_advance(parser);
+    }
+    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, source_start,
+                                  parser->current_offset);
+}
 
 static struct ink_syntax_node *ink_parse_name_expr(struct ink_parser *parser)
 {
@@ -1628,17 +1657,6 @@ static struct ink_syntax_node *ink_parse_name_expr(struct ink_parser *parser)
     rhs = ink_parse_argument_list(parser);
     return ink_parser_create_binary(parser, INK_NODE_CALL_EXPR, source_start,
                                     parser->current_offset, lhs, rhs);
-}
-
-static struct ink_syntax_node *ink_parse_string(struct ink_parser *parser)
-{
-    const size_t source_start = parser->current_offset;
-
-    while (!ink_context_delim(parser)) {
-        ink_parser_advance(parser);
-    }
-    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, source_start,
-                                  parser->current_offset);
 }
 
 static struct ink_syntax_node *ink_parse_string_expr(struct ink_parser *parser)
@@ -1837,85 +1855,6 @@ static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *parser)
     return node;
 }
 
-static struct ink_syntax_node *
-ink_parse_content_string(struct ink_parser *parser)
-{
-    const size_t source_start = parser->current_offset;
-
-    while (!ink_context_delim(parser)) {
-        ink_parser_advance(parser);
-    }
-    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, source_start,
-                                  parser->current_offset);
-}
-
-static struct ink_syntax_node *
-ink_parse_sequence_expr(struct ink_parser *parser)
-{
-    struct ink_syntax_node *node = NULL;
-    const size_t scratch_offset = parser->scratch.count;
-    const size_t source_start = parser->current_offset;
-
-    INK_PARSER_RULE(node, ink_parse_content_expr, parser);
-
-    if (!ink_parser_check(parser, INK_TT_PIPE)) {
-        /*
-         * Backtrack and parse primary expression.
-         */
-        ink_parser_rewind_context(parser);
-        ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
-        ink_parser_advance(parser);
-        INK_PARSER_RULE(node, ink_parse_expr, parser);
-        ink_parser_pop_context(parser);
-        return node;
-    } else {
-        ink_parser_scratch_append(&parser->scratch, node);
-
-        while (!ink_parser_check(parser, INK_TT_EOF) &&
-               !ink_parser_check(parser, INK_TT_NL) &&
-               !ink_parser_check(parser, INK_TT_RIGHT_BRACE)) {
-            if (ink_parser_check(parser, INK_TT_PIPE)) {
-                ink_parser_advance(parser);
-            }
-
-            INK_PARSER_RULE(node, ink_parse_content_expr, parser);
-            ink_parser_scratch_append(&parser->scratch, node);
-        }
-    }
-    return ink_parser_create_sequence(parser, INK_NODE_SEQUENCE_EXPR,
-                                      source_start, parser->current_offset,
-                                      scratch_offset);
-}
-
-static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *parser)
-{
-    struct ink_syntax_node *node = NULL;
-    const size_t source_start = ink_parser_expect(parser, INK_TT_LEFT_BRACE);
-
-    ink_parser_push_context(parser, INK_PARSE_BRACE);
-    INK_PARSER_RULE(node, ink_parse_sequence_expr, parser);
-    ink_parser_pop_context(parser);
-    ink_parser_expect(parser, INK_TT_RIGHT_BRACE);
-    return ink_parser_create_unary(parser, INK_NODE_BRACE_EXPR, source_start,
-                                   parser->current_offset, node);
-}
-
-static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
-{
-    struct ink_syntax_node *node = NULL;
-
-    if (!ink_context_delim(parser)) {
-        INK_PARSER_RULE(node, ink_parse_content_string, parser);
-    } else if (ink_parser_check(parser, INK_TT_LEFT_BRACE)) {
-        INK_PARSER_RULE(node, ink_parse_brace_expr, parser);
-    } else if (ink_parser_check(parser, INK_TT_RIGHT_ARROW)) {
-        INK_PARSER_RULE(node, ink_parse_divert_expr, parser);
-    } else if (ink_parser_check(parser, INK_TT_LEFT_ARROW)) {
-        INK_PARSER_RULE(node, ink_parse_thread_expr, parser);
-    }
-    return node;
-}
-
 static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser)
 {
     struct ink_syntax_node *node = NULL;
@@ -1951,7 +1890,168 @@ static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser)
                                    parser->current_offset, node);
 }
 
-static struct ink_syntax_node *ink_parse_content(struct ink_parser *parser)
+static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const enum ink_token_type token_type = ink_parser_token_type(parser);
+
+    if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_CONST)) {
+        INK_PARSER_RULE(node, ink_parse_const, parser);
+    } else if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_VAR)) {
+        INK_PARSER_RULE(node, ink_parse_var, parser);
+    } else {
+        switch (token_type) {
+        case INK_TT_TILDE: {
+            INK_PARSER_RULE(node, ink_parse_expr_stmt, parser);
+            break;
+        }
+        case INK_TT_LEFT_ARROW: {
+            INK_PARSER_RULE(node, ink_parse_thread_stmt, parser);
+            break;
+        }
+        case INK_TT_RIGHT_ARROW: {
+            INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
+            break;
+        }
+        default:
+            INK_PARSER_RULE(node, ink_parse_content_stmt, parser);
+            break;
+        }
+    }
+    return node;
+}
+
+static struct ink_syntax_node *
+ink_parse_conditional_branch(struct ink_parser *parser)
+{
+    struct ink_syntax_node *lhs = NULL;
+    struct ink_syntax_node *rhs = NULL;
+    const size_t source_start = parser->current_offset;
+
+    ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
+    ink_parser_advance(parser);
+    INK_PARSER_RULE(lhs, ink_parse_expr, parser);
+    ink_parser_pop_context(parser);
+    ink_parser_expect(parser, INK_TT_COLON);
+    INK_PARSER_RULE(rhs, ink_parse_stmt, parser);
+
+    return ink_parser_create_binary(parser, INK_NODE_EXPR_STMT, source_start,
+                                    parser->current_offset, lhs, rhs);
+}
+
+static struct ink_syntax_node *
+ink_parse_conditional_expr(struct ink_parser *parser,
+                           struct ink_syntax_node *expr)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t source_start = parser->current_offset;
+
+    if (ink_parser_check(parser, INK_TT_NL)) {
+        ink_parser_advance(parser);
+        ink_parser_eat(parser, INK_TT_WHITESPACE);
+        if (ink_parser_check(parser, INK_TT_MINUS)) {
+            INK_PARSER_RULE(node, ink_parse_conditional_branch, parser);
+        } else {
+            INK_PARSER_RULE(node, ink_parse_stmt, parser);
+        }
+    } else {
+        ink_parser_eat(parser, INK_TT_WHITESPACE);
+        INK_PARSER_RULE(node, ink_parse_content_expr, parser);
+        if (ink_parser_check(parser, INK_TT_PIPE)) {
+            ink_parser_advance(parser);
+            INK_PARSER_RULE(node, ink_parse_sequence_expr, parser, node);
+        }
+    }
+    return ink_parser_create_binary(parser, INK_NODE_CONDITIONAL_STMT,
+                                    source_start, parser->current_offset, expr,
+                                    node);
+}
+
+static struct ink_syntax_node *
+ink_parse_sequence_expr(struct ink_parser *parser,
+                        struct ink_syntax_node *first)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t scratch_offset = parser->scratch.count;
+    const size_t source_start = parser->current_offset;
+
+    if (first) {
+        ink_parser_scratch_append(&parser->scratch, first);
+    }
+    while (!ink_parser_check(parser, INK_TT_EOF) &&
+           !ink_parser_check(parser, INK_TT_NL)) {
+        INK_PARSER_RULE(node, ink_parse_content_expr, parser);
+        ink_parser_scratch_append(&parser->scratch, node);
+
+        if (ink_parser_check(parser, INK_TT_PIPE)) {
+            ink_parser_advance(parser);
+        } else if (ink_parser_check(parser, INK_TT_RIGHT_BRACE)) {
+            break;
+        }
+    }
+    return ink_parser_create_sequence(parser, INK_NODE_SEQUENCE_EXPR,
+                                      source_start, parser->current_offset,
+                                      scratch_offset);
+}
+
+static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t source_start = ink_parser_expect(parser, INK_TT_LEFT_BRACE);
+
+    ink_parser_push_context(parser, INK_PARSE_BRACE);
+    INK_PARSER_RULE(node, ink_parse_content_expr, parser);
+
+    if (ink_parser_check(parser, INK_TT_PIPE)) {
+        ink_parser_advance(parser);
+        INK_PARSER_RULE(node, ink_parse_sequence_expr, parser, node);
+    } else {
+        /*
+         * Backtrack and parse primary expression.
+         */
+        ink_parser_rewind_context(parser);
+        ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
+        ink_parser_advance(parser);
+        INK_PARSER_RULE(node, ink_parse_expr, parser);
+        ink_parser_pop_context(parser);
+
+        if (ink_parser_check(parser, INK_TT_COLON)) {
+            ink_parser_advance(parser);
+            INK_PARSER_RULE(node, ink_parse_conditional_expr, parser, node);
+        }
+    }
+    ink_parser_pop_context(parser);
+    ink_parser_expect(parser, INK_TT_RIGHT_BRACE);
+    return ink_parser_create_unary(parser, INK_NODE_BRACE_EXPR, source_start,
+                                   parser->current_offset, node);
+}
+
+static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t source_start = parser->current_offset;
+    const size_t scratch_offset = parser->scratch.count;
+
+    for (;;) {
+        if (!ink_context_delim(parser)) {
+            INK_PARSER_RULE(node, ink_parse_content_string, parser);
+        } else if (ink_parser_check(parser, INK_TT_LEFT_BRACE)) {
+            INK_PARSER_RULE(node, ink_parse_brace_expr, parser);
+        } else if (ink_parser_check(parser, INK_TT_RIGHT_ARROW)) {
+            INK_PARSER_RULE(node, ink_parse_divert_expr, parser);
+        } else if (ink_parser_check(parser, INK_TT_LEFT_ARROW)) {
+            INK_PARSER_RULE(node, ink_parse_thread_expr, parser);
+        } else {
+            break;
+        }
+        ink_parser_scratch_append(&parser->scratch, node);
+    }
+    return ink_parser_create_sequence(parser, INK_NODE_CONTENT_EXPR,
+                                      source_start, parser->current_offset,
+                                      scratch_offset);
+}
+
+static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *parser)
 {
     struct ink_syntax_node *node = NULL;
     const size_t source_start = parser->current_offset;
@@ -2224,61 +2324,42 @@ ink_parse_block_delimited(struct ink_parser *parser)
     const size_t source_start = parser->current_offset;
     const enum ink_token_type token_type = ink_parser_token_type(parser);
 
-    if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_CONST)) {
-        INK_PARSER_RULE(node, ink_parse_const, parser);
-    } else if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_VAR)) {
-        INK_PARSER_RULE(node, ink_parse_var, parser);
-    } else {
-        switch (token_type) {
-        case INK_TT_STAR:
-        case INK_TT_PLUS: {
-            const size_t level =
-                ink_parser_eat_nesting(parser, token_type, true);
+    switch (token_type) {
+    case INK_TT_STAR:
+    case INK_TT_PLUS: {
+        const size_t level = ink_parser_eat_nesting(parser, token_type, true);
 
-            ink_parser_rewind(parser, source_start);
-            ink_parser_advance(parser);
+        ink_parser_rewind(parser, source_start);
+        ink_parser_advance(parser);
 
-            if (level > parser->level_stack[parser->level_depth]) {
-                if (parser->level_depth + 1 >= INK_PARSE_DEPTH) {
-                    ink_parser_error(parser, "Level nesting is too deep.");
-                    return NULL;
-                }
-
-                parser->pending++;
-                parser->level_depth++;
-                parser->level_stack[parser->level_depth] = level;
-            } else if (level < parser->level_stack[parser->level_depth]) {
-                while (parser->level_depth > 0 &&
-                       level < parser->level_stack[parser->level_depth]) {
-                    parser->pending--;
-                    parser->level_depth--;
-                }
+        if (level > parser->level_stack[parser->level_depth]) {
+            if (parser->level_depth + 1 >= INK_PARSE_DEPTH) {
+                ink_parser_error(parser, "Level nesting is too deep.");
+                return NULL;
             }
-            if (parser->pending > 0) {
+
+            parser->pending++;
+            parser->level_depth++;
+            parser->level_stack[parser->level_depth] = level;
+        } else if (level < parser->level_stack[parser->level_depth]) {
+            while (parser->level_depth > 0 &&
+                   level < parser->level_stack[parser->level_depth]) {
                 parser->pending--;
-                INK_PARSER_RULE(node, ink_parse_choice, parser);
+                parser->level_depth--;
             }
-            break;
         }
-        case INK_TT_EQUAL: {
-            break;
+        if (parser->pending > 0) {
+            parser->pending--;
+            INK_PARSER_RULE(node, ink_parse_choice, parser);
         }
-        case INK_TT_TILDE: {
-            INK_PARSER_RULE(node, ink_parse_expr_stmt, parser);
-            break;
-        }
-        case INK_TT_LEFT_ARROW: {
-            INK_PARSER_RULE(node, ink_parse_thread_stmt, parser);
-            break;
-        }
-        case INK_TT_RIGHT_ARROW: {
-            INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
-            break;
-        }
-        default:
-            INK_PARSER_RULE(node, ink_parse_content, parser);
-            break;
-        }
+        break;
+    }
+    case INK_TT_EQUAL: {
+        break;
+    }
+    default:
+        INK_PARSER_RULE(node, ink_parse_stmt, parser);
+        break;
     }
     return node;
 }

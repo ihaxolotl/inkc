@@ -1,35 +1,38 @@
 // RUN: %ink-compiler < %s --dump-ast  | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: `-- BlockStmt
-// CHECK:     +-- VarDecl
-// CHECK:     |   +-- Name `negativeLiteral `
-// CHECK:     |   `-- NegateExpr
-// CHECK:     |       `-- NumberLiteral `1`
-// CHECK:     +-- VarDecl
-// CHECK:     |   +-- Name `negativeLiteral2 `
-// CHECK:     |   `-- NotExpr
-// CHECK:     |       `-- NotExpr
-// CHECK:     |           `-- False
-// CHECK:     +-- VarDecl
-// CHECK:     |   +-- Name `negativeLiteral3 `
-// CHECK:     |   `-- NotExpr
-// CHECK:     |       `-- NumberLiteral `0`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- AddExpr
-// CHECK:     |           +-- Name `negativeLiteral `
-// CHECK:     |           `-- NumberLiteral `0`
-// CHECK:     +-- ContentStmt
-// CHECK:     |   `-- BraceExpr
-// CHECK:     |       `-- AddExpr
-// CHECK:     |           +-- Name `negativeLiteral2 `
-// CHECK:     |           `-- NumberLiteral `0`
-// CHECK:     `-- ContentStmt
-// CHECK:         `-- BraceExpr
-// CHECK:             `-- AddExpr
-// CHECK:                 +-- Name `negativeLiteral3 `
-// CHECK:                 `-- NumberLiteral `0`
+// CHECK-NEXT: `--BlockStmt
+// CHECK-NEXT:    +--VarDecl
+// CHECK-NEXT:    |  +--Name `negativeLiteral `
+// CHECK-NEXT:    |  `--NegateExpr
+// CHECK-NEXT:    |     `--NumberLiteral `1`
+// CHECK-NEXT:    +--VarDecl
+// CHECK-NEXT:    |  +--Name `negativeLiteral2 `
+// CHECK-NEXT:    |  `--NotExpr
+// CHECK-NEXT:    |     `--NotExpr
+// CHECK-NEXT:    |        `--False
+// CHECK-NEXT:    +--VarDecl
+// CHECK-NEXT:    |  +--Name `negativeLiteral3 `
+// CHECK-NEXT:    |  `--NotExpr
+// CHECK-NEXT:    |     `--NumberLiteral `0`
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--AddExpr
+// CHECK-NEXT:    |           +--Name `negativeLiteral `
+// CHECK-NEXT:    |           `--NumberLiteral `0`
+// CHECK-NEXT:    +--ContentStmt
+// CHECK-NEXT:    |  `--ContentExpr
+// CHECK-NEXT:    |     `--BraceExpr
+// CHECK-NEXT:    |        `--AddExpr
+// CHECK-NEXT:    |           +--Name `negativeLiteral2 `
+// CHECK-NEXT:    |           `--NumberLiteral `0`
+// CHECK-NEXT:    `--ContentStmt
+// CHECK-NEXT:       `--ContentExpr
+// CHECK-NEXT:          `--BraceExpr
+// CHECK-NEXT:             `--AddExpr
+// CHECK-NEXT:                +--Name `negativeLiteral3 `
+// CHECK-NEXT:                `--NumberLiteral `0`
 
 VAR negativeLiteral = -1
 VAR negativeLiteral2 = not not false

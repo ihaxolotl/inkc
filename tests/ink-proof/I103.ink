@@ -1,28 +1,32 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: +-- BlockStmt
-// CHECK: |   +-- ContentStmt
-// CHECK: |   |   `-- StringLiteral `This is a thread example`
-// CHECK: |   +-- ThreadStmt
-// CHECK: |   |   `-- ThreadExpr
-// CHECK: |   |       `-- Name `example_thread`
-// CHECK: |   `-- ContentStmt
-// CHECK: |       `-- StringLiteral `The example is now complete.`
-// CHECK: `-- KnotDecl
-// CHECK:     +-- KnotPrototype
-// CHECK:     |   `-- Name `example_thread `
-// CHECK:     `-- BlockStmt
-// CHECK:         +-- ContentStmt
-// CHECK:         |   `-- StringLiteral `Hello.`
-// CHECK:         +-- DivertStmt
-// CHECK:         |   `-- DivertExpr
-// CHECK:         |       `-- Name `DONE`
-// CHECK:         +-- ContentStmt
-// CHECK:         |   `-- StringLiteral `World.`
-// CHECK:         `-- DivertStmt
-// CHECK:             `-- DivertExpr
-// CHECK:                 `-- Name `DONE`
+// CHECK-NEXT: +--BlockStmt
+// CHECK-NEXT: |  +--ContentStmt
+// CHECK-NEXT: |  |  `--ContentExpr
+// CHECK-NEXT: |  |     `--StringLiteral `This is a thread example`
+// CHECK-NEXT: |  +--ThreadStmt
+// CHECK-NEXT: |  |  `--ThreadExpr
+// CHECK-NEXT: |  |     `--Name `example_thread`
+// CHECK-NEXT: |  `--ContentStmt
+// CHECK-NEXT: |     `--ContentExpr
+// CHECK-NEXT: |        `--StringLiteral `The example is now complete.`
+// CHECK-NEXT: `--KnotDecl
+// CHECK-NEXT:    +--KnotPrototype
+// CHECK-NEXT:    |  `--Name `example_thread `
+// CHECK-NEXT:    `--BlockStmt
+// CHECK-NEXT:       +--ContentStmt
+// CHECK-NEXT:       |  `--ContentExpr
+// CHECK-NEXT:       |     `--StringLiteral `Hello.`
+// CHECK-NEXT:       +--DivertStmt
+// CHECK-NEXT:       |  `--DivertExpr
+// CHECK-NEXT:       |     `--Name `DONE`
+// CHECK-NEXT:       +--ContentStmt
+// CHECK-NEXT:       |  `--ContentExpr
+// CHECK-NEXT:       |     `--StringLiteral `World.`
+// CHECK-NEXT:       `--DivertStmt
+// CHECK-NEXT:          `--DivertExpr
+// CHECK-NEXT:             `--Name `DONE`
 
 This is a thread example
 <- example_thread

@@ -1,26 +1,27 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: +-- BlockStmt
-// CHECK: |   +-- ThreadStmt
-// CHECK: |   |   `-- ThreadExpr
-// CHECK: |   |       `-- Name `move`
-// CHECK: |   `-- ContentStmt
-// CHECK: |       `-- StringLiteral `Limes`
-// CHECK: `-- KnotDecl
-// CHECK:     +-- KnotPrototype
-// CHECK:     |   `-- Name `move`
-// CHECK:     `-- BlockStmt
-// CHECK:         `-- ChoiceStmt
-// CHECK:             `-- ChoiceStarBranch
-// CHECK:                 +-- ChoiceContentExpr
-// CHECK:                 |   +-- StringLiteral `boop`
-// CHECK:                 |   +-- NullNode
-// CHECK:                 |   `-- NullNode
-// CHECK:                 `-- BlockStmt
-// CHECK:                     `-- DivertStmt
-// CHECK:                         `-- DivertExpr
-// CHECK:                             `-- Name `END`
+// CHECK-NEXT: +--BlockStmt
+// CHECK-NEXT: |  +--ThreadStmt
+// CHECK-NEXT: |  |  `--ThreadExpr
+// CHECK-NEXT: |  |     `--Name `move`
+// CHECK-NEXT: |  `--ContentStmt
+// CHECK-NEXT: |     `--ContentExpr
+// CHECK-NEXT: |        `--StringLiteral `Limes`
+// CHECK-NEXT: `--KnotDecl
+// CHECK-NEXT:    +--KnotPrototype
+// CHECK-NEXT:    |  `--Name `move`
+// CHECK-NEXT:    `--BlockStmt
+// CHECK-NEXT:       `--ChoiceStmt
+// CHECK-NEXT:          `--ChoiceStarBranch
+// CHECK-NEXT:             +--ChoiceContentExpr
+// CHECK-NEXT:             |  +--StringLiteral `boop`
+// CHECK-NEXT:             |  +--NullNode
+// CHECK-NEXT:             |  `--NullNode
+// CHECK-NEXT:             `--BlockStmt
+// CHECK-NEXT:                `--DivertStmt
+// CHECK-NEXT:                   `--DivertExpr
+// CHECK-NEXT:                      `--Name `END`
 
 <- move
 Limes

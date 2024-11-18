@@ -25,8 +25,8 @@ static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
 static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
-static const char *INK_SYNTAX_TREE_INNER[] = {"+-- ", "|   "};
-static const char *INK_SYNTAX_TREE_FINAL[] = {"`-- ", "    "};
+static const char *INK_SYNTAX_TREE_INNER[] = {"+--", "|  "};
+static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
 
 const char *ink_token_type_strz(enum ink_token_type type)
 {

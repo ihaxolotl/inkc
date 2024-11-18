@@ -4,6 +4,9 @@
 // CHECK-NEXT: `--BlockStmt
 // CHECK-NEXT:    `--ContentStmt
 // CHECK-NEXT:       `--ContentExpr
-// CHECK-NEXT:          `--StringLiteral `Hello, world!`
+// CHECK-NEXT:          `--BraceExpr
+// CHECK-NEXT:             `--SequenceExpr
+// CHECK-NEXT:                +--ContentExpr
+// CHECK-NEXT:                `--ContentExpr
 
-Hello, world!
+{|}

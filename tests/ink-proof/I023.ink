@@ -1,28 +1,30 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: +-- BlockStmt
-// CHECK: |   `-- DivertStmt
-// CHECK: |       `-- DivertExpr
-// CHECK: |           `-- Name `firstKnot`
-// CHECK: +-- KnotDecl
-// CHECK: |   +-- KnotPrototype
-// CHECK: |   |   `-- Name `firstKnot`
-// CHECK: |   `-- BlockStmt
-// CHECK: |       +-- ContentStmt
-// CHECK: |       |   `-- StringLiteral `Hello!`
-// CHECK: |       `-- DivertStmt
-// CHECK: |           `-- DivertExpr
-// CHECK: |               `-- Name `anotherKnot`
-// CHECK: `-- KnotDecl
-// CHECK:     +-- KnotPrototype
-// CHECK:     |   `-- Name `anotherKnot`
-// CHECK:     `-- BlockStmt
-// CHECK:         +-- ContentStmt
-// CHECK:         |   `-- StringLiteral `World.`
-// CHECK:         `-- DivertStmt
-// CHECK:             `-- DivertExpr
-// CHECK:                 `-- Name `END`
+// CHECK-NEXT: +--BlockStmt
+// CHECK-NEXT: |  `--DivertStmt
+// CHECK-NEXT: |     `--DivertExpr
+// CHECK-NEXT: |        `--Name `firstKnot`
+// CHECK-NEXT: +--KnotDecl
+// CHECK-NEXT: |  +--KnotPrototype
+// CHECK-NEXT: |  |  `--Name `firstKnot`
+// CHECK-NEXT: |  `--BlockStmt
+// CHECK-NEXT: |     +--ContentStmt
+// CHECK-NEXT: |     |  `--ContentExpr
+// CHECK-NEXT: |     |     `--StringLiteral `Hello!`
+// CHECK-NEXT: |     `--DivertStmt
+// CHECK-NEXT: |        `--DivertExpr
+// CHECK-NEXT: |           `--Name `anotherKnot`
+// CHECK-NEXT: `--KnotDecl
+// CHECK-NEXT:    +--KnotPrototype
+// CHECK-NEXT:    |  `--Name `anotherKnot`
+// CHECK-NEXT:    `--BlockStmt
+// CHECK-NEXT:       +--ContentStmt
+// CHECK-NEXT:       |  `--ContentExpr
+// CHECK-NEXT:       |     `--StringLiteral `World.`
+// CHECK-NEXT:       `--DivertStmt
+// CHECK-NEXT:          `--DivertExpr
+// CHECK-NEXT:             `--Name `END`
 
 -> firstKnot
 === firstKnot
