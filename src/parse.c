@@ -225,6 +225,7 @@ static struct ink_syntax_node *ink_parse_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_return_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser);
+static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *);
@@ -1921,6 +1922,17 @@ static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser)
                                    parser->current_offset, node);
 }
 
+static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser)
+{
+    struct ink_syntax_node *node = NULL;
+    const size_t source_start = parser->current_offset;
+
+    INK_PARSER_RULE(node, ink_parse_thread_expr, parser);
+    ink_parser_expect_stmt_end(parser);
+    return ink_parser_create_unary(parser, INK_NODE_THREAD_STMT, source_start,
+                                   parser->current_offset, node);
+}
+
 static struct ink_syntax_node *ink_parse_content(struct ink_parser *parser)
 {
     struct ink_syntax_node *node = NULL;
@@ -2225,6 +2237,10 @@ ink_parse_block_delimited(struct ink_parser *parser)
         }
         case INK_TT_TILDE: {
             INK_PARSER_RULE(node, ink_parse_expr_stmt, parser);
+            break;
+        }
+        case INK_TT_LEFT_ARROW: {
+            INK_PARSER_RULE(node, ink_parse_thread_stmt, parser);
             break;
         }
         case INK_TT_RIGHT_ARROW: {
