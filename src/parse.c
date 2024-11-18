@@ -225,6 +225,7 @@ static struct ink_syntax_node *ink_parse_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_return_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser);
+static struct ink_syntax_node *ink_parse_temp_stmt(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
@@ -1819,7 +1820,9 @@ static struct ink_syntax_node *ink_parse_expr_stmt(struct ink_parser *parser)
     ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
     ink_parser_expect(parser, INK_TT_TILDE);
 
-    if (ink_parser_check(parser, INK_TT_KEYWORD_RETURN)) {
+    if (ink_parser_check(parser, INK_TT_KEYWORD_TEMP)) {
+        node = ink_parse_temp_stmt(parser);
+    } else if (ink_parser_check(parser, INK_TT_KEYWORD_RETURN)) {
         node = ink_parse_return_stmt(parser);
     } else {
         node = ink_parse_expr(parser);
@@ -1920,6 +1923,19 @@ static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *parser)
     ink_parser_expect_stmt_end(parser);
     return ink_parser_create_unary(parser, INK_NODE_DIVERT_STMT, source_start,
                                    parser->current_offset, node);
+}
+
+static struct ink_syntax_node *ink_parse_temp_stmt(struct ink_parser *parser)
+{
+    struct ink_syntax_node *lhs = NULL;
+    struct ink_syntax_node *rhs = NULL;
+    const size_t source_start = ink_parser_expect(parser, INK_TT_KEYWORD_TEMP);
+
+    lhs = ink_parse_identifier(parser);
+    ink_parser_expect(parser, INK_TT_EQUAL);
+    rhs = ink_parse_expr(parser);
+    return ink_parser_create_binary(parser, INK_NODE_TEMP_STMT, source_start,
+                                    parser->current_offset, lhs, rhs);
 }
 
 static struct ink_syntax_node *ink_parse_thread_stmt(struct ink_parser *parser)

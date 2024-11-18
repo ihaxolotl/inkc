@@ -139,6 +139,7 @@ struct ink_token {
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_STRING_LITERAL, "StringLiteral")                                    \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
+    T(NODE_TEMP_STMT, "TempStmt")                                              \
     T(NODE_THREAD_EXPR, "ThreadExpr")                                          \
     T(NODE_THREAD_STMT, "ThreadStmt")                                          \
     T(NODE_TRUE_EXPR, "True")                                                  \
