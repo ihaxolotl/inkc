@@ -1,6 +1,6 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File "tests/ink-proof/I124.ink"
+// CHECK: File "STDIN"
 // CHECK: +-- BlockStmt
 // CHECK: |   +-- ContentStmt
 // CHECK: |   |   `-- StringLiteral `One`
