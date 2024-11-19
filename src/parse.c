@@ -204,12 +204,7 @@ enum ink_lex_state {
     INK_LEX_NEWLINE,
 };
 
-static struct ink_syntax_node *ink_parse_true(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_false(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_number(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_string(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_identifier(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_content_string(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_primary_expr(struct ink_parser *);
@@ -231,10 +226,10 @@ ink_parse_sequence_expr(struct ink_parser *, struct ink_syntax_node *);
 static struct ink_syntax_node *ink_parse_brace_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_choice(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block_delimited(struct ink_parser *);
+static struct ink_syntax_node *ink_parse_argument_list(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_block(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_var(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_const(struct ink_parser *);
-static struct ink_syntax_node *ink_parse_argument_list(struct ink_parser *);
 
 static const char *INK_CONTEXT_TYPE_STR[] = {
     [INK_PARSE_CONTENT] = "Content", [INK_PARSE_EXPRESSION] = "Expression",
@@ -1631,18 +1626,6 @@ static struct ink_syntax_node *ink_parse_string(struct ink_parser *parser)
                                   parser->current_offset);
 }
 
-static struct ink_syntax_node *
-ink_parse_content_string(struct ink_parser *parser)
-{
-    const size_t source_start = parser->current_offset;
-
-    while (!ink_context_delim(parser)) {
-        ink_parser_advance(parser);
-    }
-    return ink_parser_create_leaf(parser, INK_NODE_STRING_LITERAL, source_start,
-                                  parser->current_offset);
-}
-
 static struct ink_syntax_node *ink_parse_name_expr(struct ink_parser *parser)
 {
     struct ink_syntax_node *lhs = NULL;
@@ -2034,7 +2017,7 @@ static struct ink_syntax_node *ink_parse_content_expr(struct ink_parser *parser)
 
     for (;;) {
         if (!ink_context_delim(parser)) {
-            INK_PARSER_RULE(node, ink_parse_content_string, parser);
+            INK_PARSER_RULE(node, ink_parse_string, parser);
         } else if (ink_parser_check(parser, INK_TT_LEFT_BRACE)) {
             INK_PARSER_RULE(node, ink_parse_brace_expr, parser);
         } else if (ink_parser_check(parser, INK_TT_RIGHT_ARROW)) {
@@ -2076,17 +2059,17 @@ ink_parse_choice_content(struct ink_parser *parser)
     const size_t scratch_offset = parser->scratch.count;
     const size_t source_start = parser->current_offset;
 
-    INK_PARSER_RULE(node, ink_parse_content_string, parser);
+    INK_PARSER_RULE(node, ink_parse_string, parser);
     ink_parser_scratch_append(&parser->scratch, node);
 
     if (ink_parser_check(parser, INK_TT_LEFT_BRACKET)) {
         ink_parser_advance(parser);
-        INK_PARSER_RULE(node, ink_parse_content_string, parser);
+        INK_PARSER_RULE(node, ink_parse_string, parser);
         ink_parser_scratch_append(&parser->scratch, node);
         ink_parser_expect(parser, INK_TT_RIGHT_BRACKET);
 
         if (!ink_context_delim(parser)) {
-            INK_PARSER_RULE(node, ink_parse_content_string, parser);
+            INK_PARSER_RULE(node, ink_parse_string, parser);
             ink_parser_scratch_append(&parser->scratch, node);
         } else {
             ink_parser_scratch_append(&parser->scratch, NULL);
