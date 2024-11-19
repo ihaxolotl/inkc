@@ -2028,7 +2028,6 @@ ink_parse_choice_branch(struct ink_parser *parser,
     const size_t source_start = parser->current_offset;
 
     ink_parser_eat_nesting(parser, ink_parser_token_type(parser), true);
-    ink_parser_advance(parser);
     INK_PARSER_RULE(expr, ink_parse_choice_content, parser);
 
     if (ink_parser_check(parser, INK_TT_NL)) {

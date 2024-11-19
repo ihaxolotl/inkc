@@ -1,20 +1,22 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: +-- BlockStmt
-// CHECK: |   `-- ContentStmt
-// CHECK: |       +-- StringLiteral `hello `
-// CHECK: |       `-- DivertExpr
-// CHECK: |           `-- Name `world`
-// CHECK: `-- KnotDecl
-// CHECK:     +-- KnotPrototype
-// CHECK:     |   `-- Name `world`
-// CHECK:     `-- BlockStmt
-// CHECK:         +-- ContentStmt
-// CHECK:         |   `-- StringLiteral `world`
-// CHECK:         `-- DivertStmt
-// CHECK:             `-- DivertExpr
-// CHECK:                 `-- Name `END`
+// CHECK-NEXT: +--BlockStmt
+// CHECK-NEXT: |  `--ContentStmt
+// CHECK-NEXT: |     `--ContentExpr
+// CHECK-NEXT: |        +--StringLiteral `hello `
+// CHECK-NEXT: |        `--DivertExpr
+// CHECK-NEXT: |           `--Name `world`
+// CHECK-NEXT: `--KnotDecl
+// CHECK-NEXT:    +--KnotPrototype
+// CHECK-NEXT:    |  `--Name `world`
+// CHECK-NEXT:    `--BlockStmt
+// CHECK-NEXT:       +--ContentStmt
+// CHECK-NEXT:       |  `--ContentExpr
+// CHECK-NEXT:       |     `--StringLiteral `world`
+// CHECK-NEXT:       `--DivertStmt
+// CHECK-NEXT:          `--DivertExpr
+// CHECK-NEXT:             `--Name `END`
 
 hello -> world
 == world
