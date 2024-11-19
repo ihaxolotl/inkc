@@ -478,9 +478,13 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
         case INK_LEX_NUMBER: {
             if (c == '.') {
                 state = INK_LEX_NUMBER_DOT;
-            } else if (!ink_is_digit(c)) {
-                token->type = INK_TT_NUMBER;
-                goto exit_loop;
+            } else {
+                if (ink_is_alpha(c) || c == '_') {
+                    state = INK_LEX_IDENTIFIER;
+                } else if (!ink_is_digit(c)) {
+                    token->type = INK_TT_NUMBER;
+                    goto exit_loop;
+                }
             }
             break;
         }
