@@ -8,8 +8,7 @@
 // CHECK-NEXT: |        `--DivertExpr
 // CHECK-NEXT: |           `--Name `world`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `world`
+// CHECK-NEXT:    +--Name `world`
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ContentStmt
 // CHECK-NEXT:       |  `--ContentExpr

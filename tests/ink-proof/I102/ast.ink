@@ -9,8 +9,7 @@
 // CHECK-NEXT: |     `--ContentExpr
 // CHECK-NEXT: |        `--StringLiteral `Limes`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `move`
+// CHECK-NEXT:    +--Name `move`
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       `--ChoiceStmt
 // CHECK-NEXT:          `--ChoiceStarBranch

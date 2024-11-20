@@ -12,8 +12,7 @@
 // CHECK-NEXT: |     `--ContentExpr
 // CHECK-NEXT: |        `--StringLiteral `The example is now complete.`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `example_thread `
+// CHECK-NEXT:    +--Name `example_thread `
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ContentStmt
 // CHECK-NEXT:       |  `--ContentExpr

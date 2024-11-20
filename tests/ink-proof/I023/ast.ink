@@ -6,8 +6,7 @@
 // CHECK-NEXT: |     `--DivertExpr
 // CHECK-NEXT: |        `--Name `firstKnot`
 // CHECK-NEXT: +--KnotDecl
-// CHECK-NEXT: |  +--KnotPrototype
-// CHECK-NEXT: |  |  `--Name `firstKnot`
+// CHECK-NEXT: |  +--Name `firstKnot`
 // CHECK-NEXT: |  `--BlockStmt
 // CHECK-NEXT: |     +--ContentStmt
 // CHECK-NEXT: |     |  `--ContentExpr
@@ -16,8 +15,7 @@
 // CHECK-NEXT: |        `--DivertExpr
 // CHECK-NEXT: |           `--Name `anotherKnot`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `anotherKnot`
+// CHECK-NEXT:    +--Name `anotherKnot`
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ContentStmt
 // CHECK-NEXT:       |  `--ContentExpr

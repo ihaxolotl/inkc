@@ -6,8 +6,7 @@
 // CHECK-NEXT: |     `--DivertExpr
 // CHECK-NEXT: |        `--Name `2tests`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `2tests `
+// CHECK-NEXT:    +--Name `2tests `
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--TempStmt
 // CHECK-NEXT:       |  +--Name `512x2 `

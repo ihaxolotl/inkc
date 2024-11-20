@@ -6,8 +6,7 @@
 // CHECK-NEXT: |     `--DivertExpr
 // CHECK-NEXT: |        `--Name `hurry_home`
 // CHECK-NEXT: +--KnotDecl
-// CHECK-NEXT: |  +--KnotPrototype
-// CHECK-NEXT: |  |  `--Name `hurry_home `
+// CHECK-NEXT: |  +--Name `hurry_home `
 // CHECK-NEXT: |  `--BlockStmt
 // CHECK-NEXT: |     `--ContentStmt
 // CHECK-NEXT: |        `--ContentExpr
@@ -15,8 +14,7 @@
 // CHECK-NEXT: |           `--DivertExpr
 // CHECK-NEXT: |              `--Name `as_fast_as_we_could`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `as_fast_as_we_could `
+// CHECK-NEXT:    +--Name `as_fast_as_we_could `
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ContentStmt
 // CHECK-NEXT:       |  `--ContentExpr

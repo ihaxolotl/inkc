@@ -1,46 +1,49 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
 // CHECK: File "STDIN"
-// CHECK: +-- BlockStmt
-// CHECK: |   +-- ContentStmt
-// CHECK: |   |   `-- StringLiteral `One`
-// CHECK: |   +-- ContentStmt
-// CHECK: |   |   `-- StringLiteral `Two`
-// CHECK: |   `-- ContentStmt
-// CHECK: |       `-- StringLiteral `Three`
-// CHECK: +-- KnotDecl
-// CHECK: |   +-- KnotPrototype
-// CHECK: |   |   `-- Name `func1 `
-// CHECK: |   `-- BlockStmt
-// CHECK: |       +-- ContentStmt
-// CHECK: |       |   `-- StringLiteral `This is a function`
-// CHECK: |       `-- ReturnStmt
-// CHECK: |           `-- NumberLiteral `5`
-// CHECK: +-- KnotDecl
-// CHECK: |   +-- KnotPrototype
-// CHECK: |   |   `-- Name `func2 `
-// CHECK: |   `-- BlockStmt
-// CHECK: |       +-- ContentStmt
-// CHECK: |       |   `-- StringLiteral `This is a function without a return value`
-// CHECK: |       `-- ReturnStmt
-// CHECK: `-- KnotDecl
-// CHECK:     +-- KnotPrototype
-// CHECK:     |   +-- Name `add`
-// CHECK:     |   `-- ParameterList
-// CHECK:     |       +-- ParamDecl `x`
-// CHECK:     |       `-- ParamDecl `y`
-// CHECK:     `-- BlockStmt
-// CHECK:         +-- ContentStmt
-// CHECK:         |   +-- StringLiteral `x = `
-// CHECK:         |   +-- BraceExpr
-// CHECK:         |   |   `-- Name `x`
-// CHECK:         |   +-- StringLiteral `, y = `
-// CHECK:         |   `-- BraceExpr
-// CHECK:         |       `-- Name `y`
-// CHECK:         `-- ReturnStmt
-// CHECK:             `-- AddExpr
-// CHECK:                 +-- Name `x `
-// CHECK:                 `-- Name `y`
+// CHECK-NEXT: +--BlockStmt
+// CHECK-NEXT: |  +--ContentStmt
+// CHECK-NEXT: |  |  `--ContentExpr
+// CHECK-NEXT: |  |     `--StringLiteral `One`
+// CHECK-NEXT: |  +--ContentStmt
+// CHECK-NEXT: |  |  `--ContentExpr
+// CHECK-NEXT: |  |     `--StringLiteral `Two`
+// CHECK-NEXT: |  `--ContentStmt
+// CHECK-NEXT: |     `--ContentExpr
+// CHECK-NEXT: |        `--StringLiteral `Three`
+// CHECK-NEXT: +--FunctionDecl
+// CHECK-NEXT: |  +--Name `func1 `
+// CHECK-NEXT: |  `--BlockStmt
+// CHECK-NEXT: |     +--ContentStmt
+// CHECK-NEXT: |     |  `--ContentExpr
+// CHECK-NEXT: |     |     `--StringLiteral `This is a function`
+// CHECK-NEXT: |     `--ReturnStmt
+// CHECK-NEXT: |        `--NumberLiteral `5`
+// CHECK-NEXT: +--FunctionDecl
+// CHECK-NEXT: |  +--Name `func2 `
+// CHECK-NEXT: |  `--BlockStmt
+// CHECK-NEXT: |     +--ContentStmt
+// CHECK-NEXT: |     |  `--ContentExpr
+// CHECK-NEXT: |     |     `--StringLiteral `This is a function without a return value`
+// CHECK-NEXT: |     `--ReturnStmt
+// CHECK-NEXT: `--FunctionDecl
+// CHECK-NEXT:    +--Name `add`
+// CHECK-NEXT:    +--ParameterList
+// CHECK-NEXT:    |  +--ParamDecl `x`
+// CHECK-NEXT:    |  `--ParamDecl `y`
+// CHECK-NEXT:    `--BlockStmt
+// CHECK-NEXT:       +--ContentStmt
+// CHECK-NEXT:       |  `--ContentExpr
+// CHECK-NEXT:       |     +--StringLiteral `x = `
+// CHECK-NEXT:       |     +--BraceExpr
+// CHECK-NEXT:       |     |  `--Name `x`
+// CHECK-NEXT:       |     +--StringLiteral `, y = `
+// CHECK-NEXT:       |     `--BraceExpr
+// CHECK-NEXT:       |        `--Name `y`
+// CHECK-NEXT:       `--ReturnStmt
+// CHECK-NEXT:          `--AddExpr
+// CHECK-NEXT:             +--Name `x `
+// CHECK-NEXT:             `--Name `y`
 
 One
 Two

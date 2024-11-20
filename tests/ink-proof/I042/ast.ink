@@ -6,8 +6,7 @@
 // CHECK-NEXT: |     `--DivertExpr
 // CHECK-NEXT: |        `--Name `test`
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--KnotPrototype
-// CHECK-NEXT:    |  `--Name `test`
+// CHECK-NEXT:    +--Name `test`
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       `--ChoiceStmt
 // CHECK-NEXT:          `--ChoiceStarBranch

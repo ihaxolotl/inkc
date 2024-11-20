@@ -1751,10 +1751,12 @@ static struct ink_syntax_node *ink_parse_expr(struct ink_parser *parser)
 static struct ink_syntax_node *ink_parse_return_stmt(struct ink_parser *parser)
 {
     struct ink_syntax_node *node = NULL;
-    const size_t source_start =
-        ink_parser_expect(parser, INK_TT_KEYWORD_RETURN);
+    const size_t source_start = parser->current_offset;
 
-    if (!ink_parser_check(parser, INK_TT_NL)) {
+    ink_parser_advance(parser);
+
+    if (!ink_parser_check(parser, INK_TT_NL) &&
+        !ink_parser_check(parser, INK_TT_EOF)) {
         node = ink_parse_expr(parser);
     }
     return ink_parser_create_unary(parser, INK_NODE_RETURN_STMT, source_start,
