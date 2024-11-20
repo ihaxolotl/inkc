@@ -117,12 +117,12 @@ struct ink_token {
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_EXPR_STMT, "ExprStmt")                                              \
     T(NODE_FALSE_EXPR, "False")                                                \
+    T(NODE_FUNCTION_DECL, "FunctionDecl")                                      \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
     T(NODE_KNOT_DECL, "KnotDecl")                                              \
-    T(NODE_KNOT_PROTO, "KnotPrototype")                                        \
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
     T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
     T(NODE_MUL_EXPR, "MultiplyExpr")                                           \

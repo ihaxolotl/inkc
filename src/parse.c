@@ -519,7 +519,7 @@ static void ink_token_next(struct ink_scanner *scanner, struct ink_token *token,
             default:
                 if (scanner->is_line_start) {
                     state = INK_LEX_START;
-                    break;
+                    continue;
                 }
                 token->type = INK_TT_WHITESPACE;
                 goto exit_loop;
@@ -1974,6 +1974,13 @@ static struct ink_syntax_node *ink_parse_content_stmt(struct ink_parser *parser)
     const size_t scratch_offset = parser->scratch.count;
     struct ink_syntax_node *node = NULL;
 
+    /* There seems to be a bug in Inkle's implementation that I found through
+     * I036, having to do with how lone right curly braces are handled. This
+     * is a workaround to get the tests to pass. */
+    if (ink_parser_check(parser, INK_TT_RIGHT_BRACE)) {
+        ink_parser_advance(parser);
+        return NULL;
+    }
     while (!ink_parser_check(parser, INK_TT_EOF) &&
            !ink_parser_check(parser, INK_TT_NL)) {
         INK_PARSER_RULE(node, ink_parse_content_expr, parser, token_set);
@@ -2215,23 +2222,31 @@ ink_parse_parameter_list(struct ink_parser *parser)
                                       parser->current_offset, scratch_offset);
 }
 
-static struct ink_syntax_node *ink_parse_knot_proto(struct ink_parser *parser)
+static struct ink_syntax_node *ink_parse_knot(struct ink_parser *parser)
 {
-    struct ink_syntax_node *lhs = NULL;
-    struct ink_syntax_node *rhs = NULL;
+    enum ink_syntax_node_type node_type = INK_NODE_KNOT_DECL;
+    struct ink_syntax_node *node = NULL;
+    const size_t scratch_offset = parser->scratch.count;
     const size_t source_start = parser->current_offset;
+
+    while (ink_parser_check(parser, INK_TT_EQUAL)) {
+        ink_parser_advance(parser);
+    }
 
     ink_parser_push_context(parser, INK_PARSE_EXPRESSION);
     ink_parser_eat(parser, INK_TT_WHITESPACE);
 
     if (ink_parser_try_keyword(parser, INK_TT_KEYWORD_FUNCTION)) {
+        node_type = INK_NODE_FUNCTION_DECL;
         ink_parser_advance(parser);
     }
 
-    lhs = ink_parse_identifier(parser);
+    INK_PARSER_RULE(node, ink_parse_identifier, parser);
+    ink_parser_scratch_append(&parser->scratch, node);
 
     if (ink_parser_check(parser, INK_TT_LEFT_PAREN)) {
-        rhs = ink_parse_parameter_list(parser);
+        INK_PARSER_RULE(node, ink_parse_parameter_list, parser);
+        ink_parser_scratch_append(&parser->scratch, node);
     }
 
     /* NOTE(Brett): Checking for `==` as a separate token is a hack, but
@@ -2244,24 +2259,11 @@ static struct ink_syntax_node *ink_parse_knot_proto(struct ink_parser *parser)
 
     ink_parser_pop_context(parser);
     ink_parser_expect(parser, INK_TT_NL);
-    return ink_parser_create_binary(parser, INK_NODE_KNOT_PROTO, source_start,
-                                    parser->current_offset, lhs, rhs);
-}
+    INK_PARSER_RULE(node, ink_parse_block, parser);
+    ink_parser_scratch_append(&parser->scratch, node);
 
-static struct ink_syntax_node *ink_parse_knot(struct ink_parser *parser)
-{
-    struct ink_syntax_node *lhs = NULL;
-    struct ink_syntax_node *rhs = NULL;
-    const size_t source_start = parser->current_offset;
-
-    while (ink_parser_check(parser, INK_TT_EQUAL)) {
-        ink_parser_advance(parser);
-    }
-
-    lhs = ink_parse_knot_proto(parser);
-    rhs = ink_parse_block(parser);
-    return ink_parser_create_binary(parser, INK_NODE_KNOT_DECL, source_start,
-                                    parser->current_offset, lhs, rhs);
+    return ink_parser_create_sequence(parser, node_type, source_start,
+                                      parser->current_offset, scratch_offset);
 }
 
 /**
