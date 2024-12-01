@@ -1660,7 +1660,6 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
         ink_parser_scratch_append(scratch, node);
     }
     for (;;) {
-
         if (blocks->depth > 0) {
             temp = ink_parser_context_reduce(parser, blocks,
                                              INK_NODE_BLOCK_STMT, (size_t)-1);

@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "source.h"
@@ -124,7 +125,8 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
 extern int ink_syntax_tree_initialize(const struct ink_source *source,
                                       struct ink_syntax_tree *tree);
 extern void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree);
-extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree);
+extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree,
+                                  bool colors);
 
 #ifdef __cplusplus
 }

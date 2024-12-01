@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,17 @@ struct ink_source_range {
     size_t end_offset;
 };
 
+struct ink_print_context {
+    const char *filename;
+    const char *node_type_strz;
+    const unsigned char *lexeme;
+    size_t lexeme_length;
+    size_t line_start;
+    size_t line_end;
+    size_t column_start;
+    size_t column_end;
+};
+
 INK_VEC_DECLARE(ink_node_buffer, struct ink_syntax_node *)
 INK_VEC_DECLARE(ink_line_buffer, struct ink_source_range)
 
@@ -32,6 +44,15 @@ static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
 static const char *INK_SYNTAX_TREE_INNER[] = {"+--", "|  "};
 static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
+
+/**
+ * Return a NULL-terminated string representing the type description of a
+ * syntax tree node.
+ */
+const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
+{
+    return INK_NODE_TYPE_STR[type];
+}
 
 static void ink_build_lines(struct ink_line_buffer *lines,
                             const struct ink_source *source)
@@ -75,80 +96,138 @@ static size_t ink_calculate_line(const struct ink_line_buffer *lines,
     return lines->count - 1;
 }
 
-/**
- * Return a NULL-terminated string representing the type description of a
- * syntax tree node.
- */
-const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
+static void
+ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
+                               const struct ink_print_context *context,
+                               char *buffer, size_t length)
 {
-    return INK_NODE_TYPE_STR[type];
+    switch (node->type) {
+    case INK_NODE_FILE: {
+        snprintf(buffer, length, "%s \"%s\"", context->node_type_strz,
+                 context->filename);
+        break;
+    }
+    case INK_NODE_BLOCK_STMT: {
+        snprintf(buffer, length, "%s <line:%zu, line:%zu>",
+                 context->node_type_strz, context->line_start,
+                 context->line_end);
+        break;
+    }
+    case INK_NODE_CONTENT_STMT:
+    case INK_NODE_STRING_EXPR: {
+        snprintf(buffer, length, "%s <col:%zu, col:%zu>",
+                 context->node_type_strz, context->column_start,
+                 context->column_end);
+        break;
+    }
+    case INK_NODE_STRING_LITERAL:
+    case INK_NODE_NUMBER_EXPR:
+    case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_PARAM_DECL:
+    case INK_NODE_REF_PARAM_DECL: {
+        snprintf(buffer, length, "%s `%.*s` <col:%zu, col:%zu>",
+                 context->node_type_strz, (int)context->lexeme_length,
+                 context->lexeme, context->column_start, context->column_end);
+        break;
+    }
+    default:
+        snprintf(buffer, length, "%s <col:%zu>", context->node_type_strz,
+                 context->column_start);
+        break;
+    }
+}
+
+static void
+ink_syntax_node_print_colors(const struct ink_syntax_node *node,
+                             const struct ink_print_context *context,
+                             char *buffer, size_t length)
+{
+    switch (node->type) {
+    case INK_NODE_FILE: {
+        snprintf(buffer, length,
+                 ANSI_COLOR_BLUE ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "\"%s\"",
+                 context->node_type_strz, context->filename);
+        break;
+    }
+    case INK_NODE_BLOCK_STMT: {
+        snprintf(buffer, length,
+                 ANSI_COLOR_BLUE ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
+                 "line:%zu, line:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, context->line_start,
+                 context->line_end);
+        break;
+    }
+    case INK_NODE_CONTENT_STMT:
+    case INK_NODE_STRING_EXPR: {
+        snprintf(buffer, length,
+                 ANSI_COLOR_BLUE ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
+                 "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, context->column_start,
+                 context->column_end);
+        break;
+    }
+    case INK_NODE_STRING_LITERAL:
+    case INK_NODE_NUMBER_EXPR:
+    case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_PARAM_DECL:
+    case INK_NODE_REF_PARAM_DECL: {
+        snprintf(buffer, length,
+                 ANSI_COLOR_BLUE ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN
+                 "%.*s" ANSI_COLOR_RESET "` "
+                 "<" ANSI_COLOR_YELLOW "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, (int)context->lexeme_length,
+                 context->lexeme, context->column_start, context->column_end);
+        break;
+    }
+    default:
+        snprintf(buffer, length,
+                 ANSI_COLOR_BLUE ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
+                 "col:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, context->column_start);
+        break;
+    }
 }
 
 static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
                                        const struct ink_line_buffer *lines,
                                        const struct ink_syntax_node *node,
                                        const char *prefix,
-                                       const char **pointers)
+                                       const char **pointers, bool colors)
 {
-    char output[1024];
-    const char *node_type_str = ink_syntax_node_type_strz(node->type);
-    const unsigned char *bytes = tree->source->bytes;
-    const unsigned char *lexeme = bytes + node->start_offset;
-    const size_t lexeme_length = node->end_offset - node->start_offset;
+    char line[1024];
     const size_t line_start = ink_calculate_line(lines, node->start_offset);
     const size_t line_end = ink_calculate_line(lines, node->end_offset);
     const struct ink_source_range line_range = lines->entries[line_start];
-    const size_t col_start = node->start_offset - line_range.start_offset;
-    const size_t col_end = node->end_offset - line_range.start_offset;
+    const struct ink_print_context context = {
+        .filename = tree->source->filename,
+        .node_type_strz = ink_syntax_node_type_strz(node->type),
+        .lexeme = tree->source->bytes + node->start_offset,
+        .lexeme_length = node->end_offset - node->start_offset,
+        .line_start = line_start + 1,
+        .line_end = line_end + 1,
+        .column_start = (node->start_offset - line_range.start_offset) + 1,
+        .column_end = (node->end_offset - line_range.start_offset) + 1,
+    };
 
-    switch (node->type) {
-    case INK_NODE_FILE: {
-        snprintf(output, sizeof(output),
-                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
-                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "\"%s\"",
-                 node_type_str, tree->source->filename);
-        break;
-    }
-    case INK_NODE_BLOCK_STMT: {
-        snprintf(output, sizeof(output),
-                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
-                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
-                 "line:%zu, line:%zu" ANSI_COLOR_RESET ">",
-                 node_type_str, line_start, line_end);
-        break;
-    }
-    case INK_NODE_STRING_LITERAL:
-    case INK_NODE_STRING_EXPR:
-    case INK_NODE_NUMBER_EXPR:
-    case INK_NODE_IDENTIFIER_EXPR:
-    case INK_NODE_PARAM_DECL:
-    case INK_NODE_REF_PARAM_DECL: {
-        snprintf(output, sizeof(output),
-                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
-                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN
-                 "%.*s" ANSI_COLOR_RESET "` "
-                 "<" ANSI_COLOR_YELLOW "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
-                 node_type_str, (int)lexeme_length, lexeme, col_start + 1,
-                 col_end + 1);
-        break;
-    }
-    default:
-        snprintf(output, sizeof(output),
-                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
-                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
-                 "line:%zu, col:%zu" ANSI_COLOR_RESET ">",
-                 node_type_str, line_start + 1, col_start + 1);
-        break;
+    if (colors) {
+        ink_syntax_node_print_colors(node, &context, line, sizeof(line));
+    } else {
+        ink_syntax_node_print_nocolors(node, &context, line, sizeof(line));
     }
 
-    printf("%s%s%s\n", prefix, pointers[0], output);
+    printf("%s%s%s\n", prefix, pointers[0], line);
 }
 
 static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
                                        const struct ink_line_buffer *lines,
                                        const struct ink_syntax_node *node,
                                        const char *prefix,
-                                       const char **pointers)
+                                       const char **pointers, bool colors)
 {
     char new_prefix[1024];
     struct ink_node_buffer nodes;
@@ -174,9 +253,9 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
 
         if (nodes.entries[i]) {
             ink_syntax_tree_print_node(tree, lines, nodes.entries[i], prefix,
-                                       pointers);
+                                       pointers, colors);
             ink_syntax_tree_print_walk(tree, lines, nodes.entries[i],
-                                       new_prefix, pointers);
+                                       new_prefix, pointers, colors);
         } else {
             printf("%s%sNullNode\n", prefix, pointers[0]);
         }
@@ -188,7 +267,7 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
 /**
  * Print a syntax tree.
  */
-void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
+void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
 {
     struct ink_line_buffer lines;
 
@@ -197,9 +276,9 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
 
     if (tree->root) {
         ink_syntax_tree_print_node(tree, &lines, tree->root, "",
-                                   INK_SYNTAX_TREE_EMPTY);
+                                   INK_SYNTAX_TREE_EMPTY, colors);
         ink_syntax_tree_print_walk(tree, &lines, tree->root, "",
-                                   INK_SYNTAX_TREE_EMPTY);
+                                   INK_SYNTAX_TREE_EMPTY, colors);
     }
 
     ink_line_buffer_destroy(&lines);

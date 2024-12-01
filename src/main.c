@@ -11,26 +11,28 @@
 #include "tree.h"
 
 enum {
-    OPT_TRACING = 1000,
+    OPT_COLORS = 1000,
+    OPT_TRACING,
     OPT_CACHING,
     OPT_DUMP_AST,
 };
 
 static const struct option LONGOPTS[] = {
     {"help", no_argument, NULL, 'h'},
+    {"colors", optional_argument, NULL, OPT_COLORS},
     {"tracing", optional_argument, NULL, OPT_TRACING},
     {"caching", optional_argument, NULL, OPT_CACHING},
     {"dump-ast", optional_argument, NULL, OPT_DUMP_AST},
     {NULL, 0, NULL, 0},
 };
 
-static const char *USAGE_MSG =
-    "Usage: %s [OPTION]... [FILE]\n"
-    "Load and execute an Ink story.\n\n"
-    "  -h, --help       Print this message.\n"
-    "  --tracing        Enable tracing.\n"
-    "  --caching        Enable cachine.\n"
-    "  --dump-ast       Dump the parsed file's AST\n";
+static const char *USAGE_MSG = "Usage: %s [OPTION]... [FILE]\n"
+                               "Load and execute an Ink story.\n\n"
+                               "  -h, --help       Print this message\n"
+                               "  --colors         Enable color output\n"
+                               "  --tracing        Enable tracing\n"
+                               "  --caching        Enable caching\n"
+                               "  --dump-ast       Dump a source file's AST\n";
 
 static void print_usage(const char *name)
 {
@@ -48,10 +50,15 @@ int main(int argc, char *argv[])
     int opti, rc;
     int flags = 0;
     int opt = 0;
+    bool colors = false;
     bool dump_ast = false;
 
     while ((opt = getopt_long(argc, argv, "", LONGOPTS, &opti)) != -1) {
         switch (opt) {
+        case OPT_COLORS: {
+            colors = true;
+            break;
+        }
         case OPT_TRACING: {
             flags |= INK_PARSER_F_TRACING;
             break;
@@ -64,13 +71,9 @@ int main(int argc, char *argv[])
             dump_ast = true;
             break;
         }
-        case '?': {
-            fprintf(stderr, "Unknown option `%c'.\n", optopt);
-            break;
-        }
         case ':': {
             fprintf(stderr, "Option -%c requires an argument.\n", optopt);
-            break;
+            return EXIT_FAILURE;
         }
         default:
             print_usage(argv[0]);
@@ -105,13 +108,15 @@ int main(int argc, char *argv[])
     ink_arena_initialize(&arena, arena_block_size, arena_alignment);
 
     rc = ink_syntax_tree_initialize(&source, &syntax_tree);
-    if (rc < 0)
+    if (rc < 0) {
         goto cleanup;
+    }
 
     ink_parse(&arena, &source, &syntax_tree, flags);
 
-    if (dump_ast)
-        ink_syntax_tree_print(&syntax_tree);
+    if (dump_ast) {
+        ink_syntax_tree_print(&syntax_tree, colors);
+    }
 cleanup:
     ink_syntax_tree_cleanup(&syntax_tree);
     ink_arena_release(&arena);
