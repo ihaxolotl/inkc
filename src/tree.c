@@ -42,7 +42,7 @@ static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
 static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
-static const char *INK_SYNTAX_TREE_INNER[] = {"+--", "|  "};
+static const char *INK_SYNTAX_TREE_INNER[] = {"|--", "|  "};
 static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
 
 /**
@@ -107,17 +107,20 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
                  context->filename);
         break;
     }
-    case INK_NODE_BLOCK_STMT: {
+    case INK_NODE_BLOCK_STMT:
+    case INK_NODE_CHOICE_STMT: {
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
     }
     case INK_NODE_CONTENT_STMT:
+    case INK_NODE_CHOICE_STAR_STMT:
+    case INK_NODE_CHOICE_PLUS_STMT:
     case INK_NODE_STRING_EXPR: {
-        snprintf(buffer, length, "%s <col:%zu, col:%zu>",
-                 context->node_type_strz, context->column_start,
-                 context->column_end);
+        snprintf(buffer, length, "%s <line: %zu, col:%zu:%zu>",
+                 context->node_type_strz, context->line_start,
+                 context->column_start, context->column_end);
         break;
     }
     case INK_NODE_STRING_LITERAL:
@@ -131,8 +134,9 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
         break;
     }
     default:
-        snprintf(buffer, length, "%s <col:%zu>", context->node_type_strz,
-                 context->column_start);
+        snprintf(buffer, length, "%s <col:%zu, col:%zu>",
+                 context->node_type_strz, context->column_start,
+                 context->column_end);
         break;
     }
 }
@@ -150,7 +154,8 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
                  context->node_type_strz, context->filename);
         break;
     }
-    case INK_NODE_BLOCK_STMT: {
+    case INK_NODE_BLOCK_STMT:
+    case INK_NODE_CHOICE_STMT: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -160,13 +165,15 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
         break;
     }
     case INK_NODE_CONTENT_STMT:
+    case INK_NODE_CHOICE_STAR_STMT:
+    case INK_NODE_CHOICE_PLUS_STMT:
     case INK_NODE_STRING_EXPR: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
-                 "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
-                 context->node_type_strz, context->column_start,
-                 context->column_end);
+                 "line:%zu, col:%zu:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, context->line_start,
+                 context->column_start, context->column_end);
         break;
     }
     case INK_NODE_STRING_LITERAL:
@@ -187,8 +194,9 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
-                 "col:%zu" ANSI_COLOR_RESET ">",
-                 context->node_type_strz, context->column_start);
+                 "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
+                 context->node_type_strz, context->column_start,
+                 context->column_end);
         break;
     }
 }
