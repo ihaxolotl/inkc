@@ -126,6 +126,9 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
     case INK_NODE_STRING_LITERAL:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_CHOICE_START_EXPR:
+    case INK_NODE_CHOICE_OPTION_EXPR:
+    case INK_NODE_CHOICE_INNER_EXPR:
     case INK_NODE_PARAM_DECL:
     case INK_NODE_REF_PARAM_DECL: {
         snprintf(buffer, length, "%s `%.*s` <col:%zu, col:%zu>",
@@ -179,6 +182,9 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
     case INK_NODE_STRING_LITERAL:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_CHOICE_START_EXPR:
+    case INK_NODE_CHOICE_OPTION_EXPR:
+    case INK_NODE_CHOICE_INNER_EXPR:
     case INK_NODE_PARAM_DECL:
     case INK_NODE_REF_PARAM_DECL: {
         snprintf(buffer, length,

@@ -1288,26 +1288,36 @@ ink_parse_choice_content(struct ink_parser *parser)
     struct ink_syntax_node *node = NULL;
 
     INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
-    ink_parser_scratch_append(&parser->scratch, node);
 
+    if (node) {
+        node->type = INK_NODE_CHOICE_START_EXPR;
+        ink_parser_scratch_append(&parser->scratch, node);
+    }
     if (ink_parser_check(parser, INK_TT_LEFT_BRACKET)) {
         ink_parser_advance(parser);
-        INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
-        ink_parser_scratch_append(&parser->scratch, node);
+        ink_parser_eat(parser, INK_TT_WHITESPACE);
+
+        if (!ink_parser_check(parser, INK_TT_RIGHT_BRACKET)) {
+            INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
+
+            if (node) {
+                node->type = INK_NODE_CHOICE_OPTION_EXPR;
+                ink_parser_scratch_append(&parser->scratch, node);
+            }
+        }
+
         ink_parser_expect(parser, INK_TT_RIGHT_BRACKET);
 
         if (!ink_parser_check_many(parser, token_set)) {
             INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
-            ink_parser_scratch_append(&parser->scratch, node);
-        } else {
-            ink_parser_scratch_append(&parser->scratch, NULL);
-        }
 
-    } else {
-        ink_parser_scratch_append(&parser->scratch, NULL);
-        ink_parser_scratch_append(&parser->scratch, NULL);
+            if (node) {
+                node->type = INK_NODE_CHOICE_INNER_EXPR;
+                ink_parser_scratch_append(&parser->scratch, node);
+            }
+        }
     }
-    return ink_parser_create_sequence(parser, INK_NODE_CHOICE_CONTENT_EXPR,
+    return ink_parser_create_sequence(parser, INK_NODE_CHOICE_EXPR,
                                       source_start, parser->current_offset,
                                       scratch_offset);
 }

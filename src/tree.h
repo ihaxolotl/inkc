@@ -25,7 +25,10 @@ struct ink_syntax_node;
     T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                 \
     T(NODE_CHOICE_STAR_STMT, "ChoiceStarStmt")                                 \
-    T(NODE_CHOICE_CONTENT_EXPR, "ChoiceContentExpr")                           \
+    T(NODE_CHOICE_EXPR, "ChoiceContentExpr")                                   \
+    T(NODE_CHOICE_START_EXPR, "ChoiceStartContentExpr")                        \
+    T(NODE_CHOICE_OPTION_EXPR, "ChoiceOptionOnlyContentExpr")                  \
+    T(NODE_CHOICE_INNER_EXPR, "ChoiceInnerContentExpr")                        \
     T(NODE_CONDITIONAL_STMT, "ConditionalStmt")                                \
     T(NODE_CONDITIONAL_BRANCH, "ConditionalBranchStmt")                        \
     T(NODE_CONTAINS_EXPR, "ContainsExpr")                                      \
