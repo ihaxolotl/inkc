@@ -17,21 +17,12 @@ struct ink_node_buffer {
 };
 
 #define T(name, description) description,
-static const char *INK_TT_STR[] = {INK_TT(T)};
-#undef T
-
-#define T(name, description) description,
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
 static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
 static const char *INK_SYNTAX_TREE_INNER[] = {"+--", "|  "};
 static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
-
-const char *ink_token_type_strz(enum ink_token_type type)
-{
-    return INK_TT_STR[type];
-}
 
 /**
  * Return a NULL-terminated string representing the type description of a
@@ -174,29 +165,6 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
     if (tree->root) {
         ink_syntax_tree_print_node(tree, tree->root, "", INK_SYNTAX_TREE_EMPTY);
         ink_syntax_tree_print_walk(tree, tree->root, "", INK_SYNTAX_TREE_EMPTY);
-    }
-}
-
-void ink_token_print(const struct ink_source *source,
-                     const struct ink_token *token)
-{
-    const size_t start = token->start_offset;
-    const size_t end = token->end_offset;
-
-    switch (token->type) {
-    case INK_TT_EOF:
-        printf("[DEBUG] %s(%zu, %zu): `\\0`\n",
-               ink_token_type_strz(token->type), start, end);
-        break;
-    case INK_TT_NL:
-        printf("[DEBUG] %s(%zu, %zu): `\\n`\n",
-               ink_token_type_strz(token->type), start, end);
-        break;
-    default:
-        printf("[DEBUG] %s(%zu, %zu): `%.*s`\n",
-               ink_token_type_strz(token->type), start, end, (int)(end - start),
-               source->bytes + start);
-        break;
     }
 }
 

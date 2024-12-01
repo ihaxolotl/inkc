@@ -3,7 +3,7 @@
 // CHECK: File "STDIN"
 // CHECK-NEXT: +--BlockStmt
 // CHECK-NEXT: |  +--VarDecl
-// CHECK-NEXT: |  |  +--Name `globalVal `
+// CHECK-NEXT: |  |  +--Name `globalVal`
 // CHECK-NEXT: |  |  `--NumberLiteral `5`
 // CHECK-NEXT: |  +--ContentStmt
 // CHECK-NEXT: |  |  `--ContentExpr
@@ -44,7 +44,7 @@
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ExprStmt
 // CHECK-NEXT:       |  `--AssignExpr
-// CHECK-NEXT:       |     +--Name `x `
+// CHECK-NEXT:       |     +--Name `x`
 // CHECK-NEXT:       |     `--MultiplyExpr
 // CHECK-NEXT:       |        +--Name `x `
 // CHECK-NEXT:       |        `--Name `x`

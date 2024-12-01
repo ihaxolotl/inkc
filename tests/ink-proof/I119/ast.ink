@@ -3,7 +3,7 @@
 // CHECK: File "STDIN"
 // CHECK-NEXT: `--BlockStmt
 // CHECK-NEXT:    +--VarDecl
-// CHECK-NEXT:    |  +--Name `x `
+// CHECK-NEXT:    |  +--Name `x`
 // CHECK-NEXT:    |  `--StringExpr `"Hello world 1"`
 // CHECK-NEXT:    |     `--StringLiteral `Hello world 1`
 // CHECK-NEXT:    +--ContentStmt

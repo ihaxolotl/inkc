@@ -26,7 +26,9 @@ SRCS := src/main.c                     \
         src/platform.c                 \
         src/arena.c                    \
         src/source.c                   \
+        src/token.c                    \
         src/tree.c                     \
+        src/scanner.c                  \
         src/parse.c
 
 all: $(BUILD_ROOT) $(BUILD_TARGET)

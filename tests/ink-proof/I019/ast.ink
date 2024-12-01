@@ -2,7 +2,7 @@
 
 // CHECK: File "STDIN"
 // CHECK-NEXT: `--KnotDecl
-// CHECK-NEXT:    +--Name `test `
+// CHECK-NEXT:    +--Name `test`
 // CHECK-NEXT:    `--BlockStmt
 // CHECK-NEXT:       +--ContentStmt
 // CHECK-NEXT:       |  `--ContentExpr
