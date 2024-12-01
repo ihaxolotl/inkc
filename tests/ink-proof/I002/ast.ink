@@ -6,7 +6,7 @@
 // CHECK-NEXT:    |  `--ContentExpr
 // CHECK-NEXT:    |     `--StringLiteral `"What's that?" my master asked.`
 // CHECK-NEXT:    `--ChoiceStmt
-// CHECK-NEXT:       +--ChoiceStarBranch
+// CHECK-NEXT:       +--ChoiceStarStmt
 // CHECK-NEXT:       |  +--ChoiceContentExpr
 // CHECK-NEXT:       |  |  +--StringLiteral `"I am somewhat tired`
 // CHECK-NEXT:       |  |  +--StringLiteral `."`
@@ -15,7 +15,7 @@
 // CHECK-NEXT:       |     `--ContentStmt
 // CHECK-NEXT:       |        `--ContentExpr
 // CHECK-NEXT:       |           `--StringLiteral `"Really," he responded. "How deleterious."`
-// CHECK-NEXT:       +--ChoiceStarBranch
+// CHECK-NEXT:       +--ChoiceStarStmt
 // CHECK-NEXT:       |  +--ChoiceContentExpr
 // CHECK-NEXT:       |  |  +--StringLiteral `"Nothing, Monsieur!"`
 // CHECK-NEXT:       |  |  +--StringLiteral ``
@@ -24,7 +24,7 @@
 // CHECK-NEXT:       |     `--ContentStmt
 // CHECK-NEXT:       |        `--ContentExpr
 // CHECK-NEXT:       |           `--StringLiteral `"Very good, then."`
-// CHECK-NEXT:       `--ChoiceStarBranch
+// CHECK-NEXT:       `--ChoiceStarStmt
 // CHECK-NEXT:          +--ChoiceContentExpr
 // CHECK-NEXT:          |  +--StringLiteral `"I said, this journey is appalling`
 // CHECK-NEXT:          |  +--StringLiteral `."`

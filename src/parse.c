@@ -597,16 +597,14 @@ static inline bool ink_parser_check(struct ink_parser *parser,
  */
 static void ink_parser_trace(struct ink_parser *parser, const char *rule_name)
 {
-    /*
-    const struct ink_parser_context *context = ink_parser_context(parser);
     const struct ink_token *token = ink_parser_current_token(parser);
 
-    ink_trace("Entering %s(Context=%s, TokenType=%s, SourceOffset: %zu, "
+    ink_trace("Entering %s(PendingChoices=%zu, PendingBlocks=%zu, "
+              "TokenType=%s, SourceOffset: %zu, "
               "Level: %zu)",
-              rule_name, ink_parse_type_strz(context->type),
+              rule_name, parser->choices.depth, parser->blocks.depth,
               ink_token_type_strz(token->type), parser->current_offset,
-              context->level);
-*/
+              parser->current_level);
 }
 
 static void ink_parser_rewind_scanner(struct ink_parser *parser)
@@ -1696,8 +1694,8 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
                     temp = ink_parser_context_reduce(
                         parser, blocks, INK_NODE_BLOCK_STMT, node_start);
 
-                    if (scratch->entries[scratch->count]) {
-                        scratch->entries[scratch->count]->rhs = temp;
+                    if (scratch->count > 0) {
+                        scratch->entries[scratch->count - 1]->rhs = temp;
                     }
                 }
             } else if (block_top->level != parser->current_level) {
@@ -1714,8 +1712,7 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
                     temp = ink_parser_context_reduce(
                         parser, blocks, INK_NODE_BLOCK_STMT, node_start);
 
-                    if (scratch->count > 0 &&
-                        scratch->entries[scratch->count - 1]) {
+                    if (scratch->count > 0) {
                         scratch->entries[scratch->count - 1]->rhs = temp;
                     }
                 }
@@ -1731,27 +1728,26 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
 
         ink_parser_scratch_append(scratch, node);
     }
-    while (blocks->depth != 0 && choices->depth != 0) {
-        const struct ink_parser_context *block_top =
-            &blocks->entries[blocks->depth];
-        const struct ink_parser_context *choice_top =
-            &choices->entries[choices->depth];
+    for (;;) {
 
-        if (block_top->level > 0) {
+        if (blocks->depth > 0) {
             temp = ink_parser_context_reduce(parser, blocks,
                                              INK_NODE_BLOCK_STMT, (size_t)-1);
 
-            if (scratch->entries[scratch->count]) {
-                scratch->entries[scratch->count]->rhs = temp;
+            if (scratch->count > 0) {
+                scratch->entries[scratch->count - 1]->rhs = temp;
+            } else {
+                ink_parser_scratch_append(scratch, temp);
             }
         }
-        if (choice_top->level > 0) {
+        if (choices->depth > 0) {
             temp = ink_parser_context_reduce(parser, choices,
                                              INK_NODE_CHOICE_STMT, (size_t)-1);
             ink_parser_scratch_append(scratch, temp);
+        } else {
+            break;
         }
     }
-
     return ink_parser_create_sequence(parser, INK_NODE_FILE, file_start,
                                       parser->current_offset, scratch_offset);
 }
