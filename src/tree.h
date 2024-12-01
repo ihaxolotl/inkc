@@ -8,6 +8,7 @@ extern "C" {
 #include <stddef.h>
 
 #include "source.h"
+#include "vec.h"
 
 struct ink_arena;
 struct ink_syntax_node;
@@ -18,7 +19,7 @@ struct ink_syntax_node;
     T(NODE_AND_EXPR, "AndExpr")                                                \
     T(NODE_ARG_LIST, "ArgumentList")                                           \
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
-    T(NODE_BLOCK_STMT, "BlockStmt")                                            \
+    T(NODE_BLOCK_STMT, "CompoundStmt")                                         \
     T(NODE_CALL_EXPR, "CallExpr")                                              \
     T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                 \
@@ -30,8 +31,6 @@ struct ink_syntax_node;
     T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
-    T(NODE_LABELLED_CHOICE_BRANCH, "LabelledChoiceBranch")                     \
-    T(NODE_CONDITIONAL_CHOICE_BRANCH, "ConditionalChoiceBranch")               \
     T(NODE_IDENTIFIER_EXPR, "Name")                                            \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_DIVERT, "Divert")                                                   \
@@ -55,9 +54,9 @@ struct ink_syntax_node;
     T(NODE_NOT_EXPR, "NotExpr")                                                \
     T(NODE_NUMBER_EXPR, "NumberLiteral")                                       \
     T(NODE_OR_EXPR, "OrExpr")                                                  \
-    T(NODE_PARAM_LIST, "ParameterList")                                        \
+    T(NODE_PARAM_LIST, "ParamList")                                            \
     T(NODE_PARAM_DECL, "ParamDecl")                                            \
-    T(NODE_REF_PARAM_DECL, "RefParamDecl")                                     \
+    T(NODE_REF_PARAM_DECL, "ParamRefDecl")                                     \
     T(NODE_RETURN_STMT, "ReturnStmt")                                          \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
@@ -95,22 +94,11 @@ struct ink_syntax_seq {
  * TODO(Brett): Pack node data to reduce node size?
  */
 struct ink_syntax_node {
-    /* Type of the syntax tree node */
     enum ink_syntax_node_type type;
-
-    /* Starting offset within the source buffer */
     size_t start_offset;
-
-    /* Ending offset within the source buffer */
     size_t end_offset;
-
-    /* Left-hand side */
     struct ink_syntax_node *lhs;
-
-    /* Right-hand side */
     struct ink_syntax_node *rhs;
-
-    /* Sequence of children */
     struct ink_syntax_seq *seq;
 };
 

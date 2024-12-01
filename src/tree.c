@@ -4,17 +4,26 @@
 #include <stdlib.h>
 
 #include "arena.h"
-#include "platform.h"
 #include "tree.h"
+#include "vec.h"
 
-/**
- * Node buffer.
- */
-struct ink_node_buffer {
-    size_t count;
-    size_t capacity;
-    struct ink_syntax_node **entries;
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_GREEN "\x1b[32m"
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+#define ANSI_COLOR_BLUE "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN "\x1b[36m"
+#define ANSI_COLOR_RESET "\x1b[0m"
+#define ANSI_BOLD_ON "\x1b[1m"
+#define ANSI_BOLD_OFF "\x1b[22m"
+
+struct ink_source_range {
+    size_t start_offset;
+    size_t end_offset;
 };
+
+INK_VEC_DECLARE(ink_node_buffer, struct ink_syntax_node *)
+INK_VEC_DECLARE(ink_line_buffer, struct ink_source_range)
 
 #define T(name, description) description,
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
@@ -23,6 +32,48 @@ static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
 static const char *INK_SYNTAX_TREE_INNER[] = {"+--", "|  "};
 static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
+
+static void ink_build_lines(struct ink_line_buffer *lines,
+                            const struct ink_source *source)
+{
+    struct ink_source_range range;
+    size_t start_offset = 0;
+    size_t end_offset = 0;
+
+    while (source->bytes[end_offset] != '\0') {
+        if (source->bytes[end_offset] == '\n') {
+            range.start_offset = start_offset;
+            range.end_offset = end_offset;
+
+            ink_line_buffer_append(lines, range);
+            start_offset = end_offset + 1;
+        }
+        end_offset++;
+    }
+    if (start_offset != end_offset) {
+        range.start_offset = start_offset;
+        range.end_offset = end_offset;
+
+        ink_line_buffer_append(lines, range);
+    }
+}
+
+static size_t ink_calculate_line(const struct ink_line_buffer *lines,
+                                 size_t offset)
+{
+    size_t line_number = 0;
+
+    for (size_t i = 0; i < lines->count; i++) {
+        const struct ink_source_range range = lines->entries[i];
+
+        if (offset >= range.start_offset && offset <= range.end_offset) {
+            return line_number;
+        }
+
+        line_number++;
+    }
+    return lines->count - 1;
+}
 
 /**
  * Return a NULL-terminated string representing the type description of a
@@ -33,55 +84,8 @@ const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
     return INK_NODE_TYPE_STR[type];
 }
 
-static void ink_node_buffer_initialize(struct ink_node_buffer *buffer)
-{
-    buffer->count = 0;
-    buffer->capacity = 0;
-    buffer->entries = NULL;
-}
-
-static int ink_node_buffer_append(struct ink_node_buffer *buffer,
-                                  struct ink_syntax_node *item)
-{
-    size_t capacity, old_size, new_size;
-    struct ink_syntax_node **entries;
-
-    if (buffer->count + 1 > buffer->capacity) {
-        if (buffer->capacity < 16) {
-            capacity = 16;
-        } else {
-            capacity = buffer->capacity * 2;
-        }
-
-        old_size = buffer->capacity * sizeof(entries);
-        new_size = capacity * sizeof(entries);
-
-        entries = platform_mem_realloc(buffer->entries, old_size, new_size);
-        if (entries == NULL) {
-            buffer->entries = NULL;
-            return -1;
-        }
-
-        buffer->capacity = capacity;
-        buffer->entries = entries;
-    }
-
-    buffer->entries[buffer->count++] = item;
-    return 0;
-}
-
-static void ink_node_buffer_cleanup(struct ink_node_buffer *buffer)
-{
-    size_t mem_size;
-
-    if (buffer->capacity > 0) {
-        mem_size = sizeof(buffer->entries) * buffer->capacity;
-
-        platform_mem_dealloc(buffer->entries, mem_size);
-    }
-}
-
 static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
+                                       const struct ink_line_buffer *lines,
                                        const struct ink_syntax_node *node,
                                        const char *prefix,
                                        const char **pointers)
@@ -91,33 +95,57 @@ static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
     const unsigned char *bytes = tree->source->bytes;
     const unsigned char *lexeme = bytes + node->start_offset;
     const size_t lexeme_length = node->end_offset - node->start_offset;
+    const size_t line_start = ink_calculate_line(lines, node->start_offset);
+    const size_t line_end = ink_calculate_line(lines, node->end_offset);
+    const struct ink_source_range line_range = lines->entries[line_start];
+    const size_t col_start = node->start_offset - line_range.start_offset;
+    const size_t col_end = node->end_offset - line_range.start_offset;
 
     switch (node->type) {
+    case INK_NODE_FILE: {
+        snprintf(output, sizeof(output),
+                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "\"%s\"",
+                 node_type_str, tree->source->filename);
+        break;
+    }
+    case INK_NODE_BLOCK_STMT: {
+        snprintf(output, sizeof(output),
+                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
+                 "line:%zu, line:%zu" ANSI_COLOR_RESET ">",
+                 node_type_str, line_start, line_end);
+        break;
+    }
     case INK_NODE_STRING_LITERAL:
     case INK_NODE_STRING_EXPR:
     case INK_NODE_NUMBER_EXPR:
     case INK_NODE_IDENTIFIER_EXPR:
     case INK_NODE_PARAM_DECL:
-    case INK_NODE_REF_PARAM_DECL:
-        snprintf(output, sizeof(output), "%s `%.*s`", node_type_str,
-                 (int)lexeme_length, lexeme);
+    case INK_NODE_REF_PARAM_DECL: {
+        snprintf(output, sizeof(output),
+                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN
+                 "%.*s" ANSI_COLOR_RESET "` "
+                 "<" ANSI_COLOR_YELLOW "col:%zu, col:%zu" ANSI_COLOR_RESET ">",
+                 node_type_str, (int)lexeme_length, lexeme, col_start + 1,
+                 col_end + 1);
         break;
-    case INK_NODE_FILE:
-        snprintf(output, sizeof(output), "%s \"%s\"", node_type_str,
-                 tree->source->filename);
-        break;
+    }
     default:
-        snprintf(output, sizeof(output), "%s", node_type_str);
+        snprintf(output, sizeof(output),
+                 ANSI_COLOR_MAGENTA ANSI_BOLD_ON
+                 "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
+                 "line:%zu, col:%zu" ANSI_COLOR_RESET ">",
+                 node_type_str, line_start + 1, col_start + 1);
         break;
     }
 
     printf("%s%s%s\n", prefix, pointers[0], output);
 }
 
-/**
- * Walk the syntax tree and print each node.
- */
 static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
+                                       const struct ink_line_buffer *lines,
                                        const struct ink_syntax_node *node,
                                        const char *prefix,
                                        const char **pointers)
@@ -125,7 +153,7 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
     char new_prefix[1024];
     struct ink_node_buffer nodes;
 
-    ink_node_buffer_initialize(&nodes);
+    ink_node_buffer_create(&nodes);
 
     if (node->lhs) {
         ink_node_buffer_append(&nodes, node->lhs);
@@ -145,16 +173,16 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
         snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, pointers[1]);
 
         if (nodes.entries[i]) {
-            ink_syntax_tree_print_node(tree, nodes.entries[i], prefix,
+            ink_syntax_tree_print_node(tree, lines, nodes.entries[i], prefix,
                                        pointers);
-            ink_syntax_tree_print_walk(tree, nodes.entries[i], new_prefix,
-                                       pointers);
+            ink_syntax_tree_print_walk(tree, lines, nodes.entries[i],
+                                       new_prefix, pointers);
         } else {
             printf("%s%sNullNode\n", prefix, pointers[0]);
         }
     }
 
-    ink_node_buffer_cleanup(&nodes);
+    ink_node_buffer_destroy(&nodes);
 }
 
 /**
@@ -162,10 +190,19 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
  */
 void ink_syntax_tree_print(const struct ink_syntax_tree *tree)
 {
+    struct ink_line_buffer lines;
+
+    ink_line_buffer_create(&lines);
+    ink_build_lines(&lines, tree->source);
+
     if (tree->root) {
-        ink_syntax_tree_print_node(tree, tree->root, "", INK_SYNTAX_TREE_EMPTY);
-        ink_syntax_tree_print_walk(tree, tree->root, "", INK_SYNTAX_TREE_EMPTY);
+        ink_syntax_tree_print_node(tree, &lines, tree->root, "",
+                                   INK_SYNTAX_TREE_EMPTY);
+        ink_syntax_tree_print_walk(tree, &lines, tree->root, "",
+                                   INK_SYNTAX_TREE_EMPTY);
     }
+
+    ink_line_buffer_destroy(&lines);
 }
 
 /**
@@ -182,8 +219,9 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
     assert(start_offset <= end_offset);
 
     node = ink_arena_allocate(arena, sizeof(*node));
-    if (node == NULL)
-        return NULL;
+    if (!node) {
+        return node;
+    }
 
     node->type = type;
     node->start_offset = start_offset;
@@ -195,9 +233,7 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
 }
 
 /**
- * Initialize a syntax tree.
- *
- * Storage space for the token buffer will be reserved for later use here.
+ * Initialize syntax tree.
  */
 int ink_syntax_tree_initialize(const struct ink_source *source,
                                struct ink_syntax_tree *tree)
@@ -207,6 +243,9 @@ int ink_syntax_tree_initialize(const struct ink_source *source,
     return 0;
 }
 
+/**
+ * Destroy syntax tree.
+ */
 void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree)
 {
 }

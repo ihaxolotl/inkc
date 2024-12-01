@@ -12,9 +12,8 @@
 #include "scanner.h"
 #include "token.h"
 #include "tree.h"
+#include "vec.h"
 
-#define INK_SCRATCH_COUNT_MIN 16
-#define INK_SCRATCH_GROWTH_FACTOR 2
 #define INK_HASHTABLE_SCALE_FACTOR 2u
 #define INK_HASHTABLE_LOAD_MAX .75
 #define INK_HASHTABLE_MIN_CAPACITY 16
@@ -76,6 +75,8 @@
         INK_PARSER_MEMOIZE(node, rule, __VA_ARGS__);                           \
     } while (0)
 
+INK_VEC_DECLARE(ink_parser_scratch, struct ink_syntax_node *)
+
 struct ink_parser_context {
     size_t level;
     size_t scratch_offset;
@@ -96,12 +97,6 @@ struct ink_parser_cache_key {
 struct ink_parser_cache_entry {
     struct ink_parser_cache_key key;
     struct ink_syntax_node *value;
-};
-
-struct ink_parser_scratch {
-    size_t count;
-    size_t capacity;
-    struct ink_syntax_node **entries;
 };
 
 /**
@@ -167,70 +162,6 @@ static struct ink_syntax_node *ink_parse_divert_stmt(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_stmt(struct ink_parser *parser);
 static struct ink_syntax_node *ink_parse_logic_expr(struct ink_parser *);
 static struct ink_syntax_node *ink_parse_argument_list(struct ink_parser *);
-
-static void ink_parser_scratch_initialize(struct ink_parser_scratch *scratch)
-{
-    scratch->count = 0;
-    scratch->capacity = 0;
-    scratch->entries = NULL;
-}
-
-static void ink_parser_scratch_cleanup(struct ink_parser_scratch *scratch)
-{
-    const size_t mem_size = sizeof(scratch->entries) * scratch->capacity;
-
-    platform_mem_dealloc(scratch->entries, mem_size);
-}
-
-static int ink_parser_scratch_reserve(struct ink_parser_scratch *scratch,
-                                      size_t item_count)
-{
-    struct ink_syntax_node **entries = scratch->entries;
-    const size_t old_capacity = scratch->capacity * sizeof(entries);
-    const size_t new_capacity = item_count * sizeof(entries);
-
-    entries = platform_mem_realloc(entries, old_capacity, new_capacity);
-    if (entries == NULL) {
-        scratch->entries = NULL;
-        return -1;
-    }
-
-    scratch->count = scratch->count;
-    scratch->capacity = item_count;
-    scratch->entries = entries;
-    return INK_E_OK;
-}
-
-static void ink_parser_scratch_shrink(struct ink_parser_scratch *scratch,
-                                      size_t count)
-{
-    assert(count <= scratch->capacity);
-
-    scratch->count = count;
-}
-
-static void ink_parser_scratch_append(struct ink_parser_scratch *scratch,
-                                      struct ink_syntax_node *node)
-{
-    size_t capacity, old_size, new_size;
-
-    if (scratch->count + 1 > scratch->capacity) {
-        if (scratch->capacity < INK_SCRATCH_COUNT_MIN) {
-            capacity = INK_SCRATCH_COUNT_MIN;
-        } else {
-            capacity = scratch->capacity * INK_SCRATCH_GROWTH_FACTOR;
-        }
-
-        old_size = scratch->capacity * sizeof(scratch->entries);
-        new_size = capacity * sizeof(scratch->entries);
-
-        scratch->entries =
-            platform_mem_realloc(scratch->entries, old_size, new_size);
-        scratch->capacity = capacity;
-    }
-
-    scratch->entries[scratch->count++] = node;
-}
 
 static void ink_parser_cache_initialize(struct ink_parser_cache *cache)
 {
@@ -804,8 +735,8 @@ static int ink_parser_initialize(struct ink_parser *parser,
     parser->choices.depth = 0;
     parser->choices.entries[0] = (struct ink_parser_context){0};
 
-    ink_parser_scratch_initialize(&parser->scratch);
-    ink_parser_scratch_reserve(&parser->scratch, INK_SCRATCH_COUNT_MIN);
+    ink_parser_scratch_create(&parser->scratch);
+    ink_parser_scratch_reserve(&parser->scratch, INK_VEC_COUNT_MIN);
     ink_parser_cache_initialize(&parser->cache);
 
     return INK_E_OK;
@@ -813,7 +744,7 @@ static int ink_parser_initialize(struct ink_parser *parser,
 
 static void ink_parser_cleanup(struct ink_parser *parser)
 {
-    ink_parser_scratch_cleanup(&parser->scratch);
+    ink_parser_scratch_destroy(&parser->scratch);
     ink_parser_cache_cleanup(&parser->cache);
     memset(parser, 0, sizeof(*parser));
 }
@@ -1669,8 +1600,8 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
     ink_parser_context_shift(parser, blocks, NULL, 0, 0, file_start);
 
     while (!ink_parser_check(parser, INK_TT_EOF)) {
-        struct ink_syntax_node *node = NULL;
         const size_t node_start = parser->current_offset;
+        struct ink_syntax_node *node = NULL;
         struct ink_parser_context *block_top = &blocks->entries[blocks->depth];
         struct ink_parser_context *choice_top =
             &choices->entries[choices->depth];
