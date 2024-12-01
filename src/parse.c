@@ -1659,12 +1659,13 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
 
         ink_parser_scratch_append(scratch, node);
     }
-    for (;;) {
+    while (!(choices->depth == 0 || blocks->depth == 0)) {
         if (choices->depth > 0) {
             temp = ink_parser_context_reduce(parser, choices,
                                              INK_NODE_CHOICE_STMT, (size_t)-1);
             ink_parser_scratch_append(scratch, temp);
-        } else if (blocks->depth > 0) {
+        }
+        if (blocks->depth > 0) {
             temp = ink_parser_context_reduce(parser, blocks,
                                              INK_NODE_BLOCK_STMT, (size_t)-1);
 
@@ -1673,8 +1674,6 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
             } else {
                 ink_parser_scratch_append(scratch, temp);
             }
-        } else {
-            break;
         }
     }
     return ink_parser_create_sequence(parser, INK_NODE_FILE, file_start,
