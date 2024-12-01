@@ -1596,15 +1596,17 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
     struct ink_parser_scratch *scratch = &parser->scratch;
     struct ink_parser_context_stack *blocks = &parser->blocks;
     struct ink_parser_context_stack *choices = &parser->choices;
+    struct ink_parser_context *block_top = NULL;
+    struct ink_parser_context *choice_top = NULL;
 
     ink_parser_context_shift(parser, blocks, NULL, 0, 0, file_start);
 
     while (!ink_parser_check(parser, INK_TT_EOF)) {
         const size_t node_start = parser->current_offset;
         struct ink_syntax_node *node = NULL;
-        struct ink_parser_context *block_top = &blocks->entries[blocks->depth];
-        struct ink_parser_context *choice_top =
-            &choices->entries[choices->depth];
+
+        block_top = &blocks->entries[blocks->depth];
+        choice_top = &choices->entries[choices->depth];
 
         INK_PARSER_RULE(node, ink_parse_stmt, parser);
 
@@ -1659,13 +1661,11 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
 
         ink_parser_scratch_append(scratch, node);
     }
-    while (!(choices->depth == 0 || blocks->depth == 0)) {
-        if (choices->depth > 0) {
-            temp = ink_parser_context_reduce(parser, choices,
-                                             INK_NODE_CHOICE_STMT, (size_t)-1);
-            ink_parser_scratch_append(scratch, temp);
-        }
-        if (blocks->depth > 0) {
+    while (!(choices->depth == 0 && blocks->depth == 0)) {
+        block_top = &blocks->entries[blocks->depth];
+        choice_top = &choices->entries[choices->depth];
+
+        if (block_top->level >= choice_top->level) {
             temp = ink_parser_context_reduce(parser, blocks,
                                              INK_NODE_BLOCK_STMT, (size_t)-1);
 
@@ -1674,6 +1674,10 @@ static struct ink_syntax_node *ink_parse_file(struct ink_parser *parser)
             } else {
                 ink_parser_scratch_append(scratch, temp);
             }
+        } else {
+            temp = ink_parser_context_reduce(parser, choices,
+                                             INK_NODE_CHOICE_STMT, (size_t)-1);
+            ink_parser_scratch_append(scratch, temp);
         }
     }
     return ink_parser_create_sequence(parser, INK_NODE_FILE, file_start,
