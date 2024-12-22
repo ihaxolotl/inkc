@@ -45,6 +45,7 @@ struct ink_syntax_node;
     T(NODE_FALSE_EXPR, "False")                                                \
     T(NODE_FUNCTION_DECL, "FunctionDecl")                                      \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
+    T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
     T(NODE_KNOT_DECL, "KnotDecl")                                              \

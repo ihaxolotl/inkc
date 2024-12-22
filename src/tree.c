@@ -71,7 +71,7 @@ static void ink_build_lines(struct ink_line_buffer *lines,
         }
         end_offset++;
     }
-    if (start_offset != end_offset) {
+    if (start_offset != end_offset || !end_offset) {
         range.start_offset = start_offset;
         range.end_offset = end_offset;
 

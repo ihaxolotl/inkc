@@ -2,6 +2,7 @@
 #define __INK_VEC_H__
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "common.h"
@@ -59,6 +60,12 @@ extern "C" {
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
+    __attribute__((unused)) static inline bool T##_is_empty(                   \
+        const struct T *vec)                                                   \
+    {                                                                          \
+        return vec->count == 0;                                                \
+    }                                                                          \
+                                                                               \
     __attribute__((unused)) static inline void T##_shrink(struct T *vec,       \
                                                           size_t count)        \
     {                                                                          \
@@ -87,7 +94,30 @@ extern "C" {
         }                                                                      \
                                                                                \
         vec->entries[vec->count++] = entry;                                    \
-    }
+    }                                                                          \
+                                                                               \
+    __attribute__((unused)) static inline int T##_pop(struct T *vec, V *entry) \
+    {                                                                          \
+        if (vec->count == 0) {                                                 \
+            return -1;                                                         \
+        }                                                                      \
+                                                                               \
+        *entry = vec->entries[vec->count - 1];                                 \
+        vec->count--;                                                          \
+        return 0;                                                              \
+    }                                                                          \
+                                                                               \
+    __attribute__((unused)) static inline int T##_peek(struct T *vec,          \
+                                                       V *entry)               \
+    {                                                                          \
+        if (vec->count == 0) {                                                 \
+            return -1;                                                         \
+        }                                                                      \
+                                                                               \
+        *entry = vec->entries[vec->count - 1];                                 \
+        return 0;                                                              \
+    }                                                                          \
+    /**/
 
 #ifdef __cplusplus
 }
