@@ -1749,17 +1749,6 @@ ink_parse_stmt_level(struct ink_parser *parser,
                 break;
             }
         }
-        if (!ink_parser_context_stack_is_empty(block_stack)) {
-            ink_parser_context_stack_peek(block_stack, &block);
-            if (block.level > parser->current_level) {
-                ink_parser_stack_pop(block_stack);
-
-                temp = ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
-                                         block.source_offset, start_offset);
-                ink_parser_scratch_append(scratch, temp);
-            }
-        }
-        /*
         if (node && node->type == INK_NODE_GATHER_STMT) {
             ink_parser_scratch_peek(&parser->scratch, &temp);
 
@@ -1770,7 +1759,17 @@ ink_parse_stmt_level(struct ink_parser *parser,
                     parser, INK_NODE_GATHERED_CHOICE_STMT, 0,
                     parser->current_offset, temp, node);
             }
-        }*/
+        }
+        if (!ink_parser_context_stack_is_empty(block_stack)) {
+            ink_parser_context_stack_peek(block_stack, &block);
+            if (block.level > parser->current_level) {
+                ink_parser_stack_pop(block_stack);
+
+                temp = ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
+                                         block.source_offset, start_offset);
+                ink_parser_scratch_append(scratch, temp);
+            }
+        }
     }
     return node;
 }
@@ -1820,10 +1819,12 @@ int ink_parse(struct ink_arena *arena, const struct ink_source *source,
         rc = -INK_E_PARSE_FAIL;
     }
 
+    /*
     ink_trace("left over blocks=%zu, left over choices=%zu, left over "
               "nodes=%zu, current level=%d",
               parser.blocks.count, parser.choices.count, parser.scratch.count,
               parser.current_level);
+    */
 
     ink_parser_cleanup(&parser);
 

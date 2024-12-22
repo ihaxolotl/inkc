@@ -118,7 +118,7 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
     case INK_NODE_CHOICE_STAR_STMT:
     case INK_NODE_CHOICE_PLUS_STMT:
     case INK_NODE_STRING_EXPR: {
-        snprintf(buffer, length, "%s <line: %zu, col:%zu:%zu>",
+        snprintf(buffer, length, "%s <line:%zu, col:%zu:%zu>",
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
