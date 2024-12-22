@@ -20,7 +20,7 @@ struct ink_syntax_node;
     T(NODE_AND_EXPR, "AndExpr")                                                \
     T(NODE_ARG_LIST, "ArgumentList")                                           \
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
-    T(NODE_BLOCK_STMT, "CompoundStmt")                                         \
+    T(NODE_BLOCK_STMT, "BlockStmt")                                            \
     T(NODE_CALL_EXPR, "CallExpr")                                              \
     T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                 \
