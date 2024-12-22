@@ -1624,16 +1624,16 @@ ink_parse_stmt_level(struct ink_parser *parser,
 {
     const size_t start_offset = parser->current_offset;
     struct ink_syntax_node *branch, *temp, *node;
-    struct ink_parser_context block_top = {0};
-    struct ink_parser_context choice_top = {0};
+    struct ink_parser_context block = {0};
+    struct ink_parser_context choice = {0};
     struct ink_parser_scratch *scratch = &parser->scratch;
 
-    ink_parser_context_stack_peek(block_stack, &block_top);
-    ink_parser_context_stack_peek(choice_stack, &choice_top);
+    ink_parser_context_stack_peek(block_stack, &block);
+    ink_parser_context_stack_peek(choice_stack, &choice);
 
     INK_PARSER_RULE(node, ink_parse_stmt, parser);
 
-    if (parser->current_level > choice_top.level) {
+    if (parser->current_level > choice.level) {
         assert(node != NULL);
 
         if (node->type == INK_NODE_CHOICE_STAR_STMT ||
@@ -1641,26 +1641,25 @@ ink_parse_stmt_level(struct ink_parser *parser,
             /*
              * Open a block if one has not been opened for the branch.
              */
-            if (block_top.level < choice_top.level) {
-                ink_parser_stack_push(block_stack, choice_top.level,
-                                      scratch->count, start_offset);
+            if (block.level < choice.level) {
+                ink_parser_stack_push(block_stack, choice.level, scratch->count,
+                                      start_offset);
             }
 
             ink_parser_stack_push(choice_stack, parser->current_level,
                                   scratch->count, start_offset);
         }
-    } else if (parser->current_level == choice_top.level) {
+    } else if (parser->current_level == choice.level) {
         assert(node != NULL);
 
         if (node->type == INK_NODE_CHOICE_STAR_STMT ||
             node->type == INK_NODE_CHOICE_PLUS_STMT) {
 
-            if (block_top.level == parser->current_level) {
+            if (block.level == parser->current_level) {
                 ink_parser_stack_pop(block_stack);
 
-                temp =
-                    ink_parser_reduce(parser, &block_top, INK_NODE_BLOCK_STMT,
-                                      block_top.source_offset, start_offset);
+                temp = ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
+                                         block.source_offset, start_offset);
 
                 if (scratch->count > 0) {
                     ink_parser_scratch_pop(scratch, &branch);
@@ -1672,7 +1671,7 @@ ink_parse_stmt_level(struct ink_parser *parser,
                 }
             }
         } else if (node->type == INK_NODE_GATHER_STMT) {
-        } else if (block_top.level != parser->current_level) {
+        } else if (block.level != parser->current_level) {
             /*
              * Open a block for a sequence of statements.
              */
@@ -1685,17 +1684,17 @@ ink_parse_stmt_level(struct ink_parser *parser,
          */
         while (!ink_parser_context_stack_is_empty(choice_stack)) {
             assert(!ink_parser_context_stack_is_empty(block_stack));
-            ink_parser_context_stack_peek(choice_stack, &choice_top);
+            ink_parser_context_stack_peek(choice_stack, &choice);
 
-            if (choice_top.level > parser->current_level) {
-                ink_parser_context_stack_peek(block_stack, &block_top);
+            if (choice.level > parser->current_level) {
+                ink_parser_context_stack_peek(block_stack, &block);
 
-                if (block_top.level == choice_top.level) {
+                if (block.level == choice.level) {
                     ink_parser_stack_pop(block_stack);
 
-                    temp = ink_parser_reduce(
-                        parser, &block_top, INK_NODE_BLOCK_STMT,
-                        block_top.source_offset, start_offset);
+                    temp =
+                        ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
+                                          block.source_offset, start_offset);
 
                     if (scratch->count > 0) {
                         ink_parser_scratch_pop(scratch, &branch);
@@ -1714,26 +1713,25 @@ ink_parse_stmt_level(struct ink_parser *parser,
 
                     if ((int)choice_stack->count >= parser->current_level) {
                         temp = ink_parser_reduce(
-                            parser, &choice_top, INK_NODE_CHOICE_STMT,
-                            choice_top.source_offset, start_offset);
+                            parser, &choice, INK_NODE_CHOICE_STMT,
+                            choice.source_offset, start_offset);
 
                         ink_parser_scratch_append(scratch, temp);
                     } else {
-                        ink_parser_stack_push(choice_stack,
-                                              parser->current_level,
-                                              choice_top.scratch_offset,
-                                              choice_top.source_offset);
+                        ink_parser_stack_push(
+                            choice_stack, parser->current_level,
+                            choice.scratch_offset, choice.source_offset);
                     }
                 }
             } else {
-                ink_parser_context_stack_peek(block_stack, &block_top);
+                ink_parser_context_stack_peek(block_stack, &block);
 
-                if (block_top.level == choice_top.level) {
+                if (block.level == choice.level) {
                     ink_parser_stack_pop(block_stack);
 
-                    temp = ink_parser_reduce(
-                        parser, &block_top, INK_NODE_BLOCK_STMT,
-                        block_top.source_offset, start_offset);
+                    temp =
+                        ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
+                                          block.source_offset, start_offset);
 
                     if (scratch->count > 0) {
                         ink_parser_scratch_pop(scratch, &branch);
@@ -1752,13 +1750,12 @@ ink_parse_stmt_level(struct ink_parser *parser,
             }
         }
         if (!ink_parser_context_stack_is_empty(block_stack)) {
-            ink_parser_context_stack_peek(block_stack, &block_top);
-            if (block_top.level > parser->current_level) {
+            ink_parser_context_stack_peek(block_stack, &block);
+            if (block.level > parser->current_level) {
                 ink_parser_stack_pop(block_stack);
 
-                temp =
-                    ink_parser_reduce(parser, &block_top, INK_NODE_BLOCK_STMT,
-                                      block_top.source_offset, start_offset);
+                temp = ink_parser_reduce(parser, &block, INK_NODE_BLOCK_STMT,
+                                         block.source_offset, start_offset);
                 ink_parser_scratch_append(scratch, temp);
             }
         }
