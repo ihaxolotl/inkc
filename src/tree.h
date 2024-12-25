@@ -22,9 +22,9 @@ struct ink_syntax_node;
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
     T(NODE_BLOCK_STMT, "BlockStmt")                                            \
     T(NODE_CALL_EXPR, "CallExpr")                                              \
-    T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                 \
     T(NODE_CHOICE_STAR_STMT, "ChoiceStarStmt")                                 \
+    T(NODE_CHOICE_STMT, "ChoiceStmt")                                          \
     T(NODE_CHOICE_EXPR, "ChoiceContentExpr")                                   \
     T(NODE_CHOICE_START_EXPR, "ChoiceStartContentExpr")                        \
     T(NODE_CHOICE_OPTION_EXPR, "ChoiceOptionOnlyContentExpr")                  \
@@ -41,6 +41,7 @@ struct ink_syntax_node;
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
     T(NODE_DIVERT_STMT, "DivertStmt")                                          \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
+    T(NODE_LIST_DECL, "ListDecl")                                              \
     T(NODE_LOGIC_STMT, "LogicStmt")                                            \
     T(NODE_FALSE_EXPR, "False")                                                \
     T(NODE_FUNCTION_DECL, "FunctionDecl")                                      \
@@ -63,6 +64,7 @@ struct ink_syntax_node;
     T(NODE_PARAM_DECL, "ParamDecl")                                            \
     T(NODE_REF_PARAM_DECL, "ParamRefDecl")                                     \
     T(NODE_RETURN_STMT, "ReturnStmt")                                          \
+    T(NODE_SELECTED_LIST_ELEMENT, "SelectionListElementExpr")                  \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_STRING_LITERAL, "StringLiteral")                                    \
