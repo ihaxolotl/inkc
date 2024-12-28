@@ -43,3 +43,6 @@ __pycache__/
 *.exe
 *.out
 *.app
+
+# Tags file
+tags

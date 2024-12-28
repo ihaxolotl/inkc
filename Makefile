@@ -29,7 +29,8 @@ SRCS := src/main.c                     \
         src/token.c                    \
         src/tree.c                     \
         src/scanner.c                  \
-        src/parse.c
+        src/parse.c		       \
+        src/option.c
 
 all: $(BUILD_ROOT) $(BUILD_TARGET)
 
