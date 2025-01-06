@@ -5,10 +5,10 @@
 #include "arena.h"
 #include "common.h"
 #include "logging.h"
+#include "option.h"
 #include "parse.h"
 #include "source.h"
 #include "tree.h"
-#include "option.h"
 
 enum {
     OPT_COLORS = 1000,
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
         case OPT_ARG_EXAMPLE: {
             char *arg;
             while (*(arg = option_nextarg())) {
-                    printf("--arg-example arg : %s\n", arg);
+                printf("--arg-example arg : %s\n", arg);
             }
             break;
         }
