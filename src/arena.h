@@ -16,9 +16,7 @@ struct ink_arena_block;
  * information on past allocations.
  *
  * TODO(Brett): Should we add a free-list block cache?
-
  * TODO(Brett): Should we add a panic handler?
-
  * TODO(Brett): Provide a platform abstraction for system allocators.
  */
 struct ink_arena {

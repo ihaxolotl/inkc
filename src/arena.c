@@ -24,10 +24,7 @@ struct ink_arena_block {
      */
     size_t offset;
 
-    /* Pointer to available block memory.
-     *
-     * NOTE: Uses the struct hack.
-     */
+    /* Pointer to available block memory. */
     unsigned char bytes[];
 };
 
@@ -140,7 +137,7 @@ void ink_arena_initialize(struct ink_arena *arena, size_t block_size,
 /**
  * Arena allocator.
  *
- * The design of this allocator was heavily referenced by CPython's
+ * The design of this allocator was heavily referenced from CPython's
  * `_PyArena_Malloc`.
  *
  * Will return a memory address aligned to the arena's alignment boundary.
