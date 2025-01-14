@@ -27,9 +27,7 @@ static const struct option opts[] = {
     {"--dump-ast", OPT_DUMP_AST, false},
     {"--help", OPT_HELP, false},
     {"-h", OPT_HELP, false},
-
     {"--arg-example", OPT_ARG_EXAMPLE, true},
-
     (struct option){0},
 };
 
@@ -48,17 +46,17 @@ static void print_usage(const char *name)
 
 int main(int argc, char *argv[])
 {
-    static const size_t arena_alignment = 8;
-    static const size_t arena_block_size = 8192;
-    const char *filename;
     struct ink_arena arena;
     struct ink_source source;
     struct ink_syntax_tree syntax_tree;
-    int rc;
+    const char *filename = 0;
     int flags = 0;
     int opt = 0;
+    int rc = -1;
     bool colors = false;
     bool dump_ast = false;
+    static const size_t arena_alignment = 8;
+    static const size_t arena_block_size = 8192;
 
     option_setopts(opts, argv);
 

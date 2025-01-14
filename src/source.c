@@ -56,7 +56,7 @@ int ink_source_load_stdin(struct ink_source *source)
         return -INK_E_OOM;
     }
 
-    source->filename = ink_string_copy("STDIN", 5);
+    source->filename = ink_string_copy("<STDIN>", 7);
     if (source->filename == NULL) {
         ink_source_free(source);
         return -INK_E_OOM;

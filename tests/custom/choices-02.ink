@@ -1,13 +1,13 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File "STDIN"
-// CHECK-NEXT: `--BlockStmt <line:29, line:34>
+// CHECK: File "<STDIN>"
+// CHECK-NEXT: `--BlockStmt <line:1, line:34>
 // CHECK-NEXT:    `--ChoiceStmt <line:29, line:34>
 // CHECK-NEXT:       |--ChoiceStarStmt <line:29, col:1:5>
 // CHECK-NEXT:       |  |--ChoiceContentExpr <col:3, col:4>
 // CHECK-NEXT:       |  |  `--ChoiceStartContentExpr `A` <col:3, col:4>
-// CHECK-NEXT:       |  `--BlockStmt <line:30, line:32>
-// CHECK-NEXT:       |     `--ChoiceStmt <line:30, line:32>
+// CHECK-NEXT:       |  `--BlockStmt <line:30, line:33>
+// CHECK-NEXT:       |     `--ChoiceStmt <line:30, line:33>
 // CHECK-NEXT:       |        |--ChoiceStarStmt <line:30, col:1:20>
 // CHECK-NEXT:       |        |  `--ChoiceContentExpr <col:4, col:19>
 // CHECK-NEXT:       |        |     `--ChoiceStartContentExpr `Nested inside A` <col:4, col:19>
