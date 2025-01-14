@@ -66,7 +66,7 @@ static void ink_build_lines(struct ink_line_buffer *lines,
             range.start_offset = start_offset;
             range.end_offset = end_offset;
 
-            ink_line_buffer_append(lines, range);
+            ink_line_buffer_push(lines, range);
             start_offset = end_offset + 1;
         }
         end_offset++;
@@ -75,7 +75,7 @@ static void ink_build_lines(struct ink_line_buffer *lines,
         range.start_offset = start_offset;
         range.end_offset = end_offset;
 
-        ink_line_buffer_append(lines, range);
+        ink_line_buffer_push(lines, range);
     }
 }
 
@@ -108,7 +108,8 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
         break;
     }
     case INK_NODE_BLOCK_STMT:
-    case INK_NODE_CHOICE_STMT: {
+    case INK_NODE_CHOICE_STMT:
+    case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
@@ -158,7 +159,8 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
         break;
     }
     case INK_NODE_BLOCK_STMT:
-    case INK_NODE_CHOICE_STMT: {
+    case INK_NODE_CHOICE_STMT:
+    case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -249,14 +251,14 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
     ink_node_buffer_create(&nodes);
 
     if (node->lhs) {
-        ink_node_buffer_append(&nodes, node->lhs);
+        ink_node_buffer_push(&nodes, node->lhs);
     }
     if (node->rhs) {
-        ink_node_buffer_append(&nodes, node->rhs);
+        ink_node_buffer_push(&nodes, node->rhs);
     }
     if (node->seq) {
         for (size_t i = 0; i < node->seq->count; i++) {
-            ink_node_buffer_append(&nodes, node->seq->nodes[i]);
+            ink_node_buffer_push(&nodes, node->seq->nodes[i]);
         }
     }
     for (size_t i = 0; i < nodes.count; i++) {

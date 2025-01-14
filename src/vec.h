@@ -57,6 +57,7 @@ extern "C" {
         vec->count = 0;                                                        \
         vec->capacity = count;                                                 \
         vec->entries = entries;                                                \
+                                                                               \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
@@ -73,8 +74,7 @@ extern "C" {
         vec->count = count;                                                    \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline void T##_append(struct T *vec,       \
-                                                          V entry)             \
+    __attribute__((unused)) static inline int T##_push(struct T *vec, V entry) \
     {                                                                          \
         size_t capacity, old_size, new_size;                                   \
                                                                                \
@@ -94,6 +94,8 @@ extern "C" {
         }                                                                      \
                                                                                \
         vec->entries[vec->count++] = entry;                                    \
+                                                                               \
+        return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
     __attribute__((unused)) static inline int T##_pop(struct T *vec, V *entry) \
@@ -101,13 +103,16 @@ extern "C" {
         if (vec->count == 0) {                                                 \
             return -1;                                                         \
         }                                                                      \
+        if (entry) {                                                           \
+            *entry = vec->entries[vec->count - 1];                             \
+        }                                                                      \
                                                                                \
-        *entry = vec->entries[vec->count - 1];                                 \
         vec->count--;                                                          \
+                                                                               \
         return 0;                                                              \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int T##_peek(struct T *vec,          \
+    __attribute__((unused)) static inline int T##_last(struct T *vec,          \
                                                        V *entry)               \
     {                                                                          \
         if (vec->count == 0) {                                                 \
