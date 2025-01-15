@@ -44,12 +44,12 @@ struct ink_syntax_node;
     T(NODE_LIST_DECL, "ListDecl")                                              \
     T(NODE_LOGIC_STMT, "LogicStmt")                                            \
     T(NODE_FALSE_EXPR, "False")                                                \
-    T(NODE_FUNCTION_DECL, "FunctionDecl")                                      \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
     T(NODE_KNOT_DECL, "KnotDecl")                                              \
+    T(NODE_KNOT_PROTO, "KnotProto")                                            \
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
     T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
     T(NODE_LOGIC_EXPR, "LogicExpr")                                            \
@@ -66,6 +66,8 @@ struct ink_syntax_node;
     T(NODE_RETURN_STMT, "ReturnStmt")                                          \
     T(NODE_SELECTED_LIST_ELEMENT, "SelectionListElementExpr")                  \
     T(NODE_SEQUENCE_EXPR, "SequenceExpr")                                      \
+    T(NODE_STITCH_DECL, "StitchDecl")                                          \
+    T(NODE_STITCH_PROTO, "StitchProto")                                        \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_STRING_LITERAL, "StringLiteral")                                    \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
@@ -84,6 +86,11 @@ enum ink_syntax_node_type {
 };
 #undef T
 
+enum ink_syntax_node_flags {
+    INK_NODE_F_HAS_ERROR = (1 << 0),
+    INK_NODE_F_IS_FUNCTION = (1 << 1),
+};
+
 /**
  * Sequence of syntax tree nodes.
  */
@@ -95,13 +102,15 @@ struct ink_syntax_seq {
 /**
  * Syntax tree node.
  *
- * Nodes do not directly store token information, instead opting to reference
- * source positions by index.
+ * The syntax tree's memory is arranged for reasonably efficient
+ * storage. Nodes do not directly store token information, instead opting to
+ * reference source positions by index.
  *
  * TODO(Brett): Pack node data to reduce node size?
  */
 struct ink_syntax_node {
     enum ink_syntax_node_type type;
+    int flags;
     size_t start_offset;
     size_t end_offset;
     struct ink_syntax_node *lhs;
@@ -111,9 +120,6 @@ struct ink_syntax_node {
 
 /**
  * Syntax Tree.
- *
- * The syntax tree's memory is arranged for reasonably efficient
- * storage.
  */
 struct ink_syntax_tree {
     const struct ink_source *source;

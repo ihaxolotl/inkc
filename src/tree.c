@@ -319,11 +319,13 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
     }
 
     node->type = type;
+    node->flags = 0;
     node->start_offset = start_offset;
     node->end_offset = end_offset;
     node->lhs = lhs;
     node->rhs = rhs;
     node->seq = seq;
+
     return node;
 }
 
@@ -335,6 +337,7 @@ int ink_syntax_tree_initialize(const struct ink_source *source,
 {
     tree->source = source;
     tree->root = NULL;
+
     return 0;
 }
 
