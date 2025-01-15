@@ -20,7 +20,7 @@ struct ink_syntax_node;
     T(NODE_AND_EXPR, "AndExpr")                                                \
     T(NODE_ARG_LIST, "ArgumentList")                                           \
     T(NODE_ASSIGN_EXPR, "AssignExpr")                                          \
-    T(NODE_BLOCK_STMT, "BlockStmt")                                            \
+    T(NODE_BLOCK, "BlockStmt")                                                 \
     T(NODE_CALL_EXPR, "CallExpr")                                              \
     T(NODE_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                 \
     T(NODE_CHOICE_STAR_STMT, "ChoiceStarStmt")                                 \
@@ -35,7 +35,7 @@ struct ink_syntax_node;
     T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
-    T(NODE_IDENTIFIER_EXPR, "Name")                                            \
+    T(NODE_IDENTIFIER, "Name")                                                 \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_DIVERT, "Divert")                                                   \
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
@@ -43,7 +43,7 @@ struct ink_syntax_node;
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_LIST_DECL, "ListDecl")                                              \
     T(NODE_LOGIC_STMT, "LogicStmt")                                            \
-    T(NODE_FALSE_EXPR, "False")                                                \
+    T(NODE_FALSE, "False")                                                     \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
@@ -58,7 +58,7 @@ struct ink_syntax_node;
     T(NODE_NEGATE_EXPR, "NegateExpr")                                          \
     T(NODE_NOT_EQUAL_EXPR, "LogicalInequalityExpr")                            \
     T(NODE_NOT_EXPR, "NotExpr")                                                \
-    T(NODE_NUMBER_EXPR, "NumberLiteral")                                       \
+    T(NODE_NUMBER, "NumberLiteral")                                            \
     T(NODE_OR_EXPR, "OrExpr")                                                  \
     T(NODE_PARAM_LIST, "ParamList")                                            \
     T(NODE_PARAM_DECL, "ParamDecl")                                            \
@@ -69,12 +69,12 @@ struct ink_syntax_node;
     T(NODE_STITCH_DECL, "StitchDecl")                                          \
     T(NODE_STITCH_PROTO, "StitchProto")                                        \
     T(NODE_STRING_EXPR, "StringExpr")                                          \
-    T(NODE_STRING_LITERAL, "StringLiteral")                                    \
+    T(NODE_STRING, "StringLiteral")                                            \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
     T(NODE_TEMP_STMT, "TempStmt")                                              \
     T(NODE_THREAD_EXPR, "ThreadExpr")                                          \
     T(NODE_THREAD_STMT, "ThreadStmt")                                          \
-    T(NODE_TRUE_EXPR, "True")                                                  \
+    T(NODE_TRUE, "True")                                                       \
     T(NODE_TUNNEL_STMT, "TunnelStmt")                                          \
     T(NODE_TUNNEL_ONWARDS, "TunnelOnwards")                                    \
     T(NODE_VAR_DECL, "VarDecl")                                                \
@@ -129,10 +129,10 @@ struct ink_syntax_tree {
 extern const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type);
 
 extern struct ink_syntax_node *
-ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
-                    size_t start_offset, size_t end_offset,
-                    struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    struct ink_syntax_seq *seq);
+ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
+                    size_t end_offset, struct ink_syntax_node *lhs,
+                    struct ink_syntax_node *rhs, struct ink_syntax_seq *seq,
+                    struct ink_arena *arena);
 
 extern int ink_syntax_tree_initialize(const struct ink_source *source,
                                       struct ink_syntax_tree *tree);

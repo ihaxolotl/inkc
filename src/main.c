@@ -16,7 +16,6 @@ enum {
     OPT_CACHING,
     OPT_DUMP_AST,
     OPT_HELP,
-
     OPT_ARG_EXAMPLE
 };
 
@@ -133,7 +132,7 @@ int main(int argc, char *argv[])
         goto cleanup;
     }
 
-    ink_parse(&arena, &source, &syntax_tree, flags);
+    ink_parse(&source, &syntax_tree, &arena, flags);
 
     if (dump_ast) {
         ink_syntax_tree_print(&syntax_tree, colors);
@@ -142,6 +141,5 @@ cleanup:
     ink_syntax_tree_cleanup(&syntax_tree);
     ink_arena_release(&arena);
     ink_source_free(&source);
-
     return EXIT_SUCCESS;
 }

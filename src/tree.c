@@ -107,7 +107,7 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
                  context->filename);
         break;
     }
-    case INK_NODE_BLOCK_STMT:
+    case INK_NODE_BLOCK:
     case INK_NODE_CHOICE_STMT:
     case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
@@ -124,9 +124,9 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
                  context->column_start, context->column_end);
         break;
     }
-    case INK_NODE_STRING_LITERAL:
-    case INK_NODE_NUMBER_EXPR:
-    case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_STRING:
+    case INK_NODE_NUMBER:
+    case INK_NODE_IDENTIFIER:
     case INK_NODE_CHOICE_START_EXPR:
     case INK_NODE_CHOICE_OPTION_EXPR:
     case INK_NODE_CHOICE_INNER_EXPR:
@@ -158,7 +158,7 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
                  context->node_type_strz, context->filename);
         break;
     }
-    case INK_NODE_BLOCK_STMT:
+    case INK_NODE_BLOCK:
     case INK_NODE_CHOICE_STMT:
     case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length,
@@ -181,9 +181,9 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
                  context->column_start, context->column_end);
         break;
     }
-    case INK_NODE_STRING_LITERAL:
-    case INK_NODE_NUMBER_EXPR:
-    case INK_NODE_IDENTIFIER_EXPR:
+    case INK_NODE_STRING:
+    case INK_NODE_NUMBER:
+    case INK_NODE_IDENTIFIER:
     case INK_NODE_CHOICE_START_EXPR:
     case INK_NODE_CHOICE_OPTION_EXPR:
     case INK_NODE_CHOICE_INNER_EXPR:
@@ -304,10 +304,10 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
  * Create a syntax tree node.
  */
 struct ink_syntax_node *
-ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
-                    size_t start_offset, size_t end_offset,
-                    struct ink_syntax_node *lhs, struct ink_syntax_node *rhs,
-                    struct ink_syntax_seq *seq)
+ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
+                    size_t end_offset, struct ink_syntax_node *lhs,
+                    struct ink_syntax_node *rhs, struct ink_syntax_seq *seq,
+                    struct ink_arena *arena)
 {
     struct ink_syntax_node *node;
 
@@ -325,7 +325,6 @@ ink_syntax_node_new(struct ink_arena *arena, enum ink_syntax_node_type type,
     node->lhs = lhs;
     node->rhs = rhs;
     node->seq = seq;
-
     return node;
 }
 
@@ -337,7 +336,6 @@ int ink_syntax_tree_initialize(const struct ink_source *source,
 {
     tree->source = source;
     tree->root = NULL;
-
     return 0;
 }
 
