@@ -334,6 +334,7 @@ ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
 int ink_syntax_tree_initialize(const struct ink_source *source,
                                struct ink_syntax_tree *tree)
 {
+    ink_syntax_error_vec_create(&tree->errors);
     tree->source = source;
     tree->root = NULL;
     return 0;
@@ -344,4 +345,5 @@ int ink_syntax_tree_initialize(const struct ink_source *source,
  */
 void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree)
 {
+    ink_syntax_error_vec_destroy(&tree->errors);
 }

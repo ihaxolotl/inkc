@@ -14,6 +14,18 @@ extern "C" {
 struct ink_arena;
 struct ink_syntax_node;
 
+enum ink_syntax_error_type {
+    INK_SYNTAX_OK = 0,
+};
+
+struct ink_syntax_error {
+    enum ink_syntax_error_type type;
+    size_t source_start;
+    size_t source_end;
+};
+
+INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
+
 #define INK_NODE(T)                                                            \
     T(NODE_FILE, "File")                                                       \
     T(NODE_ADD_EXPR, "AddExpr")                                                \
@@ -29,8 +41,8 @@ struct ink_syntax_node;
     T(NODE_CHOICE_START_EXPR, "ChoiceStartContentExpr")                        \
     T(NODE_CHOICE_OPTION_EXPR, "ChoiceOptionOnlyContentExpr")                  \
     T(NODE_CHOICE_INNER_EXPR, "ChoiceInnerContentExpr")                        \
-    T(NODE_CONDITIONAL_STMT, "ConditionalStmt")                                \
-    T(NODE_CONDITIONAL_BRANCH, "ConditionalBranchStmt")                        \
+    T(NODE_CONDITIONAL_CONTENT, "ConditionalContent")                          \
+    T(NODE_CONDITIONAL_BRANCH, "ConditionalBranch")                            \
     T(NODE_CONTAINS_EXPR, "ContainsExpr")                                      \
     T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
@@ -41,18 +53,18 @@ struct ink_syntax_node;
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
     T(NODE_DIVERT_STMT, "DivertStmt")                                          \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
-    T(NODE_LIST_DECL, "ListDecl")                                              \
-    T(NODE_LOGIC_STMT, "LogicStmt")                                            \
     T(NODE_FALSE, "False")                                                     \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
+    T(NODE_INLINE_LOGIC, "InlineLogicExpr")                                    \
     T(NODE_KNOT_DECL, "KnotDecl")                                              \
     T(NODE_KNOT_PROTO, "KnotProto")                                            \
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
     T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
-    T(NODE_LOGIC_EXPR, "LogicExpr")                                            \
+    T(NODE_LIST_DECL, "ListDecl")                                              \
+    T(NODE_LOGIC_STMT, "LogicStmt")                                            \
     T(NODE_MUL_EXPR, "MultiplyExpr")                                           \
     T(NODE_MOD_EXPR, "ModExpr")                                                \
     T(NODE_NEGATE_EXPR, "NegateExpr")                                          \
@@ -87,8 +99,12 @@ enum ink_syntax_node_type {
 #undef T
 
 enum ink_syntax_node_flags {
-    INK_NODE_F_HAS_ERROR = (1 << 0),
-    INK_NODE_F_IS_FUNCTION = (1 << 1),
+    INK_NODE_F_ERROR = (1 << 0),
+    INK_NODE_F_FUNCTION = (1 << 1),
+    INK_NODE_F_SEQ_STOPPING = (1 << 2),
+    INK_NODE_F_SEQ_CYCLE = (1 << 3),
+    INK_NODE_F_SEQ_SHUFFLE = (1 << 4),
+    INK_NODE_F_SEQ_ONCE = (1 << 5),
 };
 
 /**
@@ -124,6 +140,7 @@ struct ink_syntax_node {
 struct ink_syntax_tree {
     const struct ink_source *source;
     struct ink_syntax_node *root;
+    struct ink_syntax_error_vec errors;
 };
 
 extern const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type);

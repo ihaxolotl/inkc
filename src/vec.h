@@ -57,7 +57,6 @@ extern "C" {
         vec->count = 0;                                                        \
         vec->capacity = count;                                                 \
         vec->entries = entries;                                                \
-                                                                               \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
@@ -94,7 +93,6 @@ extern "C" {
         }                                                                      \
                                                                                \
         vec->entries[vec->count++] = entry;                                    \
-                                                                               \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
@@ -108,7 +106,6 @@ extern "C" {
         }                                                                      \
                                                                                \
         vec->count--;                                                          \
-                                                                               \
         return 0;                                                              \
     }                                                                          \
                                                                                \
