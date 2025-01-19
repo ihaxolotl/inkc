@@ -87,21 +87,14 @@ void ink_scanner_rewind(struct ink_scanner *scanner, size_t source_offset)
     scanner->cursor_offset = source_offset;
 }
 
-/**
- * Return a token type representing a keyword that the specified token
- * represents. If the token's type does not correspond to a keyword,
- * the token's type will be returned instead.
- *
- * TODO(Brett): Perhaps we could add an early return to ignore any
- * UTF-8 encoded byte sequence, as no reserved words contain such things.
- */
 static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
-                                               const struct ink_token *token)
+                                               enum ink_token_type type,
+                                               size_t start_offset,
+                                               size_t end_offset)
 {
     const unsigned char *source = scanner->source->bytes;
-    const unsigned char *lexeme = source + token->start_offset;
-    const size_t length = token->end_offset - token->start_offset;
-    enum ink_token_type type = token->type;
+    const unsigned char *lexeme = source + start_offset;
+    const size_t length = end_offset - start_offset;
 
     switch (length) {
     case 2: {
@@ -125,7 +118,9 @@ static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
         break;
     }
     case 4: {
-        if (memcmp(lexeme, "temp", length) == 0) {
+        if (memcmp(lexeme, "else", length) == 0) {
+            type = INK_TT_KEYWORD_ELSE;
+        } else if (memcmp(lexeme, "temp", length) == 0) {
             type = INK_TT_KEYWORD_TEMP;
         } else if (memcmp(lexeme, "true", length) == 0) {
             type = INK_TT_KEYWORD_TRUE;
@@ -161,7 +156,23 @@ static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
 }
 
 /**
- * Try to recognize the current token as a keyword.
+ * Return a token type representing a keyword that the specified token
+ * represents. If the token's type does not correspond to a keyword,
+ * the token's type will be returned instead.
+ *
+ * TODO(Brett): Perhaps we could add an early return to ignore any
+ * UTF-8 encoded byte sequence, as no reserved words contain such things.
+ */
+static enum ink_token_type
+ink_scanner_keyword_from_token(struct ink_scanner *scanner,
+                               const struct ink_token *token)
+{
+    return ink_scanner_keyword(scanner, token->type, token->start_offset,
+                               token->end_offset);
+}
+
+/**
+ * Try to recognize a token as a keyword.
  *
  * If true, the specified token will have its type modified.
  */
@@ -169,7 +180,7 @@ bool ink_scanner_try_keyword(struct ink_scanner *scanner,
                              struct ink_token *token, enum ink_token_type type)
 {
     const enum ink_token_type keyword_type =
-        ink_scanner_keyword(scanner, token);
+        ink_scanner_keyword_from_token(scanner, token);
 
     if (keyword_type == type) {
         token->type = type;
@@ -440,7 +451,13 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_IDENTIFIER: {
             if (!ink_is_identifier(c)) {
-                token->type = INK_TT_IDENTIFIER;
+                if (mode->type == INK_GRAMMAR_EXPRESSION) {
+                    token->type = ink_scanner_keyword(
+                        scanner, INK_TT_IDENTIFIER, scanner->start_offset,
+                        scanner->cursor_offset);
+                } else {
+                    token->type = INK_TT_IDENTIFIER;
+                }
                 goto exit_loop;
             }
             break;

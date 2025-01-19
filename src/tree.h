@@ -41,17 +41,19 @@ INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_CHOICE_START_EXPR, "ChoiceStartContentExpr")                        \
     T(NODE_CHOICE_OPTION_EXPR, "ChoiceOptionOnlyContentExpr")                  \
     T(NODE_CHOICE_INNER_EXPR, "ChoiceInnerContentExpr")                        \
-    T(NODE_CONDITIONAL_CONTENT, "ConditionalContent")                          \
     T(NODE_CONDITIONAL_BRANCH, "ConditionalBranch")                            \
+    T(NODE_CONDITIONAL_CONTENT, "ConditionalContent")                          \
+    T(NODE_CONDITIONAL_ELSE_BRANCH, "ConditionalElseBranch")                   \
     T(NODE_CONTAINS_EXPR, "ContainsExpr")                                      \
     T(NODE_CONST_DECL, "ConstDecl")                                            \
-    T(NODE_CONTENT_EXPR, "ContentExpr")                                        \
+    T(NODE_CONTENT, "Content")                                                 \
     T(NODE_CONTENT_STMT, "ContentStmt")                                        \
-    T(NODE_IDENTIFIER, "Name")                                                 \
+    T(NODE_IDENTIFIER, "Identifier")                                           \
     T(NODE_DIV_EXPR, "DivideExpr")                                             \
     T(NODE_DIVERT, "Divert")                                                   \
     T(NODE_DIVERT_EXPR, "DivertExpr")                                          \
     T(NODE_DIVERT_STMT, "DivertStmt")                                          \
+    T(NODE_EMPTY_CONTENT, "EmptyContent")                                      \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
     T(NODE_FALSE, "False")                                                     \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \

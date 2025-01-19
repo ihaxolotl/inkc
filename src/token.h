@@ -31,6 +31,7 @@ struct ink_source;
     T(TT_IDENTIFIER, "Name")                                                   \
     T(TT_KEYWORD_AND, "KeywordAnd")                                            \
     T(TT_KEYWORD_CONST, "KeywordConst")                                        \
+    T(TT_KEYWORD_ELSE, "KeywordElse")                                          \
     T(TT_KEYWORD_FALSE, "KeywordFalse")                                        \
     T(TT_KEYWORD_FUNCTION, "KeywordFunction")                                  \
     T(TT_KEYWORD_LIST, "KeywordList")                                          \
