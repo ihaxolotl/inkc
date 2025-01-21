@@ -1,6 +1,6 @@
 // RUN: %ink-compiler < %s --dump-ast | FileCheck %s
 
-// CHECK: File "STDIN"
+// CHECK: File "<STDIN>"
 // CHECK-NEXT: `--BlockStmt <line:12, line:12>
 // CHECK-NEXT:    `--ChoiceStmt <line:12, line:12>
 // CHECK-NEXT:       `--ChoiceStarStmt <line:12, col:1:8>

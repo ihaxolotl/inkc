@@ -109,15 +109,25 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
     }
     case INK_NODE_BLOCK:
     case INK_NODE_CHOICE_STMT:
+    case INK_NODE_KNOT_DECL:
+    case INK_NODE_STITCH_DECL:
     case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
     }
-    case INK_NODE_CONTENT_STMT:
-    case INK_NODE_CHOICE_STAR_STMT:
     case INK_NODE_CHOICE_PLUS_STMT:
+    case INK_NODE_CHOICE_STAR_STMT:
+    case INK_NODE_CONST_DECL:
+    case INK_NODE_CONTENT_STMT:
+    case INK_NODE_DIVERT_STMT:
+    case INK_NODE_EXPR_STMT:
+    case INK_NODE_GATHER_STMT:
+    case INK_NODE_LIST_DECL:
+    case INK_NODE_RETURN_STMT:
+    case INK_NODE_TEMP_DECL:
+    case INK_NODE_VAR_DECL:
     case INK_NODE_STRING_EXPR: {
         snprintf(buffer, length, "%s <line:%zu, col:%zu:%zu>",
                  context->node_type_strz, context->line_start,
@@ -160,6 +170,8 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
     }
     case INK_NODE_BLOCK:
     case INK_NODE_CHOICE_STMT:
+    case INK_NODE_KNOT_DECL:
+    case INK_NODE_STITCH_DECL:
     case INK_NODE_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
@@ -169,9 +181,17 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
                  context->line_end);
         break;
     }
-    case INK_NODE_CONTENT_STMT:
-    case INK_NODE_CHOICE_STAR_STMT:
     case INK_NODE_CHOICE_PLUS_STMT:
+    case INK_NODE_CHOICE_STAR_STMT:
+    case INK_NODE_CONST_DECL:
+    case INK_NODE_CONTENT_STMT:
+    case INK_NODE_DIVERT_STMT:
+    case INK_NODE_EXPR_STMT:
+    case INK_NODE_GATHER_STMT:
+    case INK_NODE_LIST_DECL:
+    case INK_NODE_RETURN_STMT:
+    case INK_NODE_TEMP_DECL:
+    case INK_NODE_VAR_DECL:
     case INK_NODE_STRING_EXPR: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON

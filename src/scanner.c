@@ -398,6 +398,11 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
                 scanner->cursor_offset++;
                 goto exit_loop;
             }
+            case '>': {
+                token->type = INK_TT_GLUE;
+                scanner->cursor_offset++;
+                goto exit_loop;
+            }
             default:
                 token->type = INK_TT_LESS_THAN;
                 goto exit_loop;

@@ -55,9 +55,11 @@ INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_DIVERT_STMT, "DivertStmt")                                          \
     T(NODE_EMPTY_CONTENT, "EmptyContent")                                      \
     T(NODE_EQUAL_EXPR, "LogicalEqualityExpr")                                  \
+    T(NODE_EXPR_STMT, "ExprStmt")                                              \
     T(NODE_FALSE, "False")                                                     \
     T(NODE_GATHER_STMT, "GatherStmt")                                          \
     T(NODE_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                         \
+    T(NODE_GLUE, "GlueExpr")                                                   \
     T(NODE_GREATER_EXPR, "LogicalGreaterExpr")                                 \
     T(NODE_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                    \
     T(NODE_INLINE_LOGIC, "InlineLogicExpr")                                    \
@@ -66,7 +68,6 @@ INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                        \
     T(NODE_LESS_EXPR, "LogicalLesserExpr")                                     \
     T(NODE_LIST_DECL, "ListDecl")                                              \
-    T(NODE_LOGIC_STMT, "LogicStmt")                                            \
     T(NODE_MUL_EXPR, "MultiplyExpr")                                           \
     T(NODE_MOD_EXPR, "ModExpr")                                                \
     T(NODE_NEGATE_EXPR, "NegateExpr")                                          \
@@ -85,7 +86,7 @@ INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_STRING_EXPR, "StringExpr")                                          \
     T(NODE_STRING, "StringLiteral")                                            \
     T(NODE_SUB_EXPR, "SubtractExpr")                                           \
-    T(NODE_TEMP_STMT, "TempStmt")                                              \
+    T(NODE_TEMP_DECL, "TempDecl")                                              \
     T(NODE_THREAD_EXPR, "ThreadExpr")                                          \
     T(NODE_THREAD_STMT, "ThreadStmt")                                          \
     T(NODE_TRUE, "True")                                                       \
