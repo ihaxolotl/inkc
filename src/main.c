@@ -3,11 +3,13 @@
 #include <stdlib.h>
 
 #include "arena.h"
+#include "astgen.h"
 #include "common.h"
 #include "logging.h"
 #include "option.h"
 #include "parse.h"
 #include "source.h"
+#include "story.h"
 #include "tree.h"
 
 enum {
@@ -48,6 +50,7 @@ int main(int argc, char *argv[])
     struct ink_arena arena;
     struct ink_source source;
     struct ink_syntax_tree syntax_tree;
+    struct ink_story story;
     const char *filename = 0;
     int flags = 0;
     int opt = 0;
@@ -129,15 +132,28 @@ int main(int argc, char *argv[])
 
     rc = ink_syntax_tree_initialize(&source, &syntax_tree);
     if (rc < 0) {
-        goto cleanup;
+        goto err;
     }
 
-    ink_parse(&source, &syntax_tree, &arena, flags);
-
+    rc = ink_parse(&source, &syntax_tree, &arena, flags);
     if (dump_ast) {
         ink_syntax_tree_print(&syntax_tree, colors);
     }
-cleanup:
+    if (rc < 0) {
+        goto err;
+    }
+
+    ink_story_create(&story);
+
+    rc = ink_generate_from_ast(&syntax_tree, &story, flags);
+    if (rc < 0) {
+        goto err_story;
+    }
+
+    ink_story_execute(&story);
+err_story:
+    ink_story_destroy(&story);
+err:
     ink_syntax_tree_cleanup(&syntax_tree);
     ink_arena_release(&arena);
     ink_source_free(&source);

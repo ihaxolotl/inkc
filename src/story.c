@@ -6,6 +6,64 @@
 #include "opcode.h"
 #include "story.h"
 
+#define T(name, description) description,
+static const char *INK_OPCODE_TYPE_STR[] = {INK_MAKE_OPCODE_LIST(T)};
+#undef T
+
+static const char *ink_opcode_strz(enum ink_vm_opcode type)
+{
+    return INK_OPCODE_TYPE_STR[type];
+}
+
+static void ink_disassemble_simple_inst(struct ink_story *story,
+                                        enum ink_vm_opcode opcode,
+                                        size_t offset)
+{
+    printf("%s\n", ink_opcode_strz(opcode));
+}
+
+static void ink_disassemble_unary_inst(struct ink_story *story,
+                                       enum ink_vm_opcode opcode, size_t offset)
+{
+    const struct ink_bytecode_vec *const code = &story->code;
+    const struct ink_object_vec *const consts = &story->constants;
+    const unsigned char arg = code->entries[offset + 1];
+
+    printf("%-16s %4d '", ink_opcode_strz(opcode), arg);
+    ink_story_object_print(consts->entries[arg]);
+    printf("'\n");
+}
+
+static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
+{
+    const struct ink_bytecode_vec *const code = &story->code;
+    const unsigned char byte = code->entries[offset];
+
+    printf("%04zu    | ", offset);
+
+    switch (byte) {
+    case INK_OP_RET:
+    case INK_OP_POP:
+    case INK_OP_ADD:
+    case INK_OP_SUB:
+    case INK_OP_MUL:
+    case INK_OP_DIV:
+    case INK_OP_MOD:
+    case INK_OP_NEG: {
+        ink_disassemble_simple_inst(story, byte, offset);
+        break;
+    }
+    case INK_OP_LOAD_CONST: {
+        ink_disassemble_unary_inst(story, byte, offset);
+        break;
+    }
+    default:
+        printf("Unknown opcode 0x%x\n", byte);
+        break;
+    }
+    return offset + 2;
+}
+
 void ink_story_mem_panic(struct ink_story *story)
 {
     (void)story;
@@ -128,7 +186,7 @@ int ink_story_constant_get(struct ink_story *story, size_t index,
 int ink_story_execute(struct ink_story *story)
 {
     int rc;
-    unsigned char byte;
+    unsigned char byte, arg;
 
     if (story->code.count == 0) {
         return INK_STORY_OK;
@@ -138,7 +196,10 @@ int ink_story_execute(struct ink_story *story)
 
     for (;;) {
         ink_story_stack_print(story);
+        ink_story_disassemble(story, (size_t)(story->pc - story->code.entries));
+
         byte = *story->pc++;
+        arg = *story->pc++;
 
         switch (byte) {
         case INK_OP_RET: {
@@ -150,20 +211,19 @@ int ink_story_execute(struct ink_story *story)
             break;
         }
         case INK_OP_LOAD_CONST: {
-            struct ink_object *arg = NULL;
-            const unsigned char operand = *story->pc++;
+            struct ink_object *constant;
 
-            rc = ink_story_constant_get(story, operand, &arg);
+            rc = ink_story_constant_get(story, arg, &constant);
             if (rc < 0) {
                 goto exit_loop;
             }
 
-            rc = ink_story_stack_push(story, arg);
+            rc = ink_story_stack_push(story, constant);
             if (rc < 0) {
                 goto exit_loop;
             }
             break;
-        };
+        }
         case INK_OP_ADD: {
             INK_STORY_BINARY_OP(story, ink_number_add);
             break;

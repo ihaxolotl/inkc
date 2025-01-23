@@ -22,25 +22,6 @@
 #define INK_PARSER_CACHE_LOAD_MAX INK_HASHTABLE_LOAD_MAX
 #define INK_PARSER_CACHE_MIN_CAPACITY INK_HASHTABLE_MIN_CAPACITY
 
-#define INK_VA_ARGS_NTH(_1, _2, _3, _4, _5, N, ...) N
-#define INK_VA_ARGS_COUNT(...) INK_VA_ARGS_NTH(__VA_ARGS__, 5, 4, 3, 2, 1, 0)
-
-#define INK_DISPATCH_0(func, _1) func()
-#define INK_DISPATCH_1(func, _1) func(_1)
-#define INK_DISPATCH_2(func, _1, _2) func(_1, _2)
-#define INK_DISPATCH_3(func, _1, _2, _3) func(_1, _2, _3)
-#define INK_DISPATCH_4(func, _1, _2, _3, _4) func(_1, _2, _3, _4)
-#define INK_DISPATCH_5(func, _1, _2, _3, _4, _5) func(_1, _2, _3, _4, _5)
-
-#define INK_DISPATCH_SELECT(func, count, ...)                                  \
-    INK_DISPATCH_##count(func, __VA_ARGS__)
-
-#define INK_DISPATCHER(func, count, ...)                                       \
-    INK_DISPATCH_SELECT(func, count, __VA_ARGS__)
-
-#define INK_DISPATCH(func, ...)                                                \
-    INK_DISPATCHER(func, INK_VA_ARGS_COUNT(__VA_ARGS__), __VA_ARGS__)
-
 #define INK_PARSER_TRACE(node, rule, ...)                                      \
     do {                                                                       \
         if (parser->flags & INK_PARSER_F_TRACING) {                            \
@@ -190,23 +171,6 @@ static void ink_parser_cache_cleanup(struct ink_parser_cache *cache)
     }
 }
 
-/**
- * TODO(Brett): Inline?
- */
-static unsigned int ink_parser_cache_key_hash(struct ink_parser_cache_key key)
-{
-    const size_t length = sizeof(key);
-    const unsigned char *bytes = (unsigned char *)&key;
-    const unsigned int fnv_prime = 0x01000193;
-    unsigned int hash = 0x811c9dc5;
-
-    for (size_t i = 0; i < length; i++) {
-        hash = hash ^ bytes[i];
-        hash = hash * fnv_prime;
-    }
-    return hash;
-}
-
 static inline size_t ink_parser_cache_next_size(struct ink_parser_cache *cache)
 {
     if (cache->capacity < INK_PARSER_CACHE_MIN_CAPACITY) {
@@ -249,7 +213,7 @@ static struct ink_parser_cache_entry *
 ink_parser_cache_find_slot(struct ink_parser_cache_entry *entries,
                            size_t capacity, struct ink_parser_cache_key key)
 {
-    size_t i = ink_parser_cache_key_hash(key) & (capacity - 1);
+    size_t i = ink_fnv32a((unsigned char *)&key, sizeof(key)) & (capacity - 1);
 
     for (;;) {
         struct ink_parser_cache_entry *slot = &entries[i];
@@ -1097,6 +1061,7 @@ static int ink_parser_initialize(struct ink_parser *parser,
     parser->scanner.cursor_offset = 0;
     parser->scanner.mode_stack[0].type = INK_GRAMMAR_CONTENT;
     parser->scanner.mode_stack[0].source_offset = 0;
+    parser->scanner.mode_depth = 0;
     parser->token.type = 0;
     parser->token.start_offset = 0;
     parser->token.end_offset = 0;

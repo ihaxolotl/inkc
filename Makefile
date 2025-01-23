@@ -31,6 +31,7 @@ ARFLAGS  := -crs
 lib_srcs := src/logging.c                  \
             src/unix.c                     \
             src/platform.c                 \
+            src/common.c                   \
             src/arena.c                    \
             src/object.c                   \
             src/story.c                    \
@@ -38,7 +39,8 @@ lib_srcs := src/logging.c                  \
             src/token.c                    \
             src/tree.c                     \
             src/scanner.c                  \
-            src/parse.c
+            src/parse.c                    \
+            src/astgen.c
 
 bin_srcs := src/option.c                   \
             src/main.c
