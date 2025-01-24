@@ -14,19 +14,30 @@
 #define INK_NUMBER_BUFSZ 24
 
 struct ink_astgen {
-    const struct ink_source *source;
+    struct ink_syntax_tree *tree;
     struct ink_story *story;
-    struct ink_syntax_error_vec errors;
 };
+
+static void ink_astgen_init(struct ink_astgen *astgen,
+                            struct ink_syntax_tree *tree,
+                            struct ink_story *story)
+{
+    astgen->story = story;
+    astgen->tree = tree;
+}
+
+static void ink_astgen_deinit(struct ink_astgen *astgen)
+{
+}
 
 static struct ink_object *
 ink_astgen_create_number(struct ink_astgen *astgen,
                          const struct ink_syntax_node *node)
 {
     char buf[INK_NUMBER_BUFSZ + 1];
-    const struct ink_source *const source = astgen->source;
-    const size_t length = node->end_offset - node->start_offset;
+    const struct ink_source *const source = astgen->tree->source;
     const unsigned char *const chars = &source->bytes[node->start_offset];
+    const size_t length = node->end_offset - node->start_offset;
 
     if (length > INK_NUMBER_BUFSZ) {
         return NULL;
@@ -169,28 +180,16 @@ static void ink_astgen_file(struct ink_astgen *astgen,
     ink_astgen_add_inst(astgen, INK_OP_RET, 0);
 }
 
-static void ink_astgen_initialize(struct ink_astgen *astgen,
-                                  const struct ink_syntax_tree *tree,
-                                  struct ink_story *story)
-{
-    astgen->story = story;
-    astgen->source = tree->source;
-
-    ink_syntax_error_vec_create(&astgen->errors);
-}
-
-static void ink_astgen_cleanup(struct ink_astgen *astgen)
-{
-    ink_syntax_error_vec_destroy(&astgen->errors);
-}
-
-int ink_generate_from_ast(const struct ink_syntax_tree *tree,
-                          struct ink_story *story, int flags)
+int ink_astgen(struct ink_syntax_tree *tree, struct ink_story *story, int flags)
 {
     struct ink_astgen astgen;
 
-    ink_astgen_initialize(&astgen, tree, story);
+    if (!ink_syntax_error_vec_is_empty(&tree->errors)) {
+        return -1;
+    }
+
+    ink_astgen_init(&astgen, tree, story);
     ink_astgen_file(&astgen, tree->root);
-    ink_astgen_cleanup(&astgen);
+    ink_astgen_deinit(&astgen);
     return INK_E_OK;
 }

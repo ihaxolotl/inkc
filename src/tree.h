@@ -24,7 +24,7 @@ struct ink_syntax_error {
     size_t source_end;
 };
 
-INK_VEC_DECLARE(ink_syntax_error_vec, struct ink_syntax_error)
+INK_VEC_T(ink_syntax_error_vec, struct ink_syntax_error)
 
 #define INK_NODE(T)                                                            \
     T(NODE_FILE, "File")                                                       \
@@ -154,9 +154,9 @@ ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
                     struct ink_syntax_node *rhs, struct ink_syntax_seq *seq,
                     struct ink_arena *arena);
 
-extern int ink_syntax_tree_initialize(const struct ink_source *source,
-                                      struct ink_syntax_tree *tree);
-extern void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree);
+extern int ink_syntax_tree_init(const struct ink_source *source,
+                                struct ink_syntax_tree *tree);
+extern void ink_syntax_tree_deinit(struct ink_syntax_tree *tree);
 extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree,
                                   bool colors);
 

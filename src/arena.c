@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "arena.h"
-#include "unix.h"
+#include "memory.h"
 
 /**
  * A block of pre-allocated memory.
@@ -45,14 +45,14 @@ static struct ink_arena_block *ink_arena_block_new(size_t size)
 {
     struct ink_arena_block *block;
 
-    block = unix_alloc(sizeof(*block) + size);
-    if (block == NULL)
+    block = ink_malloc(sizeof(*block) + size);
+    if (block == NULL) {
         return NULL;
+    }
 
     block->next = NULL;
     block->size = size;
     block->offset = 0;
-
     return block;
 }
 
@@ -98,7 +98,6 @@ static void *ink_arena_block_alloc(struct ink_arena_block *block, size_t size,
 
     address = (unsigned char *)block->bytes + block->offset;
     block->offset += size;
-
     return address;
 }
 
@@ -107,16 +106,16 @@ static void *ink_arena_block_alloc(struct ink_arena_block *block, size_t size,
  */
 static void ink_arena_block_free(struct ink_arena_block *block)
 {
-    unix_dealloc(block, block->size);
+    ink_free(block);
 }
 
 /**
- * Initialize a memory arena.
+ * Initialize memory arena.
  *
  * No dynamic allocations are performed here.
  */
-void ink_arena_initialize(struct ink_arena *arena, size_t block_size,
-                          size_t alignment)
+void ink_arena_init(struct ink_arena *arena, size_t block_size,
+                    size_t alignment)
 {
     /* TODO(Brett): I am not sure if this is correct. Revisit this. */
     assert(alignment != 0 && !(alignment & (alignment - 1)));
@@ -157,8 +156,9 @@ void *ink_arena_allocate(struct ink_arena *arena, size_t size)
         assert(arena->total_blocks == 0 && arena->total_allocations == 0);
 
         block = ink_arena_block_new(arena->default_block_size);
-        if (block == NULL)
+        if (block == NULL) {
             return NULL;
+        }
 
         arena->block_first = block;
         arena->block_current = block;
@@ -169,8 +169,9 @@ void *ink_arena_allocate(struct ink_arena *arena, size_t size)
 
     address = ink_arena_block_alloc(block, size, arena->alignment,
                                     arena->default_block_size);
-    if (address == NULL)
+    if (address == NULL) {
         return NULL;
+    }
 
     arena->total_allocations++;
     arena->total_bytes += size;
@@ -180,8 +181,9 @@ void *ink_arena_allocate(struct ink_arena *arena, size_t size)
         arena->total_blocks++;
         arena->total_block_size += arena->block_current->size;
 
-        if (arena->block_current->size > arena->default_block_size)
+        if (arena->block_current->size > arena->default_block_size) {
             arena->total_oversized_blocks++;
+        }
     }
     return address;
 }

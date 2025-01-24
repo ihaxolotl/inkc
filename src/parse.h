@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 
-#include <stdbool.h>
 #include <stddef.h>
 
 #define INK_PARSE_DEPTH 128

@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,20 +47,50 @@ static void print_usage(const char *name)
     fprintf(stderr, USAGE_MSG, name);
 }
 
+static int inkc_parse(struct ink_source *source, struct ink_story *story,
+                      bool dump_ast, bool colors, int flags)
+{
+    int rc;
+    struct ink_arena arena;
+    struct ink_syntax_tree ast;
+    static const size_t arena_alignment = 8;
+    static const size_t arena_block_size = 8192;
+
+    ink_arena_init(&arena, arena_block_size, arena_alignment);
+
+    rc = ink_syntax_tree_init(source, &ast);
+    if (rc < 0) {
+        return rc;
+    }
+
+    rc = ink_parse(source, &ast, &arena, flags);
+    if (rc < 0) {
+        goto out;
+    }
+    if (dump_ast) {
+        ink_syntax_tree_print(&ast, colors);
+    }
+
+    rc = ink_astgen(&ast, story, flags);
+    if (rc < 0) {
+        ink_story_deinit(story);
+    }
+out:
+    ink_syntax_tree_deinit(&ast);
+    ink_arena_release(&arena);
+    return rc;
+}
+
 int main(int argc, char *argv[])
 {
-    struct ink_arena arena;
     struct ink_source source;
-    struct ink_syntax_tree syntax_tree;
     struct ink_story story;
-    const char *filename = 0;
+    bool colors = false;
+    bool dump_ast = false;
     int flags = 0;
     int opt = 0;
     int rc = -1;
-    bool colors = false;
-    bool dump_ast = false;
-    static const size_t arena_alignment = 8;
-    static const size_t arena_block_size = 8192;
+    const char *filename = 0;
 
     option_setopts(opts, argv);
 
@@ -105,7 +137,6 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
     }
-
     if (filename == NULL || *filename == '\0') {
         rc = ink_source_load_stdin(&source);
     } else {
@@ -126,36 +157,17 @@ int main(int argc, char *argv[])
             ink_error("[ERROR] Unknown error.");
             break;
         }
+        return rc;
     }
 
-    ink_arena_initialize(&arena, arena_block_size, arena_alignment);
+    ink_story_init(&story);
 
-    rc = ink_syntax_tree_initialize(&source, &syntax_tree);
+    rc = inkc_parse(&source, &story, dump_ast, colors, flags);
     if (rc < 0) {
-        goto err;
-    }
-
-    rc = ink_parse(&source, &syntax_tree, &arena, flags);
-    if (dump_ast) {
-        ink_syntax_tree_print(&syntax_tree, colors);
-    }
-    if (rc < 0) {
-        goto err;
-    }
-
-    ink_story_create(&story);
-
-    rc = ink_generate_from_ast(&syntax_tree, &story, flags);
-    if (rc < 0) {
-        goto err_story;
+        return EXIT_FAILURE;
     }
 
     ink_story_execute(&story);
-err_story:
-    ink_story_destroy(&story);
-err:
-    ink_syntax_tree_cleanup(&syntax_tree);
-    ink_arena_release(&arena);
-    ink_source_free(&source);
+    ink_story_deinit(&story);
     return EXIT_SUCCESS;
 }

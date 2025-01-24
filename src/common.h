@@ -1,11 +1,11 @@
 #ifndef __INK_COMMON_H__
 #define __INK_COMMON_H__
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stddef.h>
 
 #define INK_VA_ARGS_NTH(_1, _2, _3, _4, _5, N, ...) N
 #define INK_VA_ARGS_COUNT(...) INK_VA_ARGS_NTH(__VA_ARGS__, 5, 4, 3, 2, 1, 0)

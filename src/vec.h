@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 #include "common.h"
-#include "platform.h"
+#include "memory.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,109 +15,106 @@ extern "C" {
 #define INK_VEC_COUNT_MIN 16
 #define INK_VEC_GROWTH_FACTOR 2
 
-#define INK_VEC_DECLARE(T, V)                                                  \
-    struct T {                                                                 \
+#define INK_VEC_T(__T, __V)                                                    \
+    struct __T {                                                               \
         size_t count;                                                          \
         size_t capacity;                                                       \
-        V *entries;                                                            \
+        __V *entries;                                                          \
     };                                                                         \
                                                                                \
-    __attribute__((unused)) static inline void T##_create(struct T *vec)       \
+    __attribute__((unused)) static inline void __T##_init(struct __T *self)    \
     {                                                                          \
-        vec->count = 0;                                                        \
-        vec->capacity = 0;                                                     \
-        vec->entries = NULL;                                                   \
+        self->count = 0;                                                       \
+        self->capacity = 0;                                                    \
+        self->entries = (void *)0;                                             \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline void T##_destroy(struct T *vec)      \
+    __attribute__((unused)) static inline void __T##_deinit(struct __T *self)  \
     {                                                                          \
-        if (vec->capacity > 0) {                                               \
-            const size_t mem_size = sizeof(V) * vec->capacity;                 \
-                                                                               \
-            platform_mem_dealloc(vec->entries, mem_size);                      \
-            vec->count = 0;                                                    \
-            vec->capacity = 0;                                                 \
-            vec->entries = NULL;                                               \
-        }                                                                      \
+        ink_free(self->entries);                                               \
+        self->count = 0;                                                       \
+        self->capacity = 0;                                                    \
+        self->entries = (void *)0;                                             \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int T##_reserve(struct T *vec,       \
-                                                          size_t count)        \
+    __attribute__((unused)) static inline int __T##_reserve(struct __T *self,  \
+                                                            size_t count)      \
     {                                                                          \
-        V *entries = vec->entries;                                             \
-        const size_t old_capacity = vec->capacity * sizeof(V);                 \
-        const size_t new_capacity = count * sizeof(V);                         \
+        __V *entries = self->entries;                                          \
                                                                                \
-        entries = platform_mem_realloc(entries, old_capacity, new_capacity);   \
-        if (entries == NULL) {                                                 \
-            vec->entries = entries;                                            \
-            return -1;                                                         \
+        entries = (__V *)ink_realloc(entries, count * sizeof(__V));            \
+        if (!entries) {                                                        \
+            self->entries = entries;                                           \
+            return -INK_E_OOM;                                                 \
         }                                                                      \
                                                                                \
-        vec->count = 0;                                                        \
-        vec->capacity = count;                                                 \
-        vec->entries = entries;                                                \
+        self->count = 0;                                                       \
+        self->capacity = count;                                                \
+        self->entries = entries;                                               \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline bool T##_is_empty(                   \
-        const struct T *vec)                                                   \
+    __attribute__((unused)) static inline bool __T##_is_empty(                 \
+        const struct __T *self)                                                \
     {                                                                          \
-        return vec->count == 0;                                                \
+        return self->count == 0;                                               \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline void T##_shrink(struct T *vec,       \
-                                                          size_t count)        \
+    __attribute__((unused)) static inline void __T##_shrink(struct __T *self,  \
+                                                            size_t count)      \
     {                                                                          \
-        assert(count <= vec->capacity);                                        \
-        vec->count = count;                                                    \
+        assert(count <= self->capacity);                                       \
+        self->count = count;                                                   \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int T##_push(struct T *vec, V entry) \
+    __attribute__((unused)) static inline int __T##_push(struct __T *self,     \
+                                                         __V entry)            \
     {                                                                          \
-        size_t capacity, old_size, new_size;                                   \
+        size_t capacity;                                                       \
                                                                                \
-        if (vec->count + 1 > vec->capacity) {                                  \
-            if (vec->capacity < INK_VEC_COUNT_MIN) {                           \
+        if (self->count + 1 > self->capacity) {                                \
+            if (self->capacity < INK_VEC_COUNT_MIN) {                          \
                 capacity = INK_VEC_COUNT_MIN;                                  \
             } else {                                                           \
-                capacity = vec->capacity * INK_VEC_GROWTH_FACTOR;              \
+                capacity = self->capacity * INK_VEC_GROWTH_FACTOR;             \
             }                                                                  \
                                                                                \
-            old_size = vec->capacity * sizeof(V);                              \
-            new_size = capacity * sizeof(V);                                   \
+            self->entries =                                                    \
+                (__V *)ink_realloc(self->entries, capacity * sizeof(__V));     \
+            if (!self->entries) {                                              \
+                return -INK_E_OOM;                                             \
+            }                                                                  \
                                                                                \
-            vec->entries =                                                     \
-                platform_mem_realloc(vec->entries, old_size, new_size);        \
-            vec->capacity = capacity;                                          \
+            self->capacity = capacity;                                         \
         }                                                                      \
                                                                                \
-        vec->entries[vec->count++] = entry;                                    \
+        self->entries[self->count++] = entry;                                  \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int T##_pop(struct T *vec, V *entry) \
+    __attribute__((unused)) static inline int __T##_pop(struct __T *self,      \
+                                                        __V *entry)            \
     {                                                                          \
-        if (vec->count == 0) {                                                 \
-            return -1;                                                         \
+        if (self->count == 0) {                                                \
+            return -INK_E_OOM;                                                 \
         }                                                                      \
         if (entry) {                                                           \
-            *entry = vec->entries[vec->count - 1];                             \
+            *entry = self->entries[self->count - 1];                           \
         }                                                                      \
                                                                                \
-        vec->count--;                                                          \
-        return 0;                                                              \
+        self->count--;                                                         \
+        return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int T##_last(struct T *vec,          \
-                                                       V *entry)               \
+    __attribute__((unused)) static inline int __T##_last(struct __T *self,     \
+                                                         __V *entry)           \
     {                                                                          \
-        if (vec->count == 0) {                                                 \
-            return -1;                                                         \
+        if (self->count == 0) {                                                \
+            return -INK_E_OOM;                                                 \
         }                                                                      \
                                                                                \
-        *entry = vec->entries[vec->count - 1];                                 \
-        return 0;                                                              \
+        *entry = self->entries[self->count - 1];                               \
+        return INK_E_OK;                                                       \
     }                                                                          \
     /**/
 

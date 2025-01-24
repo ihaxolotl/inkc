@@ -13,8 +13,8 @@ struct ink_object;
 
 #define INK_STORY_STACK_MAX 128
 
-INK_VEC_DECLARE(ink_object_vec, struct ink_object *)
-INK_VEC_DECLARE(ink_bytecode_vec, unsigned char)
+INK_VEC_T(ink_object_vec, struct ink_object *)
+INK_VEC_T(ink_bytecode_vec, unsigned char)
 
 enum ink_story_err {
     INK_STORY_OK = 0,
@@ -54,8 +54,8 @@ struct ink_story {
     struct ink_object *stack[INK_STORY_STACK_MAX];
 };
 
-extern void ink_story_create(struct ink_story *story);
-extern void ink_story_destroy(struct ink_story *story);
+extern void ink_story_init(struct ink_story *story);
+extern void ink_story_deinit(struct ink_story *story);
 extern int ink_story_execute(struct ink_story *story);
 extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,

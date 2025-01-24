@@ -34,8 +34,8 @@ struct ink_print_context {
     size_t column_end;
 };
 
-INK_VEC_DECLARE(ink_node_buffer, struct ink_syntax_node *)
-INK_VEC_DECLARE(ink_line_buffer, struct ink_source_range)
+INK_VEC_T(ink_node_buffer, struct ink_syntax_node *)
+INK_VEC_T(ink_line_buffer, struct ink_source_range)
 
 #define T(name, description) description,
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
@@ -268,7 +268,7 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
     char new_prefix[1024];
     struct ink_node_buffer nodes;
 
-    ink_node_buffer_create(&nodes);
+    ink_node_buffer_init(&nodes);
 
     if (node->lhs) {
         ink_node_buffer_push(&nodes, node->lhs);
@@ -297,7 +297,7 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
         }
     }
 
-    ink_node_buffer_destroy(&nodes);
+    ink_node_buffer_deinit(&nodes);
 }
 
 /**
@@ -307,7 +307,7 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
 {
     struct ink_line_buffer lines;
 
-    ink_line_buffer_create(&lines);
+    ink_line_buffer_init(&lines);
     ink_build_lines(&lines, tree->source);
 
     if (tree->root) {
@@ -317,7 +317,7 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
                                    INK_SYNTAX_TREE_EMPTY, colors);
     }
 
-    ink_line_buffer_destroy(&lines);
+    ink_line_buffer_deinit(&lines);
 }
 
 /**
@@ -351,10 +351,10 @@ ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
 /**
  * Initialize syntax tree.
  */
-int ink_syntax_tree_initialize(const struct ink_source *source,
-                               struct ink_syntax_tree *tree)
+int ink_syntax_tree_init(const struct ink_source *source,
+                         struct ink_syntax_tree *tree)
 {
-    ink_syntax_error_vec_create(&tree->errors);
+    ink_syntax_error_vec_init(&tree->errors);
     tree->source = source;
     tree->root = NULL;
     return 0;
@@ -363,7 +363,7 @@ int ink_syntax_tree_initialize(const struct ink_source *source,
 /**
  * Destroy syntax tree.
  */
-void ink_syntax_tree_cleanup(struct ink_syntax_tree *tree)
+void ink_syntax_tree_deinit(struct ink_syntax_tree *tree)
 {
-    ink_syntax_error_vec_destroy(&tree->errors);
+    ink_syntax_error_vec_deinit(&tree->errors);
 }

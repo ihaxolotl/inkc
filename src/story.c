@@ -260,22 +260,22 @@ exit_loop:
     return rc;
 }
 
-void ink_story_create(struct ink_story *story)
+void ink_story_init(struct ink_story *story)
 {
     story->pc = NULL;
     story->objects = NULL;
     story->stack_top = 0;
     story->stack[0] = NULL;
 
-    ink_bytecode_vec_create(&story->code);
-    ink_object_vec_create(&story->constants);
+    ink_bytecode_vec_init(&story->code);
+    ink_object_vec_init(&story->constants);
 }
 
-void ink_story_destroy(struct ink_story *story)
+void ink_story_deinit(struct ink_story *story)
 {
     ink_story_mem_flush(story);
-    ink_bytecode_vec_destroy(&story->code);
-    ink_object_vec_destroy(&story->constants);
+    ink_bytecode_vec_deinit(&story->code);
+    ink_object_vec_deinit(&story->constants);
 }
 
 #undef INK_STORY_BINARY_OP

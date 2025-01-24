@@ -29,9 +29,8 @@ LDFLAGS := -fno-omit-frame-pointer     \
 ARFLAGS  := -crs
 
 lib_srcs := src/logging.c                  \
-            src/unix.c                     \
-            src/platform.c                 \
             src/common.c                   \
+            src/memory.c                   \
             src/arena.c                    \
             src/object.c                   \
             src/story.c                    \

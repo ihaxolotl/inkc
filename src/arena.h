@@ -31,8 +31,8 @@ struct ink_arena {
     size_t total_allocations;
 };
 
-extern void ink_arena_initialize(struct ink_arena *arena, size_t block_size,
-                                 size_t alignment);
+extern void ink_arena_init(struct ink_arena *arena, size_t block_size,
+                           size_t alignment);
 extern void *ink_arena_allocate(struct ink_arena *arena, size_t size);
 extern void ink_arena_release(struct ink_arena *arena);
 
