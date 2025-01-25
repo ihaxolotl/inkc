@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,43 +16,43 @@
 
 #define INK_NUMBER_BUFSZ 24
 
-struct ink_symbol_table_key {
-    const unsigned char *bytes;
-    size_t length;
-};
-
 struct ink_symbol {
     bool is_const;
     const struct ink_syntax_node *node;
 };
 
-INK_VEC_T(ink_byte_vec, unsigned char)
-INK_HASHMAP_T(ink_symbol_table, struct ink_symbol_table_key, struct ink_symbol)
-
-struct ink_astgen {
-    struct ink_story *story;
-    struct ink_syntax_tree *tree;
-    struct ink_symbol_table symbol_table;
+struct ink_symtab_key {
+    const uint8_t *bytes;
+    size_t length;
 };
 
-static unsigned int ink_symbol_table_hash(const void *bytes, size_t length)
+INK_VEC_T(ink_byte_vec, uint8_t)
+INK_HASHMAP_T(ink_symtab, struct ink_symtab_key, struct ink_symbol)
+
+static uint32_t ink_symtab_hash(const void *bytes, size_t length)
 {
-    const struct ink_symbol_table_key *const key = bytes;
+    const struct ink_symtab_key *const key = bytes;
 
     return ink_fnv32a(key->bytes, key->length);
 }
 
-static bool ink_symbol_table_cmp(const void *a, size_t a_length, const void *b,
-                                 size_t b_length)
+static bool ink_symtab_cmp(const void *a, size_t alen, const void *b,
+                           size_t blen)
 {
-    const struct ink_symbol_table_key *const key_1 = a;
-    const struct ink_symbol_table_key *const key_2 = b;
+    const struct ink_symtab_key *const key_1 = a;
+    const struct ink_symtab_key *const key_2 = b;
 
     if (key_1->length != key_2->length) {
         return false;
     }
     return memcmp(key_1->bytes, key_2->bytes, key_1->length) == 0;
 }
+
+struct ink_astgen {
+    struct ink_story *story;
+    struct ink_syntax_tree *tree;
+    struct ink_symtab symbol_table;
+};
 
 static void ink_astgen_init(struct ink_astgen *astgen,
                             struct ink_syntax_tree *tree,
@@ -60,39 +61,49 @@ static void ink_astgen_init(struct ink_astgen *astgen,
     astgen->story = story;
     astgen->tree = tree;
 
-    ink_symbol_table_init(&astgen->symbol_table, 80ul, ink_symbol_table_hash,
-                          ink_symbol_table_cmp);
+    ink_symtab_init(&astgen->symbol_table, 80ul, ink_symtab_hash,
+                    ink_symtab_cmp);
 }
 
 static void ink_astgen_deinit(struct ink_astgen *astgen)
 {
-    ink_symbol_table_deinit(&astgen->symbol_table);
+    ink_symtab_deinit(&astgen->symbol_table);
 }
 
 static struct ink_object *
-ink_astgen_create_number(struct ink_astgen *astgen,
-                         const struct ink_syntax_node *node)
+ink_astgen_number_new(struct ink_astgen *astgen,
+                      const struct ink_syntax_node *node)
 {
     char buf[INK_NUMBER_BUFSZ + 1];
-    const struct ink_source *const source = astgen->tree->source;
-    const unsigned char *const chars = &source->bytes[node->start_offset];
-    const size_t length = node->end_offset - node->start_offset;
+    const struct ink_source *const src = astgen->tree->source;
+    const uint8_t *const chars = &src->bytes[node->start_offset];
+    const size_t len = node->end_offset - node->start_offset;
 
-    if (length > INK_NUMBER_BUFSZ) {
+    if (len > INK_NUMBER_BUFSZ) {
         return NULL;
     }
 
-    memcpy(buf, chars, length);
-    buf[length] = '\0';
+    memcpy(buf, chars, len);
+    buf[len] = '\0';
     return ink_number_new(astgen->story, strtod(buf, NULL));
 }
 
+static struct ink_object *
+ink_astgen_string_new(struct ink_astgen *astgen,
+                      const struct ink_syntax_node *node)
+{
+    const struct ink_source *const src = astgen->tree->source;
+
+    return ink_string_new(astgen->story, &src->bytes[node->start_offset],
+                          node->end_offset - node->start_offset);
+}
+
 static void ink_astgen_add_inst(struct ink_astgen *astgen,
-                                enum ink_vm_opcode opcode, unsigned char arg)
+                                enum ink_vm_opcode opcode, uint8_t arg)
 {
     struct ink_bytecode_vec *const code = &astgen->story->code;
 
-    ink_bytecode_vec_push(code, (unsigned char)opcode);
+    ink_bytecode_vec_push(code, (uint8_t)opcode);
     ink_bytecode_vec_push(code, arg);
 }
 
@@ -106,11 +117,11 @@ static void ink_astgen_add_const(struct ink_astgen *astgen,
 
 static void ink_astgen_identifier_token(struct ink_astgen *astgen,
                                         const struct ink_syntax_node *node,
-                                        struct ink_symbol_table_key *token)
+                                        struct ink_symtab_key *token)
 {
-    const struct ink_source *const source = astgen->tree->source;
+    const struct ink_source *const src = astgen->tree->source;
 
-    token->bytes = source->bytes + node->start_offset;
+    token->bytes = src->bytes + node->start_offset;
     token->length = node->end_offset - node->start_offset;
 }
 
@@ -118,7 +129,21 @@ static void ink_astgen_number(struct ink_astgen *astgen,
                               const struct ink_syntax_node *node)
 {
     const size_t id = astgen->story->constants.count;
-    struct ink_object *const obj = ink_astgen_create_number(astgen, node);
+    struct ink_object *const obj = ink_astgen_number_new(astgen, node);
+
+    if (!obj) {
+        return;
+    }
+
+    ink_astgen_add_const(astgen, obj);
+    ink_astgen_add_inst(astgen, INK_OP_LOAD_CONST, (unsigned char)id);
+}
+
+static void ink_astgen_string(struct ink_astgen *astgen,
+                              const struct ink_syntax_node *node)
+{
+    const size_t id = astgen->story->constants.count;
+    struct ink_object *const obj = ink_astgen_string_new(astgen, node);
 
     if (!obj) {
         return;
@@ -131,14 +156,14 @@ static void ink_astgen_number(struct ink_astgen *astgen,
 static void ink_astgen_identifier(struct ink_astgen *astgen,
                                   const struct ink_syntax_node *node)
 {
-    const struct ink_source *source = astgen->tree->source;
-    const struct ink_symbol_table_key key = {
-        .bytes = source->bytes + node->start_offset,
+    const struct ink_source *src = astgen->tree->source;
+    const struct ink_symtab_key key = {
+        .bytes = src->bytes + node->start_offset,
         .length = node->end_offset - node->start_offset,
     };
     struct ink_symbol symbol;
 
-    if (ink_symbol_table_lookup(&astgen->symbol_table, key, &symbol) < 0) {
+    if (ink_symtab_lookup(&astgen->symbol_table, key, &symbol) < 0) {
         struct ink_syntax_error err = {
             .type = INK_SYNTAX_IDENT_UNKNOWN,
             .source_start = node->start_offset,
@@ -206,6 +231,39 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
     }
 }
 
+static void ink_astgen_inline_logic(struct ink_astgen *astgen,
+                                    const struct ink_syntax_node *node)
+{
+    ink_astgen_expr(astgen, node->lhs);
+    ink_astgen_expr(astgen, node->rhs);
+}
+
+static void ink_astgen_content_expr(struct ink_astgen *astgen,
+                                    const struct ink_syntax_node *node)
+{
+    const struct ink_syntax_seq *const seq = node->seq;
+
+    for (size_t i = 0; i < seq->count; i++) {
+        const struct ink_syntax_node *const node = seq->nodes[i];
+
+        switch (node->type) {
+        case INK_NODE_STRING: {
+            ink_astgen_string(astgen, node);
+            break;
+        }
+        case INK_NODE_INLINE_LOGIC: {
+            ink_astgen_inline_logic(astgen, node);
+            break;
+        }
+        default:
+            assert(false);
+            break;
+        }
+    }
+
+    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+}
+
 static void ink_astgen_var_decl(struct ink_astgen *astgen,
                                 const struct ink_syntax_node *node)
 {
@@ -213,11 +271,11 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
         .node = node,
         .is_const = node->type == INK_NODE_CONST_DECL,
     };
-    struct ink_symbol_table_key key;
+    struct ink_symtab_key key;
 
     ink_astgen_identifier_token(astgen, node->lhs, &key);
 
-    if (ink_symbol_table_insert(&astgen->symbol_table, key, symbol) < 0) {
+    if (ink_symtab_insert(&astgen->symbol_table, key, symbol) < 0) {
         struct ink_syntax_error err = {
             .type = INK_SYNTAX_IDENT_REDEFINED,
             .source_start = node->lhs->start_offset,
@@ -226,6 +284,12 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
 
         ink_syntax_error_vec_push(&astgen->tree->errors, err);
     }
+}
+
+static void ink_astgen_content_stmt(struct ink_astgen *astgen,
+                                    const struct ink_syntax_node *node)
+{
+    ink_astgen_content_expr(astgen, node->lhs);
 }
 
 static void ink_astgen_expr_stmt(struct ink_astgen *astgen,
@@ -248,6 +312,10 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
         case INK_NODE_CONST_DECL:
         case INK_NODE_TEMP_DECL: {
             ink_astgen_var_decl(astgen, node);
+            break;
+        }
+        case INK_NODE_CONTENT_STMT: {
+            ink_astgen_content_stmt(astgen, node);
             break;
         }
         case INK_NODE_EXPR_STMT: {

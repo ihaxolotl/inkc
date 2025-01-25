@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "object.h"
 #include "story.h"
@@ -93,11 +94,42 @@ struct ink_object *ink_number_negate(struct ink_story *story,
     return ink_number_new(story, -INK_OBJECT_AS_NUMBER(lhs)->value);
 }
 
+struct ink_object *ink_string_new(struct ink_story *story,
+                                  const unsigned char *bytes, size_t length)
+{
+    struct ink_string *str;
+
+    str = (struct ink_string *)ink_story_object_new(story, INK_OBJECT_STRING,
+                                                    sizeof(*str) + length + 1);
+    if (str == NULL) {
+        return NULL;
+    }
+
+    memcpy(str->bytes, bytes, length);
+    str->bytes[length] = '\0';
+    str->length = length;
+    return (struct ink_object *)str;
+}
+
+void ink_string_print(const struct ink_object *object)
+{
+    struct ink_string *str;
+
+    assert(INK_OBJECT_IS_STRING(object));
+    str = INK_OBJECT_AS_STRING(object);
+
+    printf("\"%s\"", str->bytes);
+}
+
 void ink_story_object_print(const struct ink_object *object)
 {
     switch (object->type) {
     case INK_OBJECT_NUMBER: {
         ink_number_print(object);
+        break;
+    }
+    case INK_OBJECT_STRING: {
+        ink_string_print(object);
         break;
     }
     default:

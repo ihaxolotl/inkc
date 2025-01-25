@@ -64,7 +64,9 @@ static void test_ink_story(void **state)
     ink_bytecode_vec_push(&story.code, INK_OP_LOAD_CONST);
     ink_bytecode_vec_push(&story.code, 1);
     ink_bytecode_vec_push(&story.code, INK_OP_ADD);
+    ink_bytecode_vec_push(&story.code, 0);
     ink_bytecode_vec_push(&story.code, INK_OP_RET);
+    ink_bytecode_vec_push(&story.code, 0);
 
     ink_story_execute(&story);
     ink_story_deinit(&story);

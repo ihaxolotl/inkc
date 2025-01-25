@@ -26,7 +26,7 @@ extern "C" {
     {                                                                          \
         self->count = 0;                                                       \
         self->capacity = 0;                                                    \
-        self->entries = (void *)0;                                             \
+        self->entries = NULL;                                                  \
     }                                                                          \
                                                                                \
     __attribute__((unused)) static inline void __T##_deinit(struct __T *self)  \
@@ -34,7 +34,7 @@ extern "C" {
         ink_free(self->entries);                                               \
         self->count = 0;                                                       \
         self->capacity = 0;                                                    \
-        self->entries = (void *)0;                                             \
+        self->entries = NULL;                                                  \
     }                                                                          \
                                                                                \
     __attribute__((unused)) static inline int __T##_reserve(struct __T *self,  \
