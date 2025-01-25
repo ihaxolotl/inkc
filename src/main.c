@@ -164,10 +164,12 @@ int main(int argc, char *argv[])
 
     rc = inkc_parse(&source, &story, dump_ast, colors, flags);
     if (rc < 0) {
+        ink_source_free(&source);
         return EXIT_FAILURE;
     }
 
     ink_story_execute(&story);
     ink_story_deinit(&story);
+    ink_source_free(&source);
     return EXIT_SUCCESS;
 }

@@ -1,8 +1,10 @@
 #include <assert.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "arena.h"
 #include "tree.h"
@@ -34,6 +36,14 @@ struct ink_print_context {
     size_t column_end;
 };
 
+struct ink_error_info {
+    size_t line;
+    size_t column;
+    size_t snippet_start;
+    size_t snippet_end;
+    char *message;
+};
+
 INK_VEC_T(ink_node_buffer, struct ink_syntax_node *)
 INK_VEC_T(ink_line_buffer, struct ink_source_range)
 
@@ -52,6 +62,125 @@ static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
 const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
 {
     return INK_NODE_TYPE_STR[type];
+}
+
+static void ink_render_error_info(const struct ink_source *source,
+                                  const struct ink_error_info *info)
+{
+    const size_t line = info->line + 1;
+    const size_t col = info->column + 1;
+
+    printf("%s:%zu:%zu: error: %s\n", source->filename, line, col,
+           info->message);
+    printf("%4zu | %.*s\n", line,
+           (int)(info->snippet_end - info->snippet_start),
+           source->bytes + info->snippet_start);
+    printf("     | %*s^\n\n", (int)info->column, "");
+}
+
+static void ink_syntax_error_renderf(const struct ink_syntax_tree *tree,
+                                     const struct ink_syntax_error *error,
+                                     struct ink_arena *arena, const char *fmt,
+                                     ...)
+{
+    va_list ap;
+    long msglen;
+    size_t offset;
+    struct ink_error_info info;
+    const unsigned char *bytes;
+
+    va_start(ap, fmt);
+    msglen = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    if (msglen < 0) {
+        return;
+    }
+
+    info.message = (char *)ink_arena_allocate(arena, (size_t)msglen + 1);
+    if (!info.message) {
+        return;
+    }
+
+    va_start(ap, fmt);
+    msglen = vsnprintf(info.message, (size_t)msglen + 1, fmt, ap);
+    va_end(ap);
+
+    bytes = tree->source->bytes;
+    offset = 0;
+    info.column = 0;
+    info.line = 0;
+
+    for (;;) {
+        if (offset < error->source_start) {
+            if (bytes[offset] == '\n') {
+                info.column = 0;
+                info.line++;
+            } else if (bytes[offset] != '\0') {
+                info.column++;
+            } else {
+                break;
+            }
+
+            offset++;
+        } else {
+            info.snippet_end = info.snippet_start = offset - info.column;
+            break;
+        }
+    }
+    for (;;) {
+        const unsigned char c = bytes[info.snippet_end];
+
+        if (c != '\0' && c != '\n') {
+            info.snippet_end++;
+        } else {
+            break;
+        }
+    }
+
+    ink_render_error_info(tree->source, &info);
+}
+
+static void ink_syntax_error_render(const struct ink_syntax_tree *tree,
+                                    const struct ink_syntax_error *error,
+                                    struct ink_arena *arena)
+{
+    const struct ink_source *const source = tree->source;
+    const size_t length = error->source_end - error->source_start;
+    const unsigned char *const bytes = source->bytes + error->source_start;
+
+    switch (error->type) {
+    case INK_SYNTAX_IDENT_UNKNOWN:
+        ink_syntax_error_renderf(tree, error, arena,
+                                 "use of undeclared identifier '%.*s'",
+                                 (int)length, bytes);
+        break;
+    case INK_SYNTAX_IDENT_REDEFINED:
+        ink_syntax_error_renderf(tree, error, arena, "redefinition of '%.*s'",
+                                 (int)length, bytes);
+        break;
+    default:
+        assert(false);
+        return;
+    }
+}
+
+void ink_syntax_tree_render_errors(const struct ink_syntax_tree *tree)
+{
+    struct ink_arena arena;
+    const struct ink_syntax_error_vec *const errors = &tree->errors;
+    static const size_t arena_alignment = 8;
+    static const size_t arena_block_size = 8192;
+
+    ink_arena_init(&arena, arena_block_size, arena_alignment);
+
+    for (size_t i = 0; i < errors->count; i++) {
+        const struct ink_syntax_error e = errors->entries[i];
+
+        ink_syntax_error_render(tree, &e, &arena);
+    }
+
+    ink_arena_release(&arena);
 }
 
 static void ink_build_lines(struct ink_line_buffer *lines,

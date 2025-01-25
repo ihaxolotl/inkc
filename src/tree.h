@@ -16,6 +16,8 @@ struct ink_syntax_node;
 
 enum ink_syntax_error_type {
     INK_SYNTAX_OK = 0,
+    INK_SYNTAX_IDENT_UNKNOWN,
+    INK_SYNTAX_IDENT_REDEFINED,
 };
 
 struct ink_syntax_error {
@@ -159,6 +161,7 @@ extern int ink_syntax_tree_init(const struct ink_source *source,
 extern void ink_syntax_tree_deinit(struct ink_syntax_tree *tree);
 extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree,
                                   bool colors);
+extern void ink_syntax_tree_render_errors(const struct ink_syntax_tree *tree);
 
 #ifdef __cplusplus
 }
