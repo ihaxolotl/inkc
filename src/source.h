@@ -6,10 +6,11 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 struct ink_source {
     char *filename;
-    unsigned char *bytes;
+    uint8_t *bytes;
     size_t length;
 };
 

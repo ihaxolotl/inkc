@@ -28,7 +28,7 @@ struct ink_source_range {
 struct ink_print_context {
     const char *filename;
     const char *node_type_strz;
-    const unsigned char *lexeme;
+    const uint8_t *lexeme;
     size_t lexeme_length;
     size_t line_start;
     size_t line_end;
@@ -87,7 +87,7 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
     long msglen;
     size_t offset;
     struct ink_error_info info;
-    const unsigned char *bytes;
+    const uint8_t *bytes;
 
     va_start(ap, fmt);
     msglen = vsnprintf(NULL, 0, fmt, ap);
@@ -129,7 +129,7 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
         }
     }
     for (;;) {
-        const unsigned char c = bytes[info.snippet_end];
+        const uint8_t c = bytes[info.snippet_end];
 
         if (c != '\0' && c != '\n') {
             info.snippet_end++;
@@ -147,7 +147,7 @@ static void ink_syntax_error_render(const struct ink_ast *tree,
 {
     const struct ink_source *const source = tree->source;
     const size_t length = error->source_end - error->source_start;
-    const unsigned char *const bytes = source->bytes + error->source_start;
+    const uint8_t *const bytes = source->bytes + error->source_start;
 
     switch (error->type) {
     case INK_SYNTAX_IDENT_UNKNOWN:

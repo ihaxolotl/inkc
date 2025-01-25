@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "vec.h"
 
@@ -14,7 +15,7 @@ struct ink_object;
 #define INK_STORY_STACK_MAX 128
 
 INK_VEC_T(ink_object_vec, struct ink_object *)
-INK_VEC_T(ink_bytecode_vec, unsigned char)
+INK_VEC_T(ink_bytecode_vec, uint8_t)
 
 enum ink_story_err {
     INK_STORY_OK = 0,
@@ -31,7 +32,7 @@ struct ink_story {
     /**
      * Program counter / instruction pointer.
      */
-    unsigned char *pc;
+    uint8_t *pc;
     /**
      * Stack top offset.
      */

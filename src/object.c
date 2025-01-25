@@ -94,8 +94,8 @@ struct ink_object *ink_number_negate(struct ink_story *story,
     return ink_number_new(story, -INK_OBJECT_AS_NUMBER(lhs)->value);
 }
 
-struct ink_object *ink_string_new(struct ink_story *story,
-                                  const unsigned char *bytes, size_t length)
+struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
+                                  size_t length)
 {
     struct ink_string *str;
 

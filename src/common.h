@@ -2,6 +2,7 @@
 #define __INK_COMMON_H__
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,7 +36,7 @@ enum ink_status {
     INK_E_PARSE_PANIC,
 };
 
-extern unsigned int ink_fnv32a(const unsigned char *data, size_t length);
+extern uint32_t ink_fnv32a(const uint8_t *data, size_t length);
 
 #ifdef __cplusplus
 }

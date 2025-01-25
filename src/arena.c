@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "arena.h"
@@ -25,7 +26,7 @@ struct ink_arena_block {
     size_t offset;
 
     /* Pointer to available block memory. */
-    unsigned char bytes[];
+    uint8_t bytes[];
 };
 
 /**
@@ -96,7 +97,7 @@ static void *ink_arena_block_alloc(struct ink_arena_block *block, size_t size,
     /* TODO(Brett): This may cause an integer overflow. Do we care? */
     assert(block->offset + size <= block->size);
 
-    address = (unsigned char *)block->bytes + block->offset;
+    address = (uint8_t *)block->bytes + block->offset;
     block->offset += size;
     return address;
 }

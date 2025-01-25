@@ -28,14 +28,14 @@ extern "C" {
         size_t count;                                                          \
         size_t capacity;                                                       \
         struct __T##_kv *entries;                                              \
-        unsigned int (*hasher)(const void *bytes, size_t length);              \
+        uint32_t (*hasher)(const void *bytes, size_t length);                  \
         bool (*compare)(const void *a, size_t a_length, const void *b,         \
                         size_t b_length);                                      \
     };                                                                         \
                                                                                \
     __attribute__((unused)) static inline void __T##_init(                     \
         struct __T *self, size_t max_load_percentage,                          \
-        unsigned int (*hasher)(const void *bytes, size_t length),              \
+        uint32_t (*hasher)(const void *bytes, size_t length),                  \
         bool (*compare)(const void *a, size_t a_length, const void *b,         \
                         size_t b_length))                                      \
     {                                                                          \
@@ -80,7 +80,7 @@ extern "C" {
     __attribute__((unused)) static inline struct __T##_kv *__T##_find_slot(    \
         struct __T##_kv *entries, size_t capacity, const void *key,            \
         size_t key_length,                                                     \
-        unsigned int (*hasher)(const void *bytes, size_t length),              \
+        uint32_t (*hasher)(const void *bytes, size_t length),                  \
         bool (*compare)(const void *a, size_t a_length, const void *b,         \
                         size_t b_length))                                      \
     {                                                                          \

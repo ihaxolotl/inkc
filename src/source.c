@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,12 +14,12 @@
 static const char *INK_FILE_EXT = ".ink";
 static const size_t INK_FILE_EXT_LENGTH = 4;
 
-int unix_load_file(const char *filename, unsigned char **bytes, size_t *length)
+int unix_load_file(const char *filename, uint8_t **bytes, size_t *length)
 {
     int fd;
     ssize_t nread;
     off_t bufsz;
-    unsigned char *buf;
+    uint8_t *buf;
 
     fd = open(filename, O_RDONLY);
     if (fd == -1) {
@@ -83,7 +84,7 @@ int ink_source_load_stdin(struct ink_source *source)
     while (fgets(buf, INK_SOURCE_BUF_MAX, stdin)) {
         const size_t len = source->length;
         const size_t buflen = strlen(buf);
-        unsigned char *tmp;
+        uint8_t *tmp;
 
         tmp = realloc(source->bytes, len + buflen + 1);
         if (tmp == NULL) {

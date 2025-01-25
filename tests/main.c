@@ -13,9 +13,9 @@
 
 INK_HASHMAP_T(test_hashmap_1, int, int)
 
-static unsigned int __test_hashmap_1_hash(const void *data, size_t length)
+static uint32_t __test_hashmap_1_hash(const void *data, size_t length)
 {
-    return ink_fnv32a((unsigned char *)data, length);
+    return ink_fnv32a((uint8_t *)data, length);
 }
 
 static bool __test_hashmap_1_cmp(const void *a, size_t a_length, const void *b,

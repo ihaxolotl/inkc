@@ -36,17 +36,17 @@ const char *ink_grammar_type_strz(enum ink_grammar_type type)
     return INK_GRAMMAR_TYPE_STR[type];
 }
 
-static inline bool ink_is_alpha(unsigned char c)
+static inline bool ink_is_alpha(uint8_t c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-static inline bool ink_is_digit(unsigned char c)
+static inline bool ink_is_digit(uint8_t c)
 {
     return (c >= '0' && c <= '9');
 }
 
-static inline bool ink_is_identifier(unsigned char c)
+static inline bool ink_is_identifier(uint8_t c)
 {
     return ink_is_alpha(c) || ink_is_digit(c) || c == '_';
 }
@@ -92,8 +92,8 @@ static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
                                                size_t start_offset,
                                                size_t end_offset)
 {
-    const unsigned char *source = scanner->source->bytes;
-    const unsigned char *lexeme = source + start_offset;
+    const uint8_t *source = scanner->source->bytes;
+    const uint8_t *lexeme = source + start_offset;
     const size_t length = end_offset - start_offset;
 
     switch (length) {
@@ -191,7 +191,7 @@ bool ink_scanner_try_keyword(struct ink_scanner *scanner,
 
 void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
 {
-    unsigned char c;
+    uint8_t c;
     enum ink_lex_state state = INK_LEX_START;
     const struct ink_source *source = scanner->source;
     const struct ink_scanner_mode *mode = ink_scanner_current(scanner);

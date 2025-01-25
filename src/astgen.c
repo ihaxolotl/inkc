@@ -133,7 +133,7 @@ static void ink_astgen_number(struct ink_astgen *astgen,
     }
 
     ink_astgen_add_const(astgen, obj);
-    ink_astgen_add_inst(astgen, INK_OP_LOAD_CONST, (unsigned char)id);
+    ink_astgen_add_inst(astgen, INK_OP_LOAD_CONST, (uint8_t)id);
 }
 
 static void ink_astgen_string(struct ink_astgen *astgen,
@@ -147,7 +147,7 @@ static void ink_astgen_string(struct ink_astgen *astgen,
     }
 
     ink_astgen_add_const(astgen, obj);
-    ink_astgen_add_inst(astgen, INK_OP_LOAD_CONST, (unsigned char)id);
+    ink_astgen_add_inst(astgen, INK_OP_LOAD_CONST, (uint8_t)id);
 }
 
 static void ink_astgen_identifier(struct ink_astgen *astgen,

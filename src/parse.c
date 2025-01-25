@@ -142,9 +142,9 @@ static int ink_parser_stack_emplace(struct ink_parser_stack *stack,
     return ink_parser_stack_push(stack, entry);
 }
 
-static unsigned int ink_parser_cache_key_hash(const void *key, size_t length)
+static uint32_t ink_parser_cache_key_hash(const void *key, size_t length)
 {
-    return ink_fnv32a((unsigned char *)key, length);
+    return ink_fnv32a((uint8_t *)key, length);
 }
 
 static bool ink_parser_cache_key_compare(const void *a, size_t a_length,

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@ static void ink_disassemble_unary_inst(struct ink_story *story,
 {
     const struct ink_bytecode_vec *const code = &story->code;
     const struct ink_object_vec *const consts = &story->constants;
-    const unsigned char arg = code->entries[offset + 1];
+    const uint8_t arg = code->entries[offset + 1];
 
     printf("%-16s %4d '", ink_opcode_strz(opcode), arg);
     ink_story_object_print(consts->entries[arg]);
@@ -37,7 +38,7 @@ static void ink_disassemble_unary_inst(struct ink_story *story,
 static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
 {
     const struct ink_bytecode_vec *const code = &story->code;
-    const unsigned char byte = code->entries[offset];
+    const uint8_t byte = code->entries[offset];
 
     printf("%04zu    | ", offset);
 
@@ -186,7 +187,7 @@ int ink_story_constant_get(struct ink_story *story, size_t index,
 int ink_story_execute(struct ink_story *story)
 {
     int rc;
-    unsigned char byte, arg;
+    uint8_t byte, arg;
 
     if (story->code.count == 0) {
         return INK_STORY_OK;

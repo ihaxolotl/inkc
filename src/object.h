@@ -28,7 +28,7 @@ struct ink_number {
 struct ink_string {
     struct ink_object obj;
     size_t length;
-    unsigned char bytes[1];
+    uint8_t bytes[1];
 };
 
 #define INK_OBJECT_IS_NUMBER(__x) ((__x)->type == INK_OBJECT_NUMBER)
@@ -61,8 +61,7 @@ extern struct ink_object *ink_number_negate(struct ink_story *story,
                                             const struct ink_object *lhs);
 
 extern struct ink_object *ink_string_new(struct ink_story *story,
-                                         const unsigned char *chars,
-                                         size_t length);
+                                         const uint8_t *chars, size_t length);
 extern void ink_string_print(const struct ink_object *object);
 
 #ifdef __cplusplus
