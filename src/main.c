@@ -52,13 +52,13 @@ static int inkc_parse(struct ink_source *source, struct ink_story *story,
 {
     int rc;
     struct ink_arena arena;
-    struct ink_syntax_tree ast;
+    struct ink_ast ast;
     static const size_t arena_alignment = 8;
     static const size_t arena_block_size = 8192;
 
     ink_arena_init(&arena, arena_block_size, arena_alignment);
 
-    rc = ink_syntax_tree_init(source, &ast);
+    rc = ink_ast_init(source, &ast);
     if (rc < 0) {
         return rc;
     }
@@ -68,7 +68,7 @@ static int inkc_parse(struct ink_source *source, struct ink_story *story,
         goto out;
     }
     if (dump_ast) {
-        ink_syntax_tree_print(&ast, colors);
+        ink_ast_print(&ast, colors);
     }
 
     rc = ink_astgen(&ast, story, flags);
@@ -76,7 +76,7 @@ static int inkc_parse(struct ink_source *source, struct ink_story *story,
         ink_story_deinit(story);
     }
 out:
-    ink_syntax_tree_deinit(&ast);
+    ink_ast_deinit(&ast);
     ink_arena_release(&arena);
     return rc;
 }

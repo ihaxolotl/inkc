@@ -18,7 +18,7 @@
 
 struct ink_symbol {
     bool is_const;
-    const struct ink_syntax_node *node;
+    const struct ink_ast_node *node;
 };
 
 struct ink_symtab_key {
@@ -50,12 +50,11 @@ static bool ink_symtab_cmp(const void *a, size_t alen, const void *b,
 
 struct ink_astgen {
     struct ink_story *story;
-    struct ink_syntax_tree *tree;
+    struct ink_ast *tree;
     struct ink_symtab symbol_table;
 };
 
-static void ink_astgen_init(struct ink_astgen *astgen,
-                            struct ink_syntax_tree *tree,
+static void ink_astgen_init(struct ink_astgen *astgen, struct ink_ast *tree,
                             struct ink_story *story)
 {
     astgen->story = story;
@@ -70,9 +69,8 @@ static void ink_astgen_deinit(struct ink_astgen *astgen)
     ink_symtab_deinit(&astgen->symbol_table);
 }
 
-static struct ink_object *
-ink_astgen_number_new(struct ink_astgen *astgen,
-                      const struct ink_syntax_node *node)
+static struct ink_object *ink_astgen_number_new(struct ink_astgen *astgen,
+                                                const struct ink_ast_node *node)
 {
     char buf[INK_NUMBER_BUFSZ + 1];
     const struct ink_source *const src = astgen->tree->source;
@@ -88,9 +86,8 @@ ink_astgen_number_new(struct ink_astgen *astgen,
     return ink_number_new(astgen->story, strtod(buf, NULL));
 }
 
-static struct ink_object *
-ink_astgen_string_new(struct ink_astgen *astgen,
-                      const struct ink_syntax_node *node)
+static struct ink_object *ink_astgen_string_new(struct ink_astgen *astgen,
+                                                const struct ink_ast_node *node)
 {
     const struct ink_source *const src = astgen->tree->source;
 
@@ -116,7 +113,7 @@ static void ink_astgen_add_const(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_identifier_token(struct ink_astgen *astgen,
-                                        const struct ink_syntax_node *node,
+                                        const struct ink_ast_node *node,
                                         struct ink_symtab_key *token)
 {
     const struct ink_source *const src = astgen->tree->source;
@@ -126,7 +123,7 @@ static void ink_astgen_identifier_token(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_number(struct ink_astgen *astgen,
-                              const struct ink_syntax_node *node)
+                              const struct ink_ast_node *node)
 {
     const size_t id = astgen->story->constants.count;
     struct ink_object *const obj = ink_astgen_number_new(astgen, node);
@@ -140,7 +137,7 @@ static void ink_astgen_number(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_string(struct ink_astgen *astgen,
-                              const struct ink_syntax_node *node)
+                              const struct ink_ast_node *node)
 {
     const size_t id = astgen->story->constants.count;
     struct ink_object *const obj = ink_astgen_string_new(astgen, node);
@@ -154,7 +151,7 @@ static void ink_astgen_string(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_identifier(struct ink_astgen *astgen,
-                                  const struct ink_syntax_node *node)
+                                  const struct ink_ast_node *node)
 {
     const struct ink_source *src = astgen->tree->source;
     const struct ink_symtab_key key = {
@@ -176,7 +173,7 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_expr(struct ink_astgen *astgen,
-                            const struct ink_syntax_node *node)
+                            const struct ink_ast_node *node)
 {
     if (!node) {
         return;
@@ -232,19 +229,19 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_inline_logic(struct ink_astgen *astgen,
-                                    const struct ink_syntax_node *node)
+                                    const struct ink_ast_node *node)
 {
     ink_astgen_expr(astgen, node->lhs);
     ink_astgen_expr(astgen, node->rhs);
 }
 
 static void ink_astgen_content_expr(struct ink_astgen *astgen,
-                                    const struct ink_syntax_node *node)
+                                    const struct ink_ast_node *node)
 {
-    const struct ink_syntax_seq *const seq = node->seq;
+    const struct ink_ast_seq *const seq = node->seq;
 
     for (size_t i = 0; i < seq->count; i++) {
-        const struct ink_syntax_node *const node = seq->nodes[i];
+        const struct ink_ast_node *const node = seq->nodes[i];
 
         switch (node->type) {
         case INK_NODE_STRING: {
@@ -265,7 +262,7 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_var_decl(struct ink_astgen *astgen,
-                                const struct ink_syntax_node *node)
+                                const struct ink_ast_node *node)
 {
     const struct ink_symbol symbol = {
         .node = node,
@@ -287,25 +284,25 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_content_stmt(struct ink_astgen *astgen,
-                                    const struct ink_syntax_node *node)
+                                    const struct ink_ast_node *node)
 {
     ink_astgen_content_expr(astgen, node->lhs);
 }
 
 static void ink_astgen_expr_stmt(struct ink_astgen *astgen,
-                                 const struct ink_syntax_node *node)
+                                 const struct ink_ast_node *node)
 {
     ink_astgen_expr(astgen, node->lhs);
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
 }
 
 static void ink_astgen_block_stmt(struct ink_astgen *astgen,
-                                  const struct ink_syntax_node *node)
+                                  const struct ink_ast_node *node)
 {
-    const struct ink_syntax_seq *const seq = node->seq;
+    const struct ink_ast_seq *const seq = node->seq;
 
     for (size_t i = 0; i < seq->count; i++) {
-        const struct ink_syntax_node *const node = seq->nodes[i];
+        const struct ink_ast_node *const node = seq->nodes[i];
 
         switch (node->type) {
         case INK_NODE_VAR_DECL:
@@ -330,12 +327,12 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_file(struct ink_astgen *astgen,
-                            const struct ink_syntax_node *node)
+                            const struct ink_ast_node *node)
 {
-    const struct ink_syntax_seq *const seq = node->seq;
+    const struct ink_ast_seq *const seq = node->seq;
 
     for (size_t i = 0; i < seq->count; i++) {
-        const struct ink_syntax_node *const node = seq->nodes[i];
+        const struct ink_ast_node *const node = seq->nodes[i];
 
         switch (node->type) {
         case INK_NODE_BLOCK: {
@@ -351,7 +348,7 @@ static void ink_astgen_file(struct ink_astgen *astgen,
     ink_astgen_add_inst(astgen, INK_OP_RET, 0);
 }
 
-int ink_astgen(struct ink_syntax_tree *tree, struct ink_story *story, int flags)
+int ink_astgen(struct ink_ast *tree, struct ink_story *story, int flags)
 {
     struct ink_astgen astgen;
 
@@ -364,7 +361,7 @@ int ink_astgen(struct ink_syntax_tree *tree, struct ink_story *story, int flags)
     ink_astgen_deinit(&astgen);
 
     if (!ink_syntax_error_vec_is_empty(&tree->errors)) {
-        ink_syntax_tree_render_errors(tree);
+        ink_ast_render_errors(tree);
         return -1;
     }
     return INK_E_OK;

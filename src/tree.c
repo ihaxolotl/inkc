@@ -44,7 +44,7 @@ struct ink_error_info {
     char *message;
 };
 
-INK_VEC_T(ink_node_buffer, struct ink_syntax_node *)
+INK_VEC_T(ink_node_buffer, struct ink_ast_node *)
 INK_VEC_T(ink_line_buffer, struct ink_source_range)
 
 #define T(name, description) description,
@@ -59,7 +59,7 @@ static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
  * Return a NULL-terminated string representing the type description of a
  * syntax tree node.
  */
-const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type)
+const char *ink_ast_node_type_strz(enum ink_ast_node_type type)
 {
     return INK_NODE_TYPE_STR[type];
 }
@@ -78,7 +78,7 @@ static void ink_render_error_info(const struct ink_source *source,
     printf("     | %*s^\n\n", (int)info->column, "");
 }
 
-static void ink_syntax_error_renderf(const struct ink_syntax_tree *tree,
+static void ink_syntax_error_renderf(const struct ink_ast *tree,
                                      const struct ink_syntax_error *error,
                                      struct ink_arena *arena, const char *fmt,
                                      ...)
@@ -141,7 +141,7 @@ static void ink_syntax_error_renderf(const struct ink_syntax_tree *tree,
     ink_render_error_info(tree->source, &info);
 }
 
-static void ink_syntax_error_render(const struct ink_syntax_tree *tree,
+static void ink_syntax_error_render(const struct ink_ast *tree,
                                     const struct ink_syntax_error *error,
                                     struct ink_arena *arena)
 {
@@ -165,7 +165,7 @@ static void ink_syntax_error_render(const struct ink_syntax_tree *tree,
     }
 }
 
-void ink_syntax_tree_render_errors(const struct ink_syntax_tree *tree)
+void ink_ast_render_errors(const struct ink_ast *tree)
 {
     struct ink_arena arena;
     const struct ink_syntax_error_vec *const errors = &tree->errors;
@@ -225,10 +225,9 @@ static size_t ink_calculate_line(const struct ink_line_buffer *lines,
     return lines->count - 1;
 }
 
-static void
-ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
-                               const struct ink_print_context *context,
-                               char *buffer, size_t length)
+static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
+                                        const struct ink_print_context *context,
+                                        char *buffer, size_t length)
 {
     switch (node->type) {
     case INK_NODE_FILE: {
@@ -284,10 +283,9 @@ ink_syntax_node_print_nocolors(const struct ink_syntax_node *node,
     }
 }
 
-static void
-ink_syntax_node_print_colors(const struct ink_syntax_node *node,
-                             const struct ink_print_context *context,
-                             char *buffer, size_t length)
+static void ink_ast_node_print_colors(const struct ink_ast_node *node,
+                                      const struct ink_print_context *context,
+                                      char *buffer, size_t length)
 {
     switch (node->type) {
     case INK_NODE_FILE: {
@@ -358,11 +356,11 @@ ink_syntax_node_print_colors(const struct ink_syntax_node *node,
     }
 }
 
-static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
-                                       const struct ink_line_buffer *lines,
-                                       const struct ink_syntax_node *node,
-                                       const char *prefix,
-                                       const char **pointers, bool colors)
+static void ink_ast_print_node(const struct ink_ast *tree,
+                               const struct ink_line_buffer *lines,
+                               const struct ink_ast_node *node,
+                               const char *prefix, const char **pointers,
+                               bool colors)
 {
     char line[1024];
     const size_t line_start = ink_calculate_line(lines, node->start_offset);
@@ -370,7 +368,7 @@ static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
     const struct ink_source_range line_range = lines->entries[line_start];
     const struct ink_print_context context = {
         .filename = tree->source->filename,
-        .node_type_strz = ink_syntax_node_type_strz(node->type),
+        .node_type_strz = ink_ast_node_type_strz(node->type),
         .lexeme = tree->source->bytes + node->start_offset,
         .lexeme_length = node->end_offset - node->start_offset,
         .line_start = line_start + 1,
@@ -380,19 +378,19 @@ static void ink_syntax_tree_print_node(const struct ink_syntax_tree *tree,
     };
 
     if (colors) {
-        ink_syntax_node_print_colors(node, &context, line, sizeof(line));
+        ink_ast_node_print_colors(node, &context, line, sizeof(line));
     } else {
-        ink_syntax_node_print_nocolors(node, &context, line, sizeof(line));
+        ink_ast_node_print_nocolors(node, &context, line, sizeof(line));
     }
 
     printf("%s%s%s\n", prefix, pointers[0], line);
 }
 
-static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
-                                       const struct ink_line_buffer *lines,
-                                       const struct ink_syntax_node *node,
-                                       const char *prefix,
-                                       const char **pointers, bool colors)
+static void ink_ast_print_walk(const struct ink_ast *tree,
+                               const struct ink_line_buffer *lines,
+                               const struct ink_ast_node *node,
+                               const char *prefix, const char **pointers,
+                               bool colors)
 {
     char new_prefix[1024];
     struct ink_node_buffer nodes;
@@ -417,10 +415,10 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
         snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, pointers[1]);
 
         if (nodes.entries[i]) {
-            ink_syntax_tree_print_node(tree, lines, nodes.entries[i], prefix,
-                                       pointers, colors);
-            ink_syntax_tree_print_walk(tree, lines, nodes.entries[i],
-                                       new_prefix, pointers, colors);
+            ink_ast_print_node(tree, lines, nodes.entries[i], prefix, pointers,
+                               colors);
+            ink_ast_print_walk(tree, lines, nodes.entries[i], new_prefix,
+                               pointers, colors);
         } else {
             printf("%s%sNullNode\n", prefix, pointers[0]);
         }
@@ -430,9 +428,9 @@ static void ink_syntax_tree_print_walk(const struct ink_syntax_tree *tree,
 }
 
 /**
- * Print a syntax tree.
+ * Print AST.
  */
-void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
+void ink_ast_print(const struct ink_ast *tree, bool colors)
 {
     struct ink_line_buffer lines;
 
@@ -440,25 +438,26 @@ void ink_syntax_tree_print(const struct ink_syntax_tree *tree, bool colors)
     ink_build_lines(&lines, tree->source);
 
     if (tree->root) {
-        ink_syntax_tree_print_node(tree, &lines, tree->root, "",
-                                   INK_SYNTAX_TREE_EMPTY, colors);
-        ink_syntax_tree_print_walk(tree, &lines, tree->root, "",
-                                   INK_SYNTAX_TREE_EMPTY, colors);
+        ink_ast_print_node(tree, &lines, tree->root, "", INK_SYNTAX_TREE_EMPTY,
+                           colors);
+        ink_ast_print_walk(tree, &lines, tree->root, "", INK_SYNTAX_TREE_EMPTY,
+                           colors);
     }
 
     ink_line_buffer_deinit(&lines);
 }
 
 /**
- * Create a syntax tree node.
+ * Create an AST node.
  */
-struct ink_syntax_node *
-ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
-                    size_t end_offset, struct ink_syntax_node *lhs,
-                    struct ink_syntax_node *rhs, struct ink_syntax_seq *seq,
-                    struct ink_arena *arena)
+struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
+                                      size_t start_offset, size_t end_offset,
+                                      struct ink_ast_node *lhs,
+                                      struct ink_ast_node *rhs,
+                                      struct ink_ast_seq *seq,
+                                      struct ink_arena *arena)
 {
-    struct ink_syntax_node *node;
+    struct ink_ast_node *node;
 
     assert(start_offset <= end_offset);
 
@@ -478,10 +477,9 @@ ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
 }
 
 /**
- * Initialize syntax tree.
+ * Initialize AST.
  */
-int ink_syntax_tree_init(const struct ink_source *source,
-                         struct ink_syntax_tree *tree)
+int ink_ast_init(const struct ink_source *source, struct ink_ast *tree)
 {
     ink_syntax_error_vec_init(&tree->errors);
     tree->source = source;
@@ -490,9 +488,9 @@ int ink_syntax_tree_init(const struct ink_source *source,
 }
 
 /**
- * Destroy syntax tree.
+ * Free AST.
  */
-void ink_syntax_tree_deinit(struct ink_syntax_tree *tree)
+void ink_ast_deinit(struct ink_ast *tree)
 {
     ink_syntax_error_vec_deinit(&tree->errors);
 }

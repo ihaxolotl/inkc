@@ -12,7 +12,7 @@ extern "C" {
 #include "vec.h"
 
 struct ink_arena;
-struct ink_syntax_node;
+struct ink_ast_node;
 
 enum ink_syntax_error_type {
     INK_SYNTAX_OK = 0,
@@ -98,7 +98,7 @@ INK_VEC_T(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_INVALID, "Invalid")
 
 #define T(name, description) INK_##name,
-enum ink_syntax_node_type {
+enum ink_ast_node_type {
     INK_NODE(T)
 };
 #undef T
@@ -115,53 +115,51 @@ enum ink_syntax_node_flags {
 /**
  * Sequence of syntax tree nodes.
  */
-struct ink_syntax_seq {
+struct ink_ast_seq {
     size_t count;
-    struct ink_syntax_node *nodes[1];
+    struct ink_ast_node *nodes[1];
 };
 
 /**
- * Syntax tree node.
+ * Abstract syntax tree node.
  *
- * The syntax tree's memory is arranged for reasonably efficient
- * storage. Nodes do not directly store token information, instead opting to
- * reference source positions by index.
+ * Each node's memory is arranged for reasonably efficient storage. Nodes do
+ * not directly store token information, instead opting to reference source
+ * positions by index.
  *
  * TODO(Brett): Pack node data to reduce node size?
  */
-struct ink_syntax_node {
-    enum ink_syntax_node_type type;
+struct ink_ast_node {
+    enum ink_ast_node_type type;
     int flags;
     size_t start_offset;
     size_t end_offset;
-    struct ink_syntax_node *lhs;
-    struct ink_syntax_node *rhs;
-    struct ink_syntax_seq *seq;
+    struct ink_ast_node *lhs;
+    struct ink_ast_node *rhs;
+    struct ink_ast_seq *seq;
 };
 
 /**
- * Syntax Tree.
+ * Abstract syntax tree.
  */
-struct ink_syntax_tree {
+struct ink_ast {
     const struct ink_source *source;
-    struct ink_syntax_node *root;
+    struct ink_ast_node *root;
     struct ink_syntax_error_vec errors;
 };
 
-extern const char *ink_syntax_node_type_strz(enum ink_syntax_node_type type);
+extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
 
-extern struct ink_syntax_node *
-ink_syntax_node_new(enum ink_syntax_node_type type, size_t start_offset,
-                    size_t end_offset, struct ink_syntax_node *lhs,
-                    struct ink_syntax_node *rhs, struct ink_syntax_seq *seq,
-                    struct ink_arena *arena);
+extern struct ink_ast_node *
+ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
+                 size_t end_offset, struct ink_ast_node *lhs,
+                 struct ink_ast_node *rhs, struct ink_ast_seq *seq,
+                 struct ink_arena *arena);
 
-extern int ink_syntax_tree_init(const struct ink_source *source,
-                                struct ink_syntax_tree *tree);
-extern void ink_syntax_tree_deinit(struct ink_syntax_tree *tree);
-extern void ink_syntax_tree_print(const struct ink_syntax_tree *tree,
-                                  bool colors);
-extern void ink_syntax_tree_render_errors(const struct ink_syntax_tree *tree);
+extern int ink_ast_init(const struct ink_source *source, struct ink_ast *tree);
+extern void ink_ast_deinit(struct ink_ast *tree);
+extern void ink_ast_print(const struct ink_ast *tree, bool colors);
+extern void ink_ast_render_errors(const struct ink_ast *tree);
 
 #ifdef __cplusplus
 }
