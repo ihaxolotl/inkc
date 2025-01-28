@@ -74,7 +74,7 @@ static void test_bytecode(void **state)
 
 static void test_story_content(void **state)
 {
-    static const char *text = "Hello, world!\n";
+    static const char *text = "Hello, world!";
     char *str;
     struct ink_story story;
 
