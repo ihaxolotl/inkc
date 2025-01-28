@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "source.h"
 #include "token.h"
 
 #define T(name, description) description,
@@ -12,8 +11,7 @@ const char *ink_token_type_strz(enum ink_token_type type)
     return INK_TT_STR[type];
 }
 
-void ink_token_print(const struct ink_source *source,
-                     const struct ink_token *token)
+void ink_token_print(const uint8_t *source_bytes, const struct ink_token *token)
 {
     const size_t start = token->start_offset;
     const size_t end = token->end_offset;
@@ -30,7 +28,7 @@ void ink_token_print(const struct ink_source *source,
     default:
         printf("[DEBUG] %s(%zu, %zu): `%.*s`\n",
                ink_token_type_strz(token->type), start, end, (int)(end - start),
-               source->bytes + start);
+               source_bytes + start);
         break;
     }
 }

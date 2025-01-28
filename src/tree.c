@@ -41,6 +41,7 @@ struct ink_error_info {
     size_t column;
     size_t snippet_start;
     size_t snippet_end;
+    char *filename;
     char *message;
 };
 
@@ -64,17 +65,16 @@ const char *ink_ast_node_type_strz(enum ink_ast_node_type type)
     return INK_NODE_TYPE_STR[type];
 }
 
-static void ink_render_error_info(const struct ink_source *source,
+static void ink_render_error_info(const uint8_t *source_bytes,
                                   const struct ink_error_info *info)
 {
     const size_t line = info->line + 1;
     const size_t col = info->column + 1;
 
-    printf("%s:%zu:%zu: error: %s\n", source->filename, line, col,
-           info->message);
+    printf("%s:%zu:%zu: error: %s\n", info->filename, line, col, info->message);
     printf("%4zu | %.*s\n", line,
            (int)(info->snippet_end - info->snippet_start),
-           source->bytes + info->snippet_start);
+           source_bytes + info->snippet_start);
     printf("     | %*s^\n\n", (int)info->column, "");
 }
 
@@ -106,7 +106,7 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
     msglen = vsnprintf(info.message, (size_t)msglen + 1, fmt, ap);
     va_end(ap);
 
-    bytes = tree->source->bytes;
+    bytes = tree->source_bytes;
     offset = 0;
     info.column = 0;
     info.line = 0;
@@ -138,16 +138,15 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
         }
     }
 
-    ink_render_error_info(tree->source, &info);
+    ink_render_error_info(tree->source_bytes, &info);
 }
 
 static void ink_syntax_error_render(const struct ink_ast *tree,
                                     const struct ink_syntax_error *error,
                                     struct ink_arena *arena)
 {
-    const struct ink_source *const source = tree->source;
     const size_t length = error->source_end - error->source_start;
-    const uint8_t *const bytes = source->bytes + error->source_start;
+    const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
     case INK_SYNTAX_IDENT_UNKNOWN:
@@ -183,15 +182,14 @@ void ink_ast_render_errors(const struct ink_ast *tree)
     ink_arena_release(&arena);
 }
 
-static void ink_build_lines(struct ink_line_buffer *lines,
-                            const struct ink_source *source)
+static void ink_build_lines(struct ink_line_buffer *lines, const uint8_t *bytes)
 {
     struct ink_source_range range;
     size_t start_offset = 0;
     size_t end_offset = 0;
 
-    while (source->bytes[end_offset] != '\0') {
-        if (source->bytes[end_offset] == '\n') {
+    while (bytes[end_offset] != '\0') {
+        if (bytes[end_offset] == '\n') {
             range.start_offset = start_offset;
             range.end_offset = end_offset;
 
@@ -367,9 +365,9 @@ static void ink_ast_print_node(const struct ink_ast *tree,
     const size_t line_end = ink_calculate_line(lines, node->end_offset);
     const struct ink_source_range line_range = lines->entries[line_start];
     const struct ink_print_context context = {
-        .filename = tree->source->filename,
+        .filename = tree->filename,
         .node_type_strz = ink_ast_node_type_strz(node->type),
-        .lexeme = tree->source->bytes + node->start_offset,
+        .lexeme = tree->source_bytes + node->start_offset,
         .lexeme_length = node->end_offset - node->start_offset,
         .line_start = line_start + 1,
         .line_end = line_end + 1,
@@ -435,7 +433,7 @@ void ink_ast_print(const struct ink_ast *tree, bool colors)
     struct ink_line_buffer lines;
 
     ink_line_buffer_init(&lines);
-    ink_build_lines(&lines, tree->source);
+    ink_build_lines(&lines, tree->source_bytes);
 
     if (tree->root) {
         ink_ast_print_node(tree, &lines, tree->root, "", INK_SYNTAX_TREE_EMPTY,
@@ -479,12 +477,14 @@ struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
 /**
  * Initialize AST.
  */
-int ink_ast_init(const struct ink_source *source, struct ink_ast *tree)
+void ink_ast_init(struct ink_ast *tree, const char *filename,
+                  const uint8_t *source_bytes)
 {
-    ink_syntax_error_vec_init(&tree->errors);
-    tree->source = source;
+    tree->filename = filename;
+    tree->source_bytes = source_bytes;
     tree->root = NULL;
-    return 0;
+
+    ink_syntax_error_vec_init(&tree->errors);
 }
 
 /**

@@ -47,36 +47,52 @@ static void test_ink_hashmap(void **state)
     test_hashmap_1_deinit(&ht);
 }
 
-static void test_ink_story(void **state)
+static void test_bytecode(void **state)
 {
     struct ink_story story;
     struct ink_object *obj;
 
-    ink_story_init(&story);
+    ink_story_init(&story, 0);
 
     obj = ink_number_new(&story, 1);
     ink_object_vec_push(&story.constants, obj);
 
     obj = ink_number_new(&story, 2);
     ink_object_vec_push(&story.constants, obj);
-    ink_bytecode_vec_push(&story.code, INK_OP_LOAD_CONST);
-    ink_bytecode_vec_push(&story.code, 0);
-    ink_bytecode_vec_push(&story.code, INK_OP_LOAD_CONST);
-    ink_bytecode_vec_push(&story.code, 1);
-    ink_bytecode_vec_push(&story.code, INK_OP_ADD);
-    ink_bytecode_vec_push(&story.code, 0);
-    ink_bytecode_vec_push(&story.code, INK_OP_RET);
-    ink_bytecode_vec_push(&story.code, 0);
+    ink_byte_vec_push(&story.code, INK_OP_LOAD_CONST);
+    ink_byte_vec_push(&story.code, 0);
+    ink_byte_vec_push(&story.code, INK_OP_LOAD_CONST);
+    ink_byte_vec_push(&story.code, 1);
+    ink_byte_vec_push(&story.code, INK_OP_ADD);
+    ink_byte_vec_push(&story.code, 0);
+    ink_byte_vec_push(&story.code, INK_OP_RET);
+    ink_byte_vec_push(&story.code, 0);
 
     ink_story_execute(&story);
-    ink_story_deinit(&story);
+    ink_story_free(&story);
+}
+
+static void test_story_content(void **state)
+{
+    static const char *text = "Hello, world!\n";
+    char *str;
+    struct ink_story story;
+
+    ink_story_load(&story, text, INK_F_DUMP_AST | INK_F_TRACING);
+
+    str = ink_story_continue(&story);
+    assert(str != NULL);
+    assert_string_equal(str, "Hello, world!");
+    ink_free(str);
+    ink_story_free(&story);
 }
 
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_ink_hashmap),
-        cmocka_unit_test(test_ink_story),
+        cmocka_unit_test(test_bytecode),
+        cmocka_unit_test(test_story_content),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

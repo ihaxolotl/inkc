@@ -56,20 +56,6 @@ err_file:
     return -1;
 }
 
-static char *ink_string_copy(const char *chars, size_t length)
-{
-    char *buf;
-
-    buf = ink_malloc(length + 1);
-    if (buf == NULL) {
-        return NULL;
-    }
-
-    memcpy(buf, chars, length);
-    buf[length] = '\0';
-    return buf;
-}
-
 /**
  * Load an Ink source file from STDIN.
  */
@@ -77,17 +63,16 @@ int ink_source_load_stdin(struct ink_source *source)
 {
     char buf[INK_SOURCE_BUF_MAX];
 
-    source->filename = NULL;
     source->bytes = NULL;
     source->length = 0;
 
     while (fgets(buf, INK_SOURCE_BUF_MAX, stdin)) {
+        uint8_t *tmp;
         const size_t len = source->length;
         const size_t buflen = strlen(buf);
-        uint8_t *tmp;
 
         tmp = realloc(source->bytes, len + buflen + 1);
-        if (tmp == NULL) {
+        if (!tmp) {
             ink_source_free(source);
             return -INK_E_OOM;
         }
@@ -101,12 +86,6 @@ int ink_source_load_stdin(struct ink_source *source)
         ink_source_free(source);
         return -INK_E_OOM;
     }
-
-    source->filename = ink_string_copy("<STDIN>", 7);
-    if (source->filename == NULL) {
-        ink_source_free(source);
-        return -INK_E_OOM;
-    }
     return INK_E_OK;
 }
 
@@ -115,11 +94,9 @@ int ink_source_load_stdin(struct ink_source *source)
  */
 int ink_source_load(const char *filename, struct ink_source *source)
 {
-    int rc;
     const char *ext;
     const size_t namelen = strlen(filename);
 
-    source->filename = NULL;
     source->bytes = NULL;
     source->length = 0;
 
@@ -128,29 +105,15 @@ int ink_source_load(const char *filename, struct ink_source *source)
     }
 
     ext = filename + namelen - INK_FILE_EXT_LENGTH;
-    if (strncmp(ext, INK_FILE_EXT, INK_FILE_EXT_LENGTH) != 0) {
+    if (!(strncmp(ext, INK_FILE_EXT, INK_FILE_EXT_LENGTH) == 0)) {
         return -INK_E_FILE;
     }
-
-    source->filename = ink_string_copy(filename, namelen);
-    if (source->filename == NULL) {
-        return -INK_E_OOM;
-    }
-
-    rc = unix_load_file(filename, &source->bytes, &source->length);
-    if (rc == -1) {
-        ink_free(source->filename);
-        return -INK_E_OS;
-    }
-    return 0;
+    return unix_load_file(filename, &source->bytes, &source->length);
 }
 
 void ink_source_free(struct ink_source *source)
 {
     ink_free(source->bytes);
-    ink_free(source->filename);
-
-    source->filename = NULL;
     source->bytes = NULL;
     source->length = 0;
 }

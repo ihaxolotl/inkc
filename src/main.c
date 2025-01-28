@@ -4,15 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "arena.h"
-#include "astgen.h"
 #include "common.h"
 #include "logging.h"
 #include "option.h"
-#include "parse.h"
 #include "source.h"
 #include "story.h"
-#include "tree.h"
 
 enum {
     OPT_COLORS = 1000,
@@ -47,46 +43,10 @@ static void print_usage(const char *name)
     fprintf(stderr, USAGE_MSG, name);
 }
 
-static int inkc_parse(struct ink_source *source, struct ink_story *story,
-                      bool dump_ast, bool colors, int flags)
-{
-    int rc;
-    struct ink_arena arena;
-    struct ink_ast ast;
-    static const size_t arena_alignment = 8;
-    static const size_t arena_block_size = 8192;
-
-    ink_arena_init(&arena, arena_block_size, arena_alignment);
-
-    rc = ink_ast_init(source, &ast);
-    if (rc < 0) {
-        return rc;
-    }
-
-    rc = ink_parse(source, &ast, &arena, flags);
-    if (rc < 0) {
-        goto out;
-    }
-    if (dump_ast) {
-        ink_ast_print(&ast, colors);
-    }
-
-    rc = ink_astgen(&ast, story, flags);
-    if (rc < 0) {
-        ink_story_deinit(story);
-    }
-out:
-    ink_ast_deinit(&ast);
-    ink_arena_release(&arena);
-    return rc;
-}
-
 int main(int argc, char *argv[])
 {
     struct ink_source source;
     struct ink_story story;
-    bool colors = false;
-    bool dump_ast = false;
     int flags = 0;
     int opt = 0;
     int rc = -1;
@@ -97,19 +57,19 @@ int main(int argc, char *argv[])
     while ((opt = option_nextopt())) {
         switch (opt) {
         case OPT_COLORS: {
-            colors = true;
+            flags |= INK_F_COLOR;
             break;
         }
         case OPT_TRACING: {
-            flags |= INK_PARSER_F_TRACING;
+            flags |= INK_F_TRACING;
             break;
         }
         case OPT_CACHING: {
-            flags |= INK_PARSER_F_CACHING;
+            flags |= INK_F_CACHING;
             break;
         }
         case OPT_DUMP_AST: {
-            dump_ast = true;
+            flags |= INK_F_DUMP_AST;
             break;
         }
         case OPTION_UNKNOWN: {
@@ -160,16 +120,19 @@ int main(int argc, char *argv[])
         return rc;
     }
 
-    ink_story_init(&story);
-
-    rc = inkc_parse(&source, &story, dump_ast, colors, flags);
+    rc = ink_story_load(&story, (char *)source.bytes, flags);
     if (rc < 0) {
         ink_source_free(&source);
         return EXIT_FAILURE;
     }
+    while (story.can_continue) {
+        char *content = ink_story_continue(&story);
 
-    ink_story_execute(&story);
-    ink_story_deinit(&story);
+        printf("%s\n", content);
+        ink_free(content);
+    }
+
+    ink_story_free(&story);
     ink_source_free(&source);
     return EXIT_SUCCESS;
 }

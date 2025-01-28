@@ -143,7 +143,8 @@ struct ink_ast_node {
  * Abstract syntax tree.
  */
 struct ink_ast {
-    const struct ink_source *source;
+    const char *filename;
+    const unsigned char *source_bytes;
     struct ink_ast_node *root;
     struct ink_syntax_error_vec errors;
 };
@@ -156,7 +157,8 @@ ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
                  struct ink_ast_node *rhs, struct ink_ast_seq *seq,
                  struct ink_arena *arena);
 
-extern int ink_ast_init(const struct ink_source *source, struct ink_ast *tree);
+extern void ink_ast_init(struct ink_ast *tree, const char *filename,
+                         const unsigned char *source_bytes);
 extern void ink_ast_deinit(struct ink_ast *tree);
 extern void ink_ast_print(const struct ink_ast *tree, bool colors);
 extern void ink_ast_render_errors(const struct ink_ast *tree);

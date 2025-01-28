@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "scanner.h"
-#include "source.h"
 #include "token.h"
 
 enum ink_lex_state {
@@ -92,8 +91,7 @@ static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
                                                size_t start_offset,
                                                size_t end_offset)
 {
-    const uint8_t *source = scanner->source->bytes;
-    const uint8_t *lexeme = source + start_offset;
+    const uint8_t *lexeme = &scanner->bytes[start_offset];
     const size_t length = end_offset - start_offset;
 
     switch (length) {
@@ -191,15 +189,13 @@ bool ink_scanner_try_keyword(struct ink_scanner *scanner,
 
 void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
 {
-    uint8_t c;
     enum ink_lex_state state = INK_LEX_START;
-    const struct ink_source *source = scanner->source;
     const struct ink_scanner_mode *mode = ink_scanner_current(scanner);
 
     for (;;) {
-        c = source->bytes[scanner->cursor_offset];
+        const uint8_t c = scanner->bytes[scanner->cursor_offset];
 
-        if (scanner->cursor_offset >= source->length) {
+        if (c == '\0') {
             token->type = INK_TT_EOF;
             break;
         }

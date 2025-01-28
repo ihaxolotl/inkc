@@ -14,7 +14,9 @@ extern "C" {
     T(OP_MUL, "MUL")                                                           \
     T(OP_DIV, "DIV")                                                           \
     T(OP_MOD, "MOD")                                                           \
-    T(OP_NEG, "NEG")
+    T(OP_NEG, "NEG")                                                           \
+    T(OP_CONTENT_PUSH, "CONTENT_PUSH")                                         \
+    T(OP_CONTENT_POST, "CONTENT_POST")
 
 #define T(name, description) INK_##name,
 enum ink_vm_opcode {

@@ -3,9 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
+#include "astgen.h"
 #include "object.h"
 #include "opcode.h"
+#include "parse.h"
 #include "story.h"
+#include "tree.h"
 
 #define T(name, description) description,
 static const char *INK_OPCODE_TYPE_STR[] = {INK_MAKE_OPCODE_LIST(T)};
@@ -26,7 +30,7 @@ static void ink_disassemble_simple_inst(struct ink_story *story,
 static void ink_disassemble_unary_inst(struct ink_story *story,
                                        enum ink_vm_opcode opcode, size_t offset)
 {
-    const struct ink_bytecode_vec *const code = &story->code;
+    const struct ink_byte_vec *const code = &story->code;
     const struct ink_object_vec *const consts = &story->constants;
     const uint8_t arg = code->entries[offset + 1];
 
@@ -37,7 +41,7 @@ static void ink_disassemble_unary_inst(struct ink_story *story,
 
 static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
 {
-    const struct ink_bytecode_vec *const code = &story->code;
+    const struct ink_byte_vec *const code = &story->code;
     const uint8_t byte = code->entries[offset];
 
     printf("%04zu    | ", offset);
@@ -50,7 +54,9 @@ static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
     case INK_OP_MUL:
     case INK_OP_DIV:
     case INK_OP_MOD:
-    case INK_OP_NEG: {
+    case INK_OP_NEG:
+    case INK_OP_CONTENT_POST:
+    case INK_OP_CONTENT_PUSH: {
         ink_disassemble_simple_inst(story, byte, offset);
         break;
     }
@@ -76,8 +82,10 @@ void *ink_story_mem_alloc(struct ink_story *story, void *ptr, size_t size_old,
                           size_t size_new)
 {
     if (size_new > size_old) {
-        fprintf(stdout, "[TRACE] Allocating memory (%p) %zu -> %zu\n", ptr,
-                size_old, size_new);
+        if (story->flags & INK_F_TRACING) {
+            fprintf(stdout, "[TRACE] Allocating memory (%p) %zu -> %zu\n", ptr,
+                    size_old, size_new);
+        }
     }
     if (size_new == 0) {
         free(ptr);
@@ -88,7 +96,10 @@ void *ink_story_mem_alloc(struct ink_story *story, void *ptr, size_t size_old,
 
 void ink_story_mem_free(struct ink_story *story, void *ptr)
 {
-    fprintf(stdout, "[TRACE] Free memory region (%p)\n", ptr);
+    if (story->flags & INK_F_TRACING) {
+        fprintf(stdout, "[TRACE] Free memory region (%p)\n", ptr);
+    }
+
     ink_story_mem_alloc(story, ptr, 0, 0);
 }
 
@@ -101,6 +112,129 @@ void ink_story_mem_flush(struct ink_story *story)
 
         story->objects = story->objects->next;
         ink_story_mem_free(story, obj);
+    }
+}
+
+void ink_story_init(struct ink_story *story, int flags)
+{
+    story->can_continue = true;
+    story->flags = flags;
+    story->pc = NULL;
+    story->stack_top = 0;
+    story->objects = NULL;
+    story->stack[0] = NULL;
+
+    ink_byte_vec_init(&story->content);
+    ink_byte_vec_init(&story->code);
+    ink_object_vec_init(&story->constants);
+}
+
+void ink_story_deinit(struct ink_story *story)
+{
+    ink_byte_vec_deinit(&story->content);
+    ink_byte_vec_deinit(&story->code);
+    ink_object_vec_deinit(&story->constants);
+    ink_story_mem_flush(story);
+}
+
+int ink_story_load(struct ink_story *story, const char *text, int flags)
+{
+    int rc;
+    struct ink_arena arena;
+    struct ink_ast ast;
+    static const size_t arena_alignment = 8;
+    static const size_t arena_block_size = 8192;
+
+    ink_arena_init(&arena, arena_block_size, arena_alignment);
+    ink_ast_init(&ast, "<STDIN>", (uint8_t *)text);
+
+    rc = ink_parse(&ast, &arena, flags);
+    if (rc < 0) {
+        goto out;
+    }
+    if (flags & INK_F_DUMP_AST) {
+        ink_ast_print(&ast, flags & INK_F_COLOR);
+    }
+
+    ink_story_init(story, flags);
+
+    rc = ink_astgen(&ast, story, flags);
+    if (rc < 0) {
+        ink_story_deinit(story);
+    }
+out:
+    ink_ast_deinit(&ast);
+    ink_arena_release(&arena);
+    return rc;
+}
+
+void ink_story_free(struct ink_story *story)
+{
+    ink_story_deinit(story);
+}
+
+static char *ink_story_copy_content(struct ink_story *story)
+{
+    char *str;
+    const size_t size = story->content.count;
+
+    str = ink_malloc(size + 1);
+    if (!str) {
+        return str;
+    }
+
+    memcpy(str, story->content.entries, size);
+    str[size] = '\0';
+    return str;
+}
+
+char *ink_story_continue(struct ink_story *story)
+{
+    const int rc = ink_story_execute(story);
+
+    if (rc < 0) {
+        return NULL;
+    }
+    return ink_story_copy_content(story);
+}
+
+int ink_story_constant_add(struct ink_story *story, struct ink_object *obj)
+{
+    return ink_object_vec_push(&story->constants, obj);
+}
+
+int ink_story_constant_get(struct ink_story *story, size_t index,
+                           struct ink_object **obj)
+{
+    if (index > story->constants.count) {
+        return -INK_STORY_ERR_INVALID_ARG;
+    }
+
+    *obj = story->constants.entries[index];
+    return INK_STORY_OK;
+}
+
+static int ink_story_content_push(struct ink_story *story,
+                                  struct ink_object *obj)
+{
+    int rc;
+    struct ink_string *const str = INK_OBJECT_AS_STRING(obj);
+
+    for (size_t i = 0; i < str->length; i++) {
+        rc = ink_byte_vec_push(&story->content, str->bytes[i]);
+        if (rc < 0) {
+            return rc;
+        }
+    }
+    return INK_E_OK;
+}
+
+static void ink_story_content_clear(struct ink_story *story)
+{
+    ink_byte_vec_shrink(&story->content, 0);
+
+    if (story->content.capacity > 0) {
+        story->content.entries[0] = '\0';
     }
 }
 
@@ -146,22 +280,6 @@ void ink_story_stack_print(struct ink_story *story)
     printf("\n");
 }
 
-int ink_story_constant_add(struct ink_story *story, struct ink_object *object)
-{
-    return ink_object_vec_push(&story->constants, object);
-}
-
-int ink_story_constant_get(struct ink_story *story, size_t index,
-                           struct ink_object **object)
-{
-    if (index > story->constants.count) {
-        return -INK_STORY_ERR_INVALID_ARG;
-    }
-
-    *object = story->constants.entries[index];
-    return INK_STORY_OK;
-}
-
 #define INK_STORY_BINARY_OP(story, proc)                                       \
     do {                                                                       \
         struct ink_object *res = NULL;                                         \
@@ -192,12 +310,17 @@ int ink_story_execute(struct ink_story *story)
     if (story->code.count == 0) {
         return INK_STORY_OK;
     }
-
-    story->pc = &story->code.entries[0];
+    if (story->pc == NULL) {
+        story->pc = &story->code.entries[0];
+    }
+    ink_story_content_clear(story);
 
     for (;;) {
-        ink_story_stack_print(story);
-        ink_story_disassemble(story, (size_t)(story->pc - story->code.entries));
+        if (story->flags & INK_F_TRACING) {
+            ink_story_stack_print(story);
+            ink_story_disassemble(story,
+                                  (size_t)(story->pc - story->code.entries));
+        }
 
         byte = *story->pc++;
         arg = *story->pc++;
@@ -205,6 +328,7 @@ int ink_story_execute(struct ink_story *story)
         switch (byte) {
         case INK_OP_RET: {
             rc = INK_STORY_OK;
+            story->can_continue = false;
             goto exit_loop;
         }
         case INK_OP_POP: {
@@ -253,30 +377,23 @@ int ink_story_execute(struct ink_story *story)
             ink_story_stack_push(story, res);
             break;
         }
+        case INK_OP_CONTENT_PUSH: {
+            struct ink_object *const arg = ink_story_stack_pop(story);
+
+            ink_story_content_push(story, arg);
+            break;
+        }
+        case INK_OP_CONTENT_POST: {
+            rc = INK_STORY_OK;
+            goto exit_loop;
+        }
         default:
+            rc = -1;
             goto exit_loop;
         }
     }
 exit_loop:
     return rc;
-}
-
-void ink_story_init(struct ink_story *story)
-{
-    story->pc = NULL;
-    story->objects = NULL;
-    story->stack_top = 0;
-    story->stack[0] = NULL;
-
-    ink_bytecode_vec_init(&story->code);
-    ink_object_vec_init(&story->constants);
-}
-
-void ink_story_deinit(struct ink_story *story)
-{
-    ink_story_mem_flush(story);
-    ink_bytecode_vec_deinit(&story->code);
-    ink_object_vec_deinit(&story->constants);
 }
 
 #undef INK_STORY_BINARY_OP

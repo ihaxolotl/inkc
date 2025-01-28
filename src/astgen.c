@@ -9,10 +9,8 @@
 #include "hashmap.h"
 #include "object.h"
 #include "opcode.h"
-#include "source.h"
 #include "story.h"
 #include "tree.h"
-#include "vec.h"
 
 #define INK_NUMBER_BUFSZ 24
 
@@ -26,7 +24,6 @@ struct ink_symtab_key {
     size_t length;
 };
 
-INK_VEC_T(ink_byte_vec, uint8_t)
 INK_HASHMAP_T(ink_symtab, struct ink_symtab_key, struct ink_symbol)
 
 static uint32_t ink_symtab_hash(const void *bytes, size_t length)
@@ -73,8 +70,8 @@ static struct ink_object *ink_astgen_number_new(struct ink_astgen *astgen,
                                                 const struct ink_ast_node *node)
 {
     char buf[INK_NUMBER_BUFSZ + 1];
-    const struct ink_source *const src = astgen->tree->source;
-    const uint8_t *const chars = &src->bytes[node->start_offset];
+    const struct ink_ast *const tree = astgen->tree;
+    const uint8_t *const chars = &tree->source_bytes[node->start_offset];
     const size_t len = node->end_offset - node->start_offset;
 
     if (len > INK_NUMBER_BUFSZ) {
@@ -89,19 +86,20 @@ static struct ink_object *ink_astgen_number_new(struct ink_astgen *astgen,
 static struct ink_object *ink_astgen_string_new(struct ink_astgen *astgen,
                                                 const struct ink_ast_node *node)
 {
-    const struct ink_source *const src = astgen->tree->source;
+    const struct ink_ast *const tree = astgen->tree;
 
-    return ink_string_new(astgen->story, &src->bytes[node->start_offset],
+    return ink_string_new(astgen->story,
+                          &tree->source_bytes[node->start_offset],
                           node->end_offset - node->start_offset);
 }
 
 static void ink_astgen_add_inst(struct ink_astgen *astgen,
                                 enum ink_vm_opcode opcode, uint8_t arg)
 {
-    struct ink_bytecode_vec *const code = &astgen->story->code;
+    struct ink_byte_vec *const code = &astgen->story->code;
 
-    ink_bytecode_vec_push(code, (uint8_t)opcode);
-    ink_bytecode_vec_push(code, arg);
+    ink_byte_vec_push(code, (uint8_t)opcode);
+    ink_byte_vec_push(code, arg);
 }
 
 static void ink_astgen_add_const(struct ink_astgen *astgen,
@@ -116,9 +114,9 @@ static void ink_astgen_identifier_token(struct ink_astgen *astgen,
                                         const struct ink_ast_node *node,
                                         struct ink_symtab_key *token)
 {
-    const struct ink_source *const src = astgen->tree->source;
+    const struct ink_ast *const tree = astgen->tree;
 
-    token->bytes = src->bytes + node->start_offset;
+    token->bytes = &tree->source_bytes[node->start_offset];
     token->length = node->end_offset - node->start_offset;
 }
 
@@ -153,9 +151,9 @@ static void ink_astgen_string(struct ink_astgen *astgen,
 static void ink_astgen_identifier(struct ink_astgen *astgen,
                                   const struct ink_ast_node *node)
 {
-    const struct ink_source *src = astgen->tree->source;
+    const struct ink_ast *const tree = astgen->tree;
     const struct ink_symtab_key key = {
-        .bytes = src->bytes + node->start_offset,
+        .bytes = &tree->source_bytes[node->start_offset],
         .length = node->end_offset - node->start_offset,
     };
     struct ink_symbol symbol;
@@ -170,6 +168,26 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
         ink_syntax_error_vec_push(&astgen->tree->errors, err);
         return;
     }
+}
+
+static void ink_astgen_expr(struct ink_astgen *astgen,
+                            const struct ink_ast_node *node);
+
+static void ink_astgen_unary_op(struct ink_astgen *astgen,
+                                const struct ink_ast_node *node,
+                                enum ink_vm_opcode op)
+{
+    ink_astgen_expr(astgen, node->lhs);
+    ink_astgen_add_inst(astgen, op, 0);
+}
+
+static void ink_astgen_binary_op(struct ink_astgen *astgen,
+                                 const struct ink_ast_node *node,
+                                 enum ink_vm_opcode op)
+{
+    ink_astgen_expr(astgen, node->lhs);
+    ink_astgen_expr(astgen, node->rhs);
+    ink_astgen_add_inst(astgen, op, 0);
 }
 
 static void ink_astgen_expr(struct ink_astgen *astgen,
@@ -188,38 +206,27 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
         break;
     }
     case INK_NODE_ADD_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_expr(astgen, node->rhs);
-        ink_astgen_add_inst(astgen, INK_OP_ADD, 0);
+        ink_astgen_binary_op(astgen, node, INK_OP_ADD);
         break;
     }
     case INK_NODE_SUB_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_expr(astgen, node->rhs);
-        ink_astgen_add_inst(astgen, INK_OP_SUB, 0);
+        ink_astgen_binary_op(astgen, node, INK_OP_SUB);
         break;
     }
     case INK_NODE_MUL_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_expr(astgen, node->rhs);
-        ink_astgen_add_inst(astgen, INK_OP_MUL, 0);
+        ink_astgen_binary_op(astgen, node, INK_OP_MUL);
         break;
     }
     case INK_NODE_DIV_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_expr(astgen, node->rhs);
-        ink_astgen_add_inst(astgen, INK_OP_DIV, 0);
+        ink_astgen_binary_op(astgen, node, INK_OP_DIV);
         break;
     }
     case INK_NODE_MOD_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_expr(astgen, node->rhs);
-        ink_astgen_add_inst(astgen, INK_OP_MOD, 0);
+        ink_astgen_binary_op(astgen, node, INK_OP_MOD);
         break;
     }
     case INK_NODE_NEGATE_EXPR: {
-        ink_astgen_expr(astgen, node->lhs);
-        ink_astgen_add_inst(astgen, INK_OP_NEG, 0);
+        ink_astgen_unary_op(astgen, node, INK_OP_NEG);
         break;
     }
     default:
@@ -256,9 +263,9 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
             assert(false);
             break;
         }
-    }
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+        ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+    }
 }
 
 static void ink_astgen_var_decl(struct ink_astgen *astgen,
@@ -287,6 +294,7 @@ static void ink_astgen_content_stmt(struct ink_astgen *astgen,
                                     const struct ink_ast_node *node)
 {
     ink_astgen_content_expr(astgen, node->lhs);
+    ink_astgen_add_inst(astgen, INK_OP_CONTENT_POST, 0);
 }
 
 static void ink_astgen_expr_stmt(struct ink_astgen *astgen,

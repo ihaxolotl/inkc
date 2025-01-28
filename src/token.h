@@ -6,8 +6,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-
-struct ink_source;
+#include <stdint.h>
 
 #define INK_TT(T)                                                              \
     T(TT_EOF, "EndOfFile")                                                     \
@@ -85,7 +84,7 @@ struct ink_token {
 };
 
 extern const char *ink_token_type_strz(enum ink_token_type type);
-extern void ink_token_print(const struct ink_source *source,
+extern void ink_token_print(const uint8_t *source_bytes,
                             const struct ink_token *token);
 
 #ifdef __cplusplus

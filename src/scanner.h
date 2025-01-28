@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "token.h"
 
@@ -23,7 +24,7 @@ struct ink_scanner_mode {
 };
 
 struct ink_scanner {
-    const struct ink_source *source;
+    const uint8_t *bytes;
     bool is_line_start;
     size_t cursor_offset;
     size_t start_offset;

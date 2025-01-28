@@ -15,7 +15,7 @@ struct ink_object;
 #define INK_STORY_STACK_MAX 128
 
 INK_VEC_T(ink_object_vec, struct ink_object *)
-INK_VEC_T(ink_bytecode_vec, uint8_t)
+INK_VEC_T(ink_byte_vec, uint8_t)
 
 enum ink_story_err {
     INK_STORY_OK = 0,
@@ -25,10 +25,20 @@ enum ink_story_err {
     INK_STORY_ERR_INVALID_ARG,
 };
 
+enum ink_flags {
+    INK_F_TRACING = (1 << 0),
+    INK_F_CACHING = (1 << 1),
+    INK_F_COLOR = (1 << 2),
+    INK_F_DUMP_AST = (1 << 3),
+    INK_F_DUMP_CODE = (1 << 4),
+};
+
 /**
  * Ink Story Context
  */
 struct ink_story {
+    bool can_continue;
+    int flags;
     /**
      * Program counter / instruction pointer.
      */
@@ -38,13 +48,17 @@ struct ink_story {
      */
     size_t stack_top;
     /**
-     * Constant value table.
+     * Story content buffer.
      */
-    struct ink_object_vec constants;
+    struct ink_byte_vec content;
     /**
      * Bytecode instructions.
      */
-    struct ink_bytecode_vec code;
+    struct ink_byte_vec code;
+    /**
+     * Constant value table.
+     */
+    struct ink_object_vec constants;
     /**
      * Object chain for tracking.
      */
@@ -55,8 +69,11 @@ struct ink_story {
     struct ink_object *stack[INK_STORY_STACK_MAX];
 };
 
-extern void ink_story_init(struct ink_story *story);
+extern void ink_story_init(struct ink_story *story, int flags);
 extern void ink_story_deinit(struct ink_story *story);
+extern int ink_story_load(struct ink_story *story, const char *text, int flags);
+extern void ink_story_free(struct ink_story *story);
+extern char *ink_story_continue(struct ink_story *story);
 extern int ink_story_execute(struct ink_story *story);
 extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,

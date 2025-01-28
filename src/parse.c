@@ -10,21 +10,16 @@
 #include "logging.h"
 #include "parse.h"
 #include "scanner.h"
+#include "story.h"
 #include "token.h"
 #include "tree.h"
 #include "vec.h"
 
-#define INK_HASHTABLE_SCALE_FACTOR 2u
-#define INK_HASHTABLE_LOAD_MAX .75
-#define INK_HASHTABLE_MIN_CAPACITY 16
 #define INK_PARSER_ARGS_MAX 255
-#define INK_PARSER_CACHE_SCALE_FACTOR INK_HASHTABLE_SCALE_FACTOR
-#define INK_PARSER_CACHE_LOAD_MAX INK_HASHTABLE_LOAD_MAX
-#define INK_PARSER_CACHE_MIN_CAPACITY INK_HASHTABLE_MIN_CAPACITY
 
 #define INK_PARSER_TRACE(node, rule, ...)                                      \
     do {                                                                       \
-        if (parser->flags & INK_PARSER_F_TRACING) {                            \
+        if (parser->flags & INK_F_TRACING) {                                   \
             ink_parser_trace(parser, #rule);                                   \
         }                                                                      \
     } while (0)
@@ -37,7 +32,7 @@
             .rule_address = (void *)rule,                                      \
         };                                                                     \
                                                                                \
-        if (parser->flags & INK_PARSER_F_CACHING) {                            \
+        if (parser->flags & INK_F_CACHING) {                                   \
             rc = ink_parser_cache_lookup(&parser->cache, key, &node);          \
             if (rc < 0) {                                                      \
                 node = INK_DISPATCH(rule, __VA_ARGS__);                        \
@@ -361,7 +356,7 @@ static void ink_parser_rewind_scanner(struct ink_parser *parser)
 {
     const struct ink_scanner_mode *mode = ink_scanner_current(&parser->scanner);
 
-    if (parser->flags & INK_PARSER_F_TRACING) {
+    if (parser->flags & INK_F_TRACING) {
         ink_trace("Rewinding scanner to %zu", parser->source_offset);
     }
 
@@ -396,7 +391,7 @@ static void *ink_parser_error(struct ink_parser *parser, const char *format,
     va_end(vargs);
 
     parser->panic_mode = true;
-    ink_token_print(parser->scanner.source, &parser->token);
+    ink_token_print(parser->scanner.bytes, &parser->token);
     return NULL;
 }
 
@@ -888,14 +883,12 @@ static void ink_parser_handle_stitch(struct ink_parser *parser,
     }
 }
 
-static int ink_parser_init(struct ink_parser *parser,
-                           const struct ink_source *source,
-                           struct ink_ast *tree, struct ink_arena *arena,
-                           int flags)
+static int ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
+                           struct ink_arena *arena, int flags)
 {
 
     parser->arena = arena;
-    parser->scanner.source = source;
+    parser->scanner.bytes = tree->source_bytes;
     parser->scanner.is_line_start = true;
     parser->scanner.start_offset = 0;
     parser->scanner.cursor_offset = 0;
@@ -1997,13 +1990,12 @@ static struct ink_ast_node *ink_parse_file(struct ink_parser *parser)
 /**
  * Parse a source file and output an AST.
  */
-int ink_parse(const struct ink_source *source, struct ink_ast *tree,
-              struct ink_arena *arena, int flags)
+int ink_parse(struct ink_ast *tree, struct ink_arena *arena, int flags)
 {
     int rc;
     struct ink_parser parser;
 
-    rc = ink_parser_init(&parser, source, tree, arena, flags);
+    rc = ink_parser_init(&parser, tree, arena, flags);
     if (rc < 0) {
         return rc;
     }

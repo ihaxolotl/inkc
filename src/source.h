@@ -9,7 +9,6 @@ extern "C" {
 #include <stdint.h>
 
 struct ink_source {
-    char *filename;
     uint8_t *bytes;
     size_t length;
 };
