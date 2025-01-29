@@ -14,19 +14,23 @@ extern "C" {
 struct ink_arena;
 struct ink_ast_node;
 
-enum ink_syntax_error_type {
-    INK_SYNTAX_OK = 0,
-    INK_SYNTAX_IDENT_UNKNOWN,
-    INK_SYNTAX_IDENT_REDEFINED,
+enum ink_ast_error_type {
+    INK_AST_OK = 0,
+    INK_AST_IDENT_UNKNOWN,
+    INK_AST_IDENT_REDEFINED,
+    INK_AST_CONDITIONAL_EMPTY,
+    INK_AST_CONDITIONAL_EXPECTED_ELSE,
+    INK_AST_CONDITIONAL_MULTIPLE_ELSE,
+    INK_AST_CONDITIONAL_FINAL_ELSE,
 };
 
-struct ink_syntax_error {
-    enum ink_syntax_error_type type;
+struct ink_ast_error {
+    enum ink_ast_error_type type;
     size_t source_start;
     size_t source_end;
 };
 
-INK_VEC_T(ink_syntax_error_vec, struct ink_syntax_error)
+INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
 
 #define INK_NODE(T)                                                            \
     T(NODE_FILE, "File")                                                       \
@@ -46,6 +50,7 @@ INK_VEC_T(ink_syntax_error_vec, struct ink_syntax_error)
     T(NODE_CONDITIONAL_BRANCH, "ConditionalBranch")                            \
     T(NODE_CONDITIONAL_CONTENT, "ConditionalContent")                          \
     T(NODE_CONDITIONAL_ELSE_BRANCH, "ConditionalElseBranch")                   \
+    T(NODE_CONDITIONAL_INNER, "ConditionalInner")                              \
     T(NODE_CONTAINS_EXPR, "ContainsExpr")                                      \
     T(NODE_CONST_DECL, "ConstDecl")                                            \
     T(NODE_CONTENT, "Content")                                                 \
@@ -146,7 +151,7 @@ struct ink_ast {
     const char *filename;
     const unsigned char *source_bytes;
     struct ink_ast_node *root;
-    struct ink_syntax_error_vec errors;
+    struct ink_ast_error_vec errors;
 };
 
 extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);

@@ -6,17 +6,28 @@ extern "C" {
 #endif
 
 #define INK_MAKE_OPCODE_LIST(T)                                                \
-    T(OP_RET, "RET")                                                           \
-    T(OP_LOAD_CONST, "LOAD_CONST")                                             \
-    T(OP_POP, "POP")                                                           \
-    T(OP_ADD, "ADD")                                                           \
-    T(OP_SUB, "SUB")                                                           \
-    T(OP_MUL, "MUL")                                                           \
-    T(OP_DIV, "DIV")                                                           \
-    T(OP_MOD, "MOD")                                                           \
-    T(OP_NEG, "NEG")                                                           \
-    T(OP_CONTENT_PUSH, "CONTENT_PUSH")                                         \
-    T(OP_CONTENT_POST, "CONTENT_POST")
+    T(OP_RET, "ret")                                                           \
+    T(OP_POP, "pop")                                                           \
+    T(OP_TRUE, "true")                                                         \
+    T(OP_FALSE, "false")                                                       \
+    T(OP_ADD, "add")                                                           \
+    T(OP_SUB, "sub")                                                           \
+    T(OP_MUL, "mul")                                                           \
+    T(OP_DIV, "div")                                                           \
+    T(OP_MOD, "mod")                                                           \
+    T(OP_NEG, "neg")                                                           \
+    T(OP_NOT, "not")                                                           \
+    T(OP_CMP_EQ, "cmp_eq")                                                     \
+    T(OP_CMP_LT, "cmp_lt")                                                     \
+    T(OP_CMP_GT, "cmp_gt")                                                     \
+    T(OP_CMP_LTE, "cmp_lte")                                                   \
+    T(OP_CMP_GTE, "cmp_gte")                                                   \
+    T(OP_JMP, "jmp")                                                           \
+    T(OP_JMP_T, "jmp_t")                                                       \
+    T(OP_JMP_F, "jmp_f")                                                       \
+    T(OP_LOAD_CONST, "load_const")                                             \
+    T(OP_CONTENT_PUSH, "content_push")                                         \
+    T(OP_CONTENT_POST, "content_post")
 
 #define T(name, description) INK_##name,
 enum ink_vm_opcode {

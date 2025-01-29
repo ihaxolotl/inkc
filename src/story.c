@@ -39,6 +39,15 @@ static void ink_disassemble_unary_inst(struct ink_story *story,
     printf("'\n");
 }
 
+static void ink_disassemble_jump_inst(struct ink_story *story,
+                                      enum ink_vm_opcode opcode, size_t offset)
+{
+    const struct ink_byte_vec *const code = &story->code;
+    const uint8_t arg = code->entries[offset + 1];
+
+    printf("%-16s %4d\n", ink_opcode_strz(opcode), arg);
+}
+
 static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
 {
     const struct ink_byte_vec *const code = &story->code;
@@ -49,12 +58,20 @@ static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
     switch (byte) {
     case INK_OP_RET:
     case INK_OP_POP:
+    case INK_OP_TRUE:
+    case INK_OP_FALSE:
     case INK_OP_ADD:
     case INK_OP_SUB:
     case INK_OP_MUL:
     case INK_OP_DIV:
     case INK_OP_MOD:
     case INK_OP_NEG:
+    case INK_OP_NOT:
+    case INK_OP_CMP_EQ:
+    case INK_OP_CMP_LT:
+    case INK_OP_CMP_LTE:
+    case INK_OP_CMP_GT:
+    case INK_OP_CMP_GTE:
     case INK_OP_CONTENT_POST:
     case INK_OP_CONTENT_PUSH: {
         ink_disassemble_simple_inst(story, byte, offset);
@@ -62,6 +79,12 @@ static size_t ink_story_disassemble(struct ink_story *story, size_t offset)
     }
     case INK_OP_LOAD_CONST: {
         ink_disassemble_unary_inst(story, byte, offset);
+        break;
+    }
+    case INK_OP_JMP:
+    case INK_OP_JMP_T:
+    case INK_OP_JMP_F: {
+        ink_disassemble_jump_inst(story, byte, offset);
         break;
     }
     default:
@@ -160,9 +183,15 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
 
     rc = ink_astgen(&ast, story, flags);
     if (rc < 0) {
-        ink_story_deinit(story);
+        goto out;
+    }
+    if (flags & INK_F_DUMP_CODE) {
+        for (size_t off = 0; off < story->code.count;) {
+            off = ink_story_disassemble(story, off);
+        }
     }
 out:
+    ink_story_deinit(story);
     ink_ast_deinit(&ast);
     ink_arena_release(&arena);
     return rc;
@@ -173,7 +202,7 @@ void ink_story_free(struct ink_story *story)
     ink_story_deinit(story);
 }
 
-static char *ink_story_copy_content(struct ink_story *story)
+static char *ink_story_content_copy(struct ink_story *story)
 {
     char *str;
     const size_t size = story->content.count;
@@ -186,32 +215,6 @@ static char *ink_story_copy_content(struct ink_story *story)
     memcpy(str, story->content.entries, size);
     str[size] = '\0';
     return str;
-}
-
-char *ink_story_continue(struct ink_story *story)
-{
-    const int rc = ink_story_execute(story);
-
-    if (rc < 0) {
-        return NULL;
-    }
-    return ink_story_copy_content(story);
-}
-
-int ink_story_constant_add(struct ink_story *story, struct ink_object *obj)
-{
-    return ink_object_vec_push(&story->constants, obj);
-}
-
-int ink_story_constant_get(struct ink_story *story, size_t index,
-                           struct ink_object **obj)
-{
-    if (index > story->constants.count) {
-        return -INK_STORY_ERR_INVALID_ARG;
-    }
-
-    *obj = story->constants.entries[index];
-    return INK_STORY_OK;
 }
 
 static int ink_story_content_push(struct ink_story *story,
@@ -236,6 +239,32 @@ static void ink_story_content_clear(struct ink_story *story)
     if (story->content.capacity > 0) {
         story->content.entries[0] = '\0';
     }
+}
+
+char *ink_story_continue(struct ink_story *story)
+{
+    const int rc = ink_story_execute(story);
+
+    if (rc < 0) {
+        return NULL;
+    }
+    return ink_story_content_copy(story);
+}
+
+int ink_story_constant_add(struct ink_story *story, struct ink_object *obj)
+{
+    return ink_object_vec_push(&story->constants, obj);
+}
+
+int ink_story_constant_get(struct ink_story *story, size_t index,
+                           struct ink_object **obj)
+{
+    if (index > story->constants.count) {
+        return -INK_STORY_ERR_INVALID_ARG;
+    }
+
+    *obj = story->constants.entries[index];
+    return INK_STORY_OK;
 }
 
 int ink_story_stack_push(struct ink_story *story, struct ink_object *object)

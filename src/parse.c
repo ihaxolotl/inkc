@@ -1399,7 +1399,7 @@ static struct ink_ast_node *ink_parse_conditional(struct ink_parser *parser,
     }
 
     ink_parser_node_context_deinit(&context);
-    return ink_ast_node_sequence(INK_NODE_CONDITIONAL_CONTENT, source_start,
+    return ink_ast_node_sequence(INK_NODE_CONDITIONAL_INNER, source_start,
                                  parser->source_offset, scratch_offset, scratch,
                                  parser->arena);
 }
@@ -1419,7 +1419,7 @@ static struct ink_ast_node *ink_parse_inline_logic(struct ink_parser *parser)
         INK_PARSER_RULE(node, ink_parse_conditional, parser, NULL);
         ink_parser_pop_scanner(parser);
         ink_parser_expect(parser, INK_TT_RIGHT_BRACE);
-        return ink_ast_node_binary(INK_NODE_INLINE_LOGIC, source_start,
+        return ink_ast_node_binary(INK_NODE_CONDITIONAL_CONTENT, source_start,
                                    parser->source_offset, NULL, node,
                                    parser->arena);
     }
@@ -1442,9 +1442,11 @@ static struct ink_ast_node *ink_parse_inline_logic(struct ink_parser *parser)
             break;
         }
         case INK_TT_RIGHT_BRACE: {
-            node = expr;
-            expr = NULL;
-            break;
+            ink_parser_pop_scanner(parser);
+            ink_parser_expect(parser, INK_TT_RIGHT_BRACE);
+            return ink_ast_node_binary(INK_NODE_INLINE_LOGIC, source_start,
+                                       parser->source_offset, expr, NULL,
+                                       parser->arena);
         }
         case INK_TT_PIPE: {
             is_inline_seq = true;
@@ -1467,7 +1469,7 @@ static struct ink_ast_node *ink_parse_inline_logic(struct ink_parser *parser)
 
     ink_parser_pop_scanner(parser);
     ink_parser_expect(parser, INK_TT_RIGHT_BRACE);
-    return ink_ast_node_binary(INK_NODE_INLINE_LOGIC, source_start,
+    return ink_ast_node_binary(INK_NODE_CONDITIONAL_CONTENT, source_start,
                                parser->source_offset, expr, node,
                                parser->arena);
 }

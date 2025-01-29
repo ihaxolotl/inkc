@@ -15,6 +15,8 @@ enum {
     OPT_TRACING,
     OPT_CACHING,
     OPT_DUMP_AST,
+    OPT_DUMP_CODE,
+    OPT_COMPILE_ONLY,
     OPT_HELP,
     OPT_ARG_EXAMPLE
 };
@@ -24,19 +26,24 @@ static const struct option opts[] = {
     {"--tracing", OPT_TRACING, false},
     {"--caching", OPT_CACHING, false},
     {"--dump-ast", OPT_DUMP_AST, false},
+    {"--dump-code", OPT_DUMP_CODE, false},
+    {"--compile-only", OPT_COMPILE_ONLY, false},
     {"--help", OPT_HELP, false},
     {"-h", OPT_HELP, false},
     {"--arg-example", OPT_ARG_EXAMPLE, true},
     (struct option){0},
 };
 
-static const char *USAGE_MSG = "Usage: %s [OPTION]... [FILE]\n"
-                               "Load and execute an Ink story.\n\n"
-                               "  -h, --help       Print this message\n"
-                               "  --colors         Enable color output\n"
-                               "  --tracing        Enable tracing\n"
-                               "  --caching        Enable caching\n"
-                               "  --dump-ast       Dump a source file's AST\n";
+static const char *USAGE_MSG =
+    "Usage: %s [OPTION]... [FILE]\n"
+    "Load and execute an Ink story.\n\n"
+    "  -h, --help       Print this message\n"
+    "  --colors         Enable color output\n"
+    "  --tracing        Enable tracing\n"
+    "  --caching        Enable caching\n"
+    "  --dump-ast       Dump a source file's AST\n"
+    "  --dump-code      Dump a story's bytecode\n"
+    "  --compile-only   Compile the story without executing\n";
 
 static void print_usage(const char *name)
 {
@@ -47,6 +54,7 @@ int main(int argc, char *argv[])
 {
     struct ink_source source;
     struct ink_story story;
+    bool compile_only = false;
     int flags = 0;
     int opt = 0;
     int rc = -1;
@@ -70,6 +78,14 @@ int main(int argc, char *argv[])
         }
         case OPT_DUMP_AST: {
             flags |= INK_F_DUMP_AST;
+            break;
+        }
+        case OPT_DUMP_CODE: {
+            flags |= INK_F_DUMP_CODE;
+            break;
+        }
+        case OPT_COMPILE_ONLY: {
+            compile_only = true;
             break;
         }
         case OPTION_UNKNOWN: {
@@ -125,11 +141,13 @@ int main(int argc, char *argv[])
         ink_source_free(&source);
         return EXIT_FAILURE;
     }
-    while (story.can_continue) {
-        char *content = ink_story_continue(&story);
+    if (!compile_only) {
+        while (story.can_continue) {
+            char *content = ink_story_continue(&story);
 
-        printf("%s\n", content);
-        ink_free(content);
+            printf("%s\n", content);
+            ink_free(content);
+        }
     }
 
     ink_story_free(&story);

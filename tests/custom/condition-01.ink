@@ -1,4 +1,4 @@
-// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast --dump-code --compile-only | FileCheck %s
 
 // CHECK: File "<STDIN>"
 // CHECK-NEXT: `--BlockStmt <line:16, line:18>
@@ -14,5 +14,6 @@
 // CHECK-NEXT:                         `--NumberLiteral `1` <col:7, col:8>
 
 {true:
+Hello, world!
 ~ 1 + 1
 }

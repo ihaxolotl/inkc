@@ -41,7 +41,7 @@ struct ink_error_info {
     size_t column;
     size_t snippet_start;
     size_t snippet_end;
-    char *filename;
+    const char *filename;
     char *message;
 };
 
@@ -52,9 +52,9 @@ INK_VEC_T(ink_line_buffer, struct ink_source_range)
 static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
 #undef T
 
-static const char *INK_SYNTAX_TREE_EMPTY[] = {"", ""};
-static const char *INK_SYNTAX_TREE_INNER[] = {"|--", "|  "};
-static const char *INK_SYNTAX_TREE_FINAL[] = {"`--", "   "};
+static const char *INK_AST_FMT_EMPTY[] = {"", ""};
+static const char *INK_AST_FMT_INNER[] = {"|--", "|  "};
+static const char *INK_AST_FMT_FINAL[] = {"`--", "   "};
 
 /**
  * Return a NULL-terminated string representing the type description of a
@@ -78,10 +78,9 @@ static void ink_render_error_info(const uint8_t *source_bytes,
     printf("     | %*s^\n\n", (int)info->column, "");
 }
 
-static void ink_syntax_error_renderf(const struct ink_ast *tree,
-                                     const struct ink_syntax_error *error,
-                                     struct ink_arena *arena, const char *fmt,
-                                     ...)
+static void ink_ast_error_renderf(const struct ink_ast *tree,
+                                  const struct ink_ast_error *error,
+                                  struct ink_arena *arena, const char *fmt, ...)
 {
     va_list ap;
     long msglen;
@@ -110,6 +109,7 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
     offset = 0;
     info.column = 0;
     info.line = 0;
+    info.filename = tree->filename;
 
     for (;;) {
         if (offset < error->source_start) {
@@ -141,23 +141,47 @@ static void ink_syntax_error_renderf(const struct ink_ast *tree,
     ink_render_error_info(tree->source_bytes, &info);
 }
 
-static void ink_syntax_error_render(const struct ink_ast *tree,
-                                    const struct ink_syntax_error *error,
-                                    struct ink_arena *arena)
+static void ink_ast_error_render(const struct ink_ast *tree,
+                                 const struct ink_ast_error *error,
+                                 struct ink_arena *arena)
 {
     const size_t length = error->source_end - error->source_start;
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
-    case INK_SYNTAX_IDENT_UNKNOWN:
-        ink_syntax_error_renderf(tree, error, arena,
-                                 "use of undeclared identifier '%.*s'",
-                                 (int)length, bytes);
+    case INK_AST_IDENT_UNKNOWN: {
+        ink_ast_error_renderf(tree, error, arena,
+                              "use of undeclared identifier '%.*s'",
+                              (int)length, bytes);
         break;
-    case INK_SYNTAX_IDENT_REDEFINED:
-        ink_syntax_error_renderf(tree, error, arena, "redefinition of '%.*s'",
-                                 (int)length, bytes);
+    }
+    case INK_AST_IDENT_REDEFINED: {
+        ink_ast_error_renderf(tree, error, arena, "redefinition of '%.*s'",
+                              (int)length, bytes);
         break;
+    }
+    case INK_AST_CONDITIONAL_EMPTY: {
+        ink_ast_error_renderf(tree, error, arena,
+                              "condition block with no conditions");
+        break;
+    }
+    case INK_AST_CONDITIONAL_EXPECTED_ELSE: {
+        ink_ast_error_renderf(
+            tree, error, arena,
+            "expected '- else:' clause rather than extra condition");
+        break;
+    }
+    case INK_AST_CONDITIONAL_MULTIPLE_ELSE: {
+        ink_ast_error_renderf(tree, error, arena,
+                              "multiple 'else' cases in conditional");
+        break;
+    }
+    case INK_AST_CONDITIONAL_FINAL_ELSE: {
+        ink_ast_error_renderf(
+            tree, error, arena,
+            "'else' case should always be the final case in conditional");
+        break;
+    }
     default:
         assert(false);
         return;
@@ -167,16 +191,16 @@ static void ink_syntax_error_render(const struct ink_ast *tree,
 void ink_ast_render_errors(const struct ink_ast *tree)
 {
     struct ink_arena arena;
-    const struct ink_syntax_error_vec *const errors = &tree->errors;
+    const struct ink_ast_error_vec *const errors = &tree->errors;
     static const size_t arena_alignment = 8;
     static const size_t arena_block_size = 8192;
 
     ink_arena_init(&arena, arena_block_size, arena_alignment);
 
     for (size_t i = 0; i < errors->count; i++) {
-        const struct ink_syntax_error e = errors->entries[i];
+        const struct ink_ast_error e = errors->entries[i];
 
-        ink_syntax_error_render(tree, &e, &arena);
+        ink_ast_error_render(tree, &e, &arena);
     }
 
     ink_arena_release(&arena);
@@ -407,8 +431,8 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
         }
     }
     for (size_t i = 0; i < nodes.count; i++) {
-        const char **pointers = i == nodes.count - 1 ? INK_SYNTAX_TREE_FINAL
-                                                     : INK_SYNTAX_TREE_INNER;
+        const char **pointers =
+            i == nodes.count - 1 ? INK_AST_FMT_FINAL : INK_AST_FMT_INNER;
 
         snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, pointers[1]);
 
@@ -436,9 +460,9 @@ void ink_ast_print(const struct ink_ast *tree, bool colors)
     ink_build_lines(&lines, tree->source_bytes);
 
     if (tree->root) {
-        ink_ast_print_node(tree, &lines, tree->root, "", INK_SYNTAX_TREE_EMPTY,
+        ink_ast_print_node(tree, &lines, tree->root, "", INK_AST_FMT_EMPTY,
                            colors);
-        ink_ast_print_walk(tree, &lines, tree->root, "", INK_SYNTAX_TREE_EMPTY,
+        ink_ast_print_walk(tree, &lines, tree->root, "", INK_AST_FMT_EMPTY,
                            colors);
     }
 
@@ -484,7 +508,7 @@ void ink_ast_init(struct ink_ast *tree, const char *filename,
     tree->source_bytes = source_bytes;
     tree->root = NULL;
 
-    ink_syntax_error_vec_init(&tree->errors);
+    ink_ast_error_vec_init(&tree->errors);
 }
 
 /**
@@ -492,5 +516,5 @@ void ink_ast_init(struct ink_ast *tree, const char *filename,
  */
 void ink_ast_deinit(struct ink_ast *tree)
 {
-    ink_syntax_error_vec_deinit(&tree->errors);
+    ink_ast_error_vec_deinit(&tree->errors);
 }
