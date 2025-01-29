@@ -11,6 +11,7 @@
 #include "opcode.h"
 #include "story.h"
 #include "tree.h"
+#include "vec.h"
 
 #define INK_NUMBER_BUFSZ 24
 
@@ -24,6 +25,11 @@ struct ink_symtab_key {
     size_t length;
 };
 
+struct ink_block {
+    size_t tmp;
+};
+
+INK_VEC_T(ink_block_stack, struct ink_block)
 INK_HASHMAP_T(ink_symtab, struct ink_symtab_key, struct ink_symbol)
 
 static uint32_t ink_symtab_hash(const void *bytes, size_t length)
@@ -49,6 +55,7 @@ struct ink_astgen {
     struct ink_story *story;
     struct ink_ast *tree;
     struct ink_symtab symbol_table;
+    struct ink_block_stack blocks;
 };
 
 static void ink_astgen_init(struct ink_astgen *astgen, struct ink_ast *tree,
@@ -59,11 +66,13 @@ static void ink_astgen_init(struct ink_astgen *astgen, struct ink_ast *tree,
 
     ink_symtab_init(&astgen->symbol_table, 80ul, ink_symtab_hash,
                     ink_symtab_cmp);
+    ink_block_stack_init(&astgen->blocks);
 }
 
 static void ink_astgen_deinit(struct ink_astgen *astgen)
 {
     ink_symtab_deinit(&astgen->symbol_table);
+    ink_block_stack_deinit(&astgen->blocks);
 }
 
 static void ink_astgen_error(struct ink_astgen *astgen,
@@ -132,6 +141,28 @@ static void ink_astgen_patch_jmp(struct ink_astgen *astgen, size_t offset)
     bytes->entries[offset + 1] = addr;
 }
 
+static void ink_astgen_expr(struct ink_astgen *astgen,
+                            const struct ink_ast_node *node);
+static void ink_astgen_block_stmt(struct ink_astgen *astgen,
+                                  const struct ink_ast_node *node);
+
+static void ink_astgen_unary_op(struct ink_astgen *astgen,
+                                const struct ink_ast_node *node,
+                                enum ink_vm_opcode op)
+{
+    ink_astgen_expr(astgen, node->lhs);
+    ink_astgen_add_inst(astgen, op, 0);
+}
+
+static void ink_astgen_binary_op(struct ink_astgen *astgen,
+                                 const struct ink_ast_node *node,
+                                 enum ink_vm_opcode op)
+{
+    ink_astgen_expr(astgen, node->lhs);
+    ink_astgen_expr(astgen, node->rhs);
+    ink_astgen_add_inst(astgen, op, 0);
+}
+
 static void ink_astgen_identifier_token(struct ink_astgen *astgen,
                                         const struct ink_ast_node *node,
                                         struct ink_symtab_key *token)
@@ -187,28 +218,6 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_expr(struct ink_astgen *astgen,
-                            const struct ink_ast_node *node);
-static void ink_astgen_block_stmt(struct ink_astgen *astgen,
-                                  const struct ink_ast_node *node);
-
-static void ink_astgen_unary_op(struct ink_astgen *astgen,
-                                const struct ink_ast_node *node,
-                                enum ink_vm_opcode op)
-{
-    ink_astgen_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, op, 0);
-}
-
-static void ink_astgen_binary_op(struct ink_astgen *astgen,
-                                 const struct ink_ast_node *node,
-                                 enum ink_vm_opcode op)
-{
-    ink_astgen_expr(astgen, node->lhs);
-    ink_astgen_expr(astgen, node->rhs);
-    ink_astgen_add_inst(astgen, op, 0);
-}
-
-static void ink_astgen_expr(struct ink_astgen *astgen,
                             const struct ink_ast_node *node)
 {
     if (!node) {
@@ -249,6 +258,10 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
     }
     case INK_NODE_MOD_EXPR: {
         ink_astgen_binary_op(astgen, node, INK_OP_MOD);
+        break;
+    }
+    case INK_NODE_EQUAL_EXPR: {
+        ink_astgen_binary_op(astgen, node, INK_OP_CMP_EQ);
         break;
     }
     case INK_NODE_NEGATE_EXPR: {
@@ -325,49 +338,94 @@ static int ink_check_conditional(struct ink_astgen *astgen,
     return 0;
 }
 
-static void ink_astgen_conditional_inner(struct ink_astgen *astgen,
+static void ink_astgen_simple_conditional(struct ink_astgen *astgen,
+                                          const struct ink_ast_node *cond_expr,
+                                          const struct ink_ast_node *inner)
+{
+    size_t then_jmp, else_jmp;
+    struct ink_ast_seq *const seq = inner->seq;
+    struct ink_ast_node *const first = seq->nodes[0];
+
+    assert(seq->count <= 2);
+
+    if (first->type == INK_NODE_BLOCK) {
+        struct ink_ast_node *const then_ = seq->nodes[0];
+
+        ink_astgen_expr(astgen, cond_expr);
+
+        then_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+        ink_astgen_block_stmt(astgen, then_);
+        else_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
+        ink_astgen_patch_jmp(astgen, then_jmp);
+
+        if (seq->count == 2) {
+            struct ink_ast_node *const else_ = seq->nodes[1];
+
+            assert(else_->type == INK_NODE_CONDITIONAL_ELSE_BRANCH);
+            ink_astgen_block_stmt(astgen, else_->rhs);
+        }
+
+        ink_astgen_patch_jmp(astgen, else_jmp);
+    } else {
+        assert(false);
+    }
+}
+
+static void ink_astgen_multi_conditional(struct ink_astgen *astgen,
                                          const struct ink_ast_node *node)
 {
-    const struct ink_ast_seq *const seq = node->seq;
+    size_t then_jmp, else_jmp;
+    struct ink_block condbr;
+    struct ink_block_stack *const block_stack = &astgen->blocks;
+    struct ink_ast_seq *const seq = node->seq;
+    const size_t block_top = block_stack->count;
 
     for (size_t i = 0; i < seq->count; i++) {
         const struct ink_ast_node *const node = seq->nodes[i];
 
         switch (node->type) {
-        case INK_NODE_BLOCK: {
-            ink_astgen_block_stmt(astgen, node);
-            break;
-        }
         case INK_NODE_CONDITIONAL_BRANCH: {
+            ink_astgen_expr(astgen, node->lhs);
+            then_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+            ink_astgen_block_stmt(astgen, node->rhs);
+            else_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
+            ink_astgen_patch_jmp(astgen, then_jmp);
             break;
         }
         case INK_NODE_CONDITIONAL_ELSE_BRANCH: {
+            ink_astgen_block_stmt(astgen, node->rhs);
+            else_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
             break;
         }
         default:
             assert(false);
             break;
         }
+
+        condbr.tmp = else_jmp;
+        ink_block_stack_push(block_stack, condbr);
+    }
+    while (!ink_block_stack_is_empty(block_stack) &&
+           block_stack->count >= block_top) {
+        ink_block_stack_pop(block_stack, &condbr);
+        ink_astgen_patch_jmp(astgen, condbr.tmp);
     }
 }
 
 static void ink_astgen_conditional_content(struct ink_astgen *astgen,
                                            const struct ink_ast_node *node)
+
 {
     int rc;
-    size_t offset;
 
     rc = ink_check_conditional(astgen, node);
     if (rc < 0) {
         return;
     }
     if (node->lhs) {
-        ink_astgen_expr(astgen, node->lhs);
-        offset = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
-        ink_astgen_conditional_inner(astgen, node->rhs);
-        ink_astgen_patch_jmp(astgen, offset);
+        ink_astgen_simple_conditional(astgen, node->lhs, node->rhs);
     } else {
-        ink_astgen_conditional_inner(astgen, node->rhs);
+        ink_astgen_multi_conditional(astgen, node->rhs);
     }
 }
 
