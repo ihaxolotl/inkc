@@ -195,11 +195,6 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
     for (;;) {
         const uint8_t c = scanner->bytes[scanner->cursor_offset];
 
-        if (c == '\0') {
-            scanner->start_offset = scanner->cursor_offset;
-            token->type = INK_TT_EOF;
-            break;
-        }
         switch (state) {
         case INK_LEX_START: {
             scanner->start_offset = scanner->cursor_offset;
