@@ -50,10 +50,84 @@ static bool ink_symtab_cmp(const void *a, size_t alen, const void *b,
            memcmp(key_1->bytes, key_2->bytes, key_1->length) == 0;
 }
 
+/**
+ * Symbol scope chain.
+ */
+struct ink_scope {
+    struct ink_scope *parent;
+    struct ink_symtab symbol_table;
+};
+
+/**
+ * Initialize a symbol scope.
+ */
+static void ink_scope_init(struct ink_scope *scope,
+                           struct ink_scope *parent_scope)
+{
+    scope->parent = parent_scope;
+
+    ink_symtab_init(&scope->symbol_table, 80ul, ink_symtab_hash,
+                    ink_symtab_cmp);
+}
+
+/**
+ * Cleanup a symbol scope.
+ */
+static void ink_scope_deinit(struct ink_scope *scope)
+{
+    ink_symtab_deinit(&scope->symbol_table);
+}
+
+/**
+ * Insert a name relative to a scope.
+ *
+ * Will fail if the name already exists or an internal error occurs.
+ */
+static int ink_scope_insert(struct ink_scope *scope, const struct ink_ast *tree,
+                            const struct ink_ast_node *node,
+                            struct ink_symbol sym)
+{
+    const struct ink_symtab_key key = {
+        .bytes = &tree->source_bytes[node->start_offset],
+        .length = node->end_offset - node->start_offset,
+    };
+
+    return ink_symtab_insert(&scope->symbol_table, key, sym);
+}
+
+/**
+ * Lookup a name relative to a scope.
+ *
+ * The scope chain is traversed recursively until a match is found or if the
+ * lookup fails.
+ */
+static int ink_scope_lookup(struct ink_scope *scope, const struct ink_ast *tree,
+                            const struct ink_ast_node *node,
+                            struct ink_symbol *sym)
+{
+    int rc = -1;
+    const struct ink_symtab_key key = {
+        .bytes = &tree->source_bytes[node->start_offset],
+        .length = node->end_offset - node->start_offset,
+    };
+
+    for (;;) {
+        if (!scope) {
+            return rc;
+        }
+
+        rc = ink_symtab_lookup(&scope->symbol_table, key, sym);
+        if (rc < 0) {
+            scope = scope->parent;
+        } else {
+            return rc;
+        }
+    }
+}
+
 struct ink_astgen {
     struct ink_ast *tree;
     struct ink_ir *ircode;
-    struct ink_symtab symbol_table;
     struct ink_astgen_scratch scratch;
     struct ink_astgen_block_stack blocks;
 };
@@ -101,15 +175,12 @@ static void ink_astgen_init(struct ink_astgen *astgen, struct ink_ast *tree,
     astgen->tree = tree;
     astgen->ircode = ircode;
 
-    ink_symtab_init(&astgen->symbol_table, 80ul, ink_symtab_hash,
-                    ink_symtab_cmp);
     ink_astgen_block_stack_init(&astgen->blocks);
     ink_astgen_scratch_init(&astgen->scratch);
 }
 
 static void ink_astgen_deinit(struct ink_astgen *astgen)
 {
-    ink_symtab_deinit(&astgen->symbol_table);
     ink_astgen_block_stack_deinit(&astgen->blocks);
     ink_astgen_scratch_deinit(&astgen->scratch);
 }
@@ -137,16 +208,6 @@ static size_t ink_astgen_add_inst(struct ink_astgen *astgen,
     ink_ir_inst_vec_push(code, inst);
     ink_astgen_scratch_push(scratch, index);
     return index;
-}
-
-static void ink_astgen_identifier_token(struct ink_astgen *astgen,
-                                        const struct ink_ast_node *node,
-                                        struct ink_symtab_key *token)
-{
-    const struct ink_ast *const tree = astgen->tree;
-
-    token->bytes = &tree->source_bytes[node->start_offset];
-    token->length = node->end_offset - node->start_offset;
 }
 
 /** Create a unary operation. */
@@ -238,23 +299,27 @@ static size_t ink_astgen_add_br(struct ink_astgen *astgen,
     return ink_astgen_add_inst(astgen, inst);
 }
 
-static size_t ink_astgen_expr(struct ink_astgen *, const struct ink_ast_node *);
-static void ink_astgen_block_stmt(struct ink_astgen *,
+static size_t ink_astgen_expr(struct ink_astgen *, struct ink_scope *,
+                              const struct ink_ast_node *);
+static void ink_astgen_block_stmt(struct ink_astgen *, struct ink_scope *,
                                   const struct ink_ast_node *);
 
 static size_t ink_astgen_unary_op(struct ink_astgen *astgen,
+                                  struct ink_scope *scope,
                                   const struct ink_ast_node *node,
                                   enum ink_ir_inst_op op)
 {
-    return ink_astgen_add_unary(astgen, op, ink_astgen_expr(astgen, node->lhs));
+    return ink_astgen_add_unary(astgen, op,
+                                ink_astgen_expr(astgen, scope, node->lhs));
 }
 
 static size_t ink_astgen_binary_op(struct ink_astgen *astgen,
+                                   struct ink_scope *scope,
                                    const struct ink_ast_node *node,
                                    enum ink_ir_inst_op op)
 {
-    const size_t lhs = ink_astgen_expr(astgen, node->lhs);
-    const size_t rhs = ink_astgen_expr(astgen, node->rhs);
+    const size_t lhs = ink_astgen_expr(astgen, scope, node->lhs);
+    const size_t rhs = ink_astgen_expr(astgen, scope, node->rhs);
 
     return ink_astgen_add_binary(astgen, op, lhs, rhs);
 }
@@ -319,17 +384,14 @@ static size_t ink_astgen_string(struct ink_astgen *astgen,
 }
 
 static size_t ink_astgen_identifier(struct ink_astgen *astgen,
+                                    struct ink_scope *scope,
                                     const struct ink_ast_node *node)
 {
     struct ink_symbol symbol;
     struct ink_ir_inst inst;
     const struct ink_ast *const tree = astgen->tree;
-    const struct ink_symtab_key key = {
-        .bytes = &tree->source_bytes[node->start_offset],
-        .length = node->end_offset - node->start_offset,
-    };
 
-    if (ink_symtab_lookup(&astgen->symbol_table, key, &symbol) < 0) {
+    if (ink_scope_lookup(scope, tree, node, &symbol) < 0) {
         ink_astgen_error(astgen, INK_AST_IDENT_UNKNOWN, node);
         return INK_IR_INVALID;
     }
@@ -340,6 +402,7 @@ static size_t ink_astgen_identifier(struct ink_astgen *astgen,
 }
 
 static size_t ink_astgen_expr(struct ink_astgen *astgen,
+                              struct ink_scope *scope,
                               const struct ink_ast_node *node)
 {
     if (!node) {
@@ -353,33 +416,33 @@ static size_t ink_astgen_expr(struct ink_astgen *astgen,
     case INK_NODE_FALSE:
         return ink_astgen_false(astgen);
     case INK_NODE_IDENTIFIER:
-        return ink_astgen_identifier(astgen, node);
+        return ink_astgen_identifier(astgen, scope, node);
     case INK_NODE_ADD_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_ADD);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_ADD);
     case INK_NODE_SUB_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_SUB);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_SUB);
     case INK_NODE_MUL_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_MUL);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_MUL);
     case INK_NODE_DIV_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_DIV);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_DIV);
     case INK_NODE_MOD_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_MOD);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_MOD);
     case INK_NODE_EQUAL_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_EQ);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_EQ);
     case INK_NODE_NOT_EQUAL_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_NEQ);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_NEQ);
     case INK_NODE_LESS_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_LT);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_LT);
     case INK_NODE_LESS_EQUAL_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_LTE);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_LTE);
     case INK_NODE_GREATER_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_GT);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_GT);
     case INK_NODE_GREATER_EQUAL_EXPR:
-        return ink_astgen_binary_op(astgen, node, INK_IR_INST_CMP_GTE);
+        return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_GTE);
     case INK_NODE_NEGATE_EXPR:
-        return ink_astgen_unary_op(astgen, node, INK_IR_INST_NEG);
+        return ink_astgen_unary_op(astgen, scope, node, INK_IR_INST_NEG);
     case INK_NODE_NOT_EXPR:
-        return ink_astgen_unary_op(astgen, node, INK_IR_INST_BOOL_NOT);
+        return ink_astgen_unary_op(astgen, scope, node, INK_IR_INST_BOOL_NOT);
     default:
         assert(false);
         return INK_IR_INVALID;
@@ -387,15 +450,15 @@ static size_t ink_astgen_expr(struct ink_astgen *astgen,
 }
 
 static size_t ink_astgen_inline_logic(struct ink_astgen *astgen,
+                                      struct ink_scope *scope,
                                       const struct ink_ast_node *node)
 {
-    return ink_astgen_expr(astgen, node->lhs);
+    return ink_astgen_expr(astgen, scope, node->lhs);
 }
 
-static size_t
-ink_astgen_simple_conditional(struct ink_astgen *astgen,
-                              const struct ink_ast_node *cond_expr,
-                              const struct ink_ast_node *inner)
+static size_t ink_astgen_simple_conditional(
+    struct ink_astgen *astgen, struct ink_scope *scope,
+    const struct ink_ast_node *cond_expr, const struct ink_ast_node *inner)
 {
     size_t block = INK_IR_INVALID;
     struct ink_ir_inst_seq *then_seq = NULL;
@@ -407,17 +470,14 @@ ink_astgen_simple_conditional(struct ink_astgen *astgen,
 
     assert(seq->count <= 2);
 
-    // IN zig, the existing instructions are added to the block before new
-    // instructions are appened. Our problem is that we dont create resizable
-    // arrays... will need to pop scratch after the block is created.
     if (first->type == INK_NODE_BLOCK) {
-        const size_t expr_index = ink_astgen_expr(astgen, cond_expr);
+        const size_t expr_index = ink_astgen_expr(astgen, scope, cond_expr);
         const size_t condbr =
             ink_astgen_add_condbr(astgen, INK_IR_INST_CONDBR, expr_index);
         const size_t then_start = scratch->count;
 
         block = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
-        ink_astgen_block_stmt(astgen, first);
+        ink_astgen_block_stmt(astgen, scope, first);
         ink_astgen_add_br(astgen, INK_IR_INST_BR, block);
 
         then_seq =
@@ -428,7 +488,7 @@ ink_astgen_simple_conditional(struct ink_astgen *astgen,
             const size_t else_start = scratch->count;
 
             assert(else_->type == INK_NODE_CONDITIONAL_ELSE_BRANCH);
-            ink_astgen_block_stmt(astgen, else_->rhs);
+            ink_astgen_block_stmt(astgen, scope, else_->rhs);
             ink_astgen_add_br(astgen, INK_IR_INST_BR, block);
             else_seq =
                 ink_astgen_seq_from_scratch(astgen, else_start, scratch->count);
@@ -441,6 +501,7 @@ ink_astgen_simple_conditional(struct ink_astgen *astgen,
     ink_astgen_set_block(
         astgen, block,
         ink_astgen_seq_from_scratch(astgen, stmt_start, scratch->count));
+
     return block;
 }
 
@@ -489,6 +550,7 @@ static size_t ink_astgen_multi_conditional(struct ink_astgen *astgen,
 }
 
 static size_t ink_astgen_conditional_content(struct ink_astgen *astgen,
+                                             struct ink_scope *scope,
                                              const struct ink_ast_node *node)
 
 {
@@ -540,12 +602,14 @@ static size_t ink_astgen_conditional_content(struct ink_astgen *astgen,
         }
     }
     if (node->lhs) {
-        return ink_astgen_simple_conditional(astgen, node->lhs, node->rhs);
+        return ink_astgen_simple_conditional(astgen, scope, node->lhs,
+                                             node->rhs);
     }
     return ink_astgen_multi_conditional(astgen, node->rhs);
 }
 
 static void ink_astgen_content_expr(struct ink_astgen *astgen,
+                                    struct ink_scope *scope,
                                     const struct ink_ast_node *node)
 {
     size_t inst_index;
@@ -561,11 +625,11 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
             break;
         }
         case INK_NODE_INLINE_LOGIC: {
-            inst_index = ink_astgen_inline_logic(astgen, node);
+            inst_index = ink_astgen_inline_logic(astgen, scope, node);
             break;
         }
         case INK_NODE_CONDITIONAL_CONTENT: {
-            inst_index = ink_astgen_conditional_content(astgen, node);
+            inst_index = ink_astgen_conditional_content(astgen, scope, node);
             break;
         }
         default:
@@ -578,10 +642,11 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
 }
 
 static size_t ink_astgen_var_decl(struct ink_astgen *astgen,
+                                  struct ink_scope *scope,
                                   const struct ink_ast_node *node)
 {
-    struct ink_symtab_key key;
     struct ink_ir_inst inst;
+    struct ink_ast *const tree = astgen->tree;
     struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
     const struct ink_symbol symbol = {
         .node = node,
@@ -590,59 +655,78 @@ static size_t ink_astgen_var_decl(struct ink_astgen *astgen,
     };
 
     inst.op = INK_IR_INST_ALLOC;
-    ink_ir_inst_vec_push(code, inst);
-    ink_astgen_identifier_token(astgen, node->lhs, &key);
+    ink_astgen_add_inst(astgen, inst);
 
-    if (ink_symtab_insert(&astgen->symbol_table, key, symbol) < 0) {
+    if (ink_scope_insert(scope, tree, node->lhs, symbol) < 0) {
         ink_astgen_error(astgen, INK_AST_IDENT_REDEFINED, node->lhs);
         return INK_IR_INVALID;
     }
     return ink_astgen_add_binary(astgen, INK_IR_INST_STORE, symbol.index,
-                                 ink_astgen_expr(astgen, node->rhs));
+                                 ink_astgen_expr(astgen, scope, node->rhs));
 }
 
 static void ink_astgen_content_stmt(struct ink_astgen *astgen,
+                                    struct ink_scope *scope,
                                     const struct ink_ast_node *node)
 {
-    ink_astgen_content_expr(astgen, node->lhs);
+    ink_astgen_content_expr(astgen, scope, node->lhs);
 }
 
 static size_t ink_astgen_expr_stmt(struct ink_astgen *astgen,
+                                   struct ink_scope *scope,
                                    const struct ink_ast_node *node)
 {
-    return ink_astgen_expr(astgen, node->lhs);
+    return ink_astgen_expr(astgen, scope, node->lhs);
+}
+
+static void ink_astgen_stmt(struct ink_astgen *astgen, struct ink_scope *scope,
+                            const struct ink_ast_node *node)
+{
+    switch (node->type) {
+    case INK_NODE_VAR_DECL:
+    case INK_NODE_CONST_DECL:
+    case INK_NODE_TEMP_DECL: {
+        ink_astgen_var_decl(astgen, scope, node);
+        break;
+    }
+    case INK_NODE_CONTENT_STMT: {
+        ink_astgen_content_stmt(astgen, scope, node);
+        break;
+    }
+    case INK_NODE_EXPR_STMT: {
+        ink_astgen_expr_stmt(astgen, scope, node);
+        break;
+    }
+    default:
+        assert(false);
+        break;
+    }
 }
 
 static void ink_astgen_block_stmt(struct ink_astgen *astgen,
+                                  struct ink_scope *scope,
                                   const struct ink_ast_node *node)
 {
-    size_t inst_index;
+    struct ink_scope block_scope;
     struct ink_ast_seq *const seq = node->seq;
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
 
-    for (size_t i = 0; i < seq->count; i++) {
-        struct ink_ast_node *const node = seq->nodes[i];
+    if (scope->parent == NULL) {
+        for (size_t i = 0; i < seq->count; i++) {
+            struct ink_ast_node *const node = seq->nodes[i];
 
-        switch (node->type) {
-        case INK_NODE_VAR_DECL:
-        case INK_NODE_CONST_DECL:
-        case INK_NODE_TEMP_DECL: {
-            inst_index = ink_astgen_var_decl(astgen, node);
-            ink_astgen_scratch_push(scratch, inst_index);
-            break;
+            ink_astgen_stmt(astgen, scope, node);
         }
-        case INK_NODE_CONTENT_STMT: {
-            ink_astgen_content_stmt(astgen, node);
-            break;
+
+    } else {
+        ink_scope_init(&block_scope, scope);
+
+        for (size_t i = 0; i < seq->count; i++) {
+            struct ink_ast_node *const node = seq->nodes[i];
+
+            ink_astgen_stmt(astgen, &block_scope, node);
         }
-        case INK_NODE_EXPR_STMT: {
-            ink_astgen_expr_stmt(astgen, node);
-            break;
-        }
-        default:
-            assert(false);
-            break;
-        }
+
+        ink_scope_deinit(&block_scope);
     }
 }
 
@@ -650,6 +734,7 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen *astgen,
                                                const struct ink_ast_node *node)
 {
     size_t i, inst_index;
+    struct ink_scope file_scope;
     struct ink_ast_node *first;
     struct ink_ast_seq *const node_seq = node->seq;
     struct ink_astgen_scratch *const scratch = &astgen->scratch;
@@ -659,10 +744,11 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen *astgen,
         return NULL;
     }
 
+    ink_scope_init(&file_scope, NULL);
     first = node_seq->nodes[0];
 
     if (first->type == INK_NODE_BLOCK) {
-        ink_astgen_block_stmt(astgen, first);
+        ink_astgen_block_stmt(astgen, &file_scope, first);
         i = 1;
     } else {
         i = 0;
@@ -678,6 +764,8 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen *astgen,
 
         ink_astgen_scratch_push(scratch, inst_index);
     }
+
+    ink_scope_deinit(&file_scope);
     return ink_astgen_seq_from_scratch(astgen, scratch_offset, scratch->count);
 }
 
