@@ -5,6 +5,7 @@
 
 #include "arena.h"
 #include "astgen.h"
+#include "ir.h"
 #include "object.h"
 #include "opcode.h"
 #include "parse.h"
@@ -165,6 +166,7 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
     int rc;
     struct ink_arena arena;
     struct ink_ast ast;
+    struct ink_ir ircode;
     static const size_t arena_alignment = 8;
     static const size_t arena_block_size = 8192;
 
@@ -180,10 +182,14 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
     }
 
     ink_story_init(story, flags);
+    ink_ir_init(&ircode);
 
-    rc = ink_astgen(&ast, story, flags);
+    rc = ink_astgen(&ast, &ircode, flags);
     if (rc < 0) {
         goto out;
+    }
+    if (flags & INK_F_DUMP_IR) {
+        ink_ir_dump(&ircode);
     }
     if (flags & INK_F_DUMP_CODE) {
         for (size_t off = 0; off < story->code.count;) {
@@ -191,7 +197,7 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
         }
     }
 out:
-    ink_story_deinit(story);
+    ink_ir_deinit(&ircode);
     ink_ast_deinit(&ast);
     ink_arena_release(&arena);
     return rc;

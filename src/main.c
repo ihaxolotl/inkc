@@ -15,6 +15,7 @@ enum {
     OPT_TRACING,
     OPT_CACHING,
     OPT_DUMP_AST,
+    OPT_DUMP_IR,
     OPT_DUMP_CODE,
     OPT_COMPILE_ONLY,
     OPT_HELP,
@@ -26,6 +27,7 @@ static const struct option opts[] = {
     {"--tracing", OPT_TRACING, false},
     {"--caching", OPT_CACHING, false},
     {"--dump-ast", OPT_DUMP_AST, false},
+    {"--dump-ir", OPT_DUMP_IR, false},
     {"--dump-code", OPT_DUMP_CODE, false},
     {"--compile-only", OPT_COMPILE_ONLY, false},
     {"--help", OPT_HELP, false},
@@ -42,6 +44,7 @@ static const char *USAGE_MSG =
     "  --tracing        Enable tracing\n"
     "  --caching        Enable caching\n"
     "  --dump-ast       Dump a source file's AST\n"
+    "  --dump-ir        Dump a source file's IR\n"
     "  --dump-code      Dump a story's bytecode\n"
     "  --compile-only   Compile the story without executing\n";
 
@@ -78,6 +81,10 @@ int main(int argc, char *argv[])
         }
         case OPT_DUMP_AST: {
             flags |= INK_F_DUMP_AST;
+            break;
+        }
+        case OPT_DUMP_IR: {
+            flags |= INK_F_DUMP_IR;
             break;
         }
         case OPT_DUMP_CODE: {

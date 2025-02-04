@@ -30,7 +30,8 @@ enum ink_flags {
     INK_F_CACHING = (1 << 1),
     INK_F_COLOR = (1 << 2),
     INK_F_DUMP_AST = (1 << 3),
-    INK_F_DUMP_CODE = (1 << 4),
+    INK_F_DUMP_IR = (1 << 4),
+    INK_F_DUMP_CODE = (1 << 5),
 };
 
 /**
