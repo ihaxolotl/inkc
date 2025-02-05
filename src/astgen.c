@@ -25,12 +25,7 @@ struct ink_symtab_key {
     size_t length;
 };
 
-struct ink_astgen_block {
-    size_t scratch_offset;
-};
-
 INK_VEC_T(ink_astgen_scratch, size_t)
-INK_VEC_T(ink_astgen_block_stack, struct ink_astgen_block)
 INK_HASHMAP_T(ink_symtab, struct ink_symtab_key, struct ink_symbol)
 
 static uint32_t ink_symtab_hash(const void *bytes, size_t length)
@@ -125,20 +120,48 @@ static int ink_scope_lookup(struct ink_scope *scope, const struct ink_ast *tree,
     }
 }
 
-struct ink_astgen {
+struct ink_astgen_global {
     struct ink_ast *tree;
     struct ink_ir *ircode;
     struct ink_astgen_scratch scratch;
-    struct ink_astgen_block_stack blocks;
 };
+
+static void ink_astgen_global_init(struct ink_astgen_global *global,
+                                   struct ink_ast *tree, struct ink_ir *ircode)
+{
+    global->tree = tree;
+    global->ircode = ircode;
+
+    ink_astgen_scratch_init(&global->scratch);
+}
+
+static void ink_astgen_global_deinit(struct ink_astgen_global *global)
+{
+    ink_astgen_scratch_deinit(&global->scratch);
+}
+
+struct ink_astgen {
+    size_t scratch_offset;
+    struct ink_astgen_scratch *scratch;
+    struct ink_astgen_global *global;
+};
+
+static void ink_astgen_make(struct ink_astgen *astgen,
+                            struct ink_astgen *parent)
+{
+    astgen->scratch_offset = parent->scratch->count;
+    astgen->scratch = parent->scratch;
+    astgen->global = parent->global;
+}
 
 static struct ink_ir_inst_seq *
 ink_astgen_seq_from_scratch(struct ink_astgen *astgen, size_t start_offset,
                             size_t end_offset)
 {
     struct ink_ir_inst_seq *seq = NULL;
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
-    struct ink_ir *const ircode = astgen->ircode;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir *const ircode = global->ircode;
 
     if (start_offset < end_offset) {
         const size_t span = end_offset - start_offset;
@@ -169,40 +192,32 @@ ink_astgen_seq_from_scratch(struct ink_astgen *astgen, size_t start_offset,
     return seq;
 }
 
-static void ink_astgen_init(struct ink_astgen *astgen, struct ink_ast *tree,
-                            struct ink_ir *ircode)
+static size_t ink_astgen_error(struct ink_astgen *astgen,
+                               enum ink_ast_error_type type,
+                               const struct ink_ast_node *node)
 {
-    astgen->tree = tree;
-    astgen->ircode = ircode;
-
-    ink_astgen_block_stack_init(&astgen->blocks);
-    ink_astgen_scratch_init(&astgen->scratch);
-}
-
-static void ink_astgen_deinit(struct ink_astgen *astgen)
-{
-    ink_astgen_block_stack_deinit(&astgen->blocks);
-    ink_astgen_scratch_deinit(&astgen->scratch);
-}
-
-static void ink_astgen_error(struct ink_astgen *astgen,
-                             enum ink_ast_error_type type,
-                             const struct ink_ast_node *node)
-{
+    struct ink_astgen_global *const global = astgen->global;
     const struct ink_ast_error err = {
         .type = type,
         .source_start = node->start_offset,
         .source_end = node->end_offset,
     };
 
-    ink_ast_error_vec_push(&astgen->tree->errors, err);
+    ink_ast_error_vec_push(&global->tree->errors, err);
+    return INK_IR_INVALID;
 }
 
+/**
+ * Push a new instruction to the IR instructions buffer.
+ *
+ * Returns an instruction index.
+ */
 static size_t ink_astgen_add_inst(struct ink_astgen *astgen,
                                   struct ink_ir_inst inst)
 {
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
-    struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
     const size_t index = code->count;
 
     ink_ir_inst_vec_push(code, inst);
@@ -210,7 +225,21 @@ static size_t ink_astgen_add_inst(struct ink_astgen *astgen,
     return index;
 }
 
-/** Create a unary operation. */
+/**
+ * Create a simple operation.
+ */
+static size_t ink_astgen_add_simple(struct ink_astgen *astgen,
+                                    enum ink_ir_inst_op op)
+{
+    const struct ink_ir_inst inst = {
+        .op = op,
+    };
+    return ink_astgen_add_inst(astgen, inst);
+}
+
+/**
+ * Create a unary operation.
+ */
 static size_t ink_astgen_add_unary(struct ink_astgen *astgen,
                                    enum ink_ir_inst_op op, size_t lhs)
 {
@@ -224,7 +253,9 @@ static size_t ink_astgen_add_unary(struct ink_astgen *astgen,
     return ink_astgen_add_inst(astgen, inst);
 }
 
-/** Create a binary operation. */
+/**
+ * Create a binary operation.
+ */
 static size_t ink_astgen_add_binary(struct ink_astgen *astgen,
                                     enum ink_ir_inst_op op, size_t lhs,
                                     size_t rhs)
@@ -240,12 +271,15 @@ static size_t ink_astgen_add_binary(struct ink_astgen *astgen,
     return ink_astgen_add_inst(astgen, inst);
 }
 
-/** Create a dominant block. */
+/**
+ * Create a dominant block.
+ */
 static size_t ink_astgen_add_block(struct ink_astgen *astgen,
                                    enum ink_ir_inst_op op)
 {
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
-    struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
     const size_t index = code->count;
     const struct ink_ir_inst inst = {
         .op = op,
@@ -257,47 +291,73 @@ static size_t ink_astgen_add_block(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_set_block(struct ink_astgen *astgen, size_t index,
-                                 struct ink_ir_inst_seq *body)
+                                 size_t scratch_top)
 {
-    struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
     struct ink_ir_inst *const inst = &code->entries[index];
 
-    inst->as.block.seq = body;
+    inst->as.block.seq =
+        ink_astgen_seq_from_scratch(astgen, scratch_top, scratch->count);
 }
 
-/** Create a conditional branching operation. */
+/**
+ * Create a conditional branching operation.
+ */
 static size_t ink_astgen_add_condbr(struct ink_astgen *astgen,
-                                    enum ink_ir_inst_op op,
                                     size_t payload_index)
 {
     const struct ink_ir_inst inst = {
-        .op = op,
+        .op = INK_IR_INST_CONDBR,
         .as.cond_br.payload_index = payload_index,
     };
     return ink_astgen_add_inst(astgen, inst);
 }
 
 static void ink_astgen_set_condbr(struct ink_astgen *astgen, size_t index,
-                                  struct ink_ir_inst_seq *then_seq,
-                                  struct ink_ir_inst_seq *else_seq)
+                                  const struct ink_astgen *then_ctx,
+                                  const struct ink_astgen *else_ctx)
 {
-    struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
     struct ink_ir_inst *const inst = &code->entries[index];
 
-    inst->as.cond_br.then_ = then_seq;
-    inst->as.cond_br.else_ = else_seq;
+    inst->as.cond_br.else_ = ink_astgen_seq_from_scratch(
+        astgen, else_ctx->scratch_offset, scratch->count);
+    inst->as.cond_br.then_ = ink_astgen_seq_from_scratch(
+        astgen, then_ctx->scratch_offset, scratch->count);
 }
 
-/** Create a breaking operation. */
-static size_t ink_astgen_add_br(struct ink_astgen *astgen,
-                                enum ink_ir_inst_op op, size_t payload_index)
+/**
+ * Create a breaking operation.
+ */
+static size_t ink_astgen_add_br(struct ink_astgen *astgen, size_t payload_index)
 {
     const struct ink_ir_inst inst = {
-        .op = op,
+        .op = INK_IR_INST_BR,
         .as.unary.lhs = payload_index,
     };
     return ink_astgen_add_inst(astgen, inst);
 }
+
+/**
+ * Create a switch case operation.
+static size_t ink_astgen_add_switch_case(struct ink_astgen *astgen, size_t lhs,
+                                         struct ink_ir_inst_seq *body)
+{
+    const struct ink_ir_inst inst = {
+        .op = INK_IR_INST_SWITCH_CASE,
+        .as.switch_case =
+            {
+                .payload_index = lhs,
+                .body = body,
+            },
+    };
+    return ink_astgen_add_inst(astgen, inst);
+}
+ */
 
 static size_t ink_astgen_expr(struct ink_astgen *, struct ink_scope *,
                               const struct ink_ast_node *);
@@ -347,7 +407,8 @@ static size_t ink_astgen_number(struct ink_astgen *astgen,
 {
     char buf[INK_NUMBER_BUFSZ + 1];
     struct ink_ir_inst inst;
-    struct ink_ast *const tree = astgen->tree;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ast *const tree = global->tree;
     const uint8_t *const chars = &tree->source_bytes[node->start_offset];
     const size_t len = node->end_offset - node->start_offset;
 
@@ -366,11 +427,12 @@ static size_t ink_astgen_string(struct ink_astgen *astgen,
                                 const struct ink_ast_node *node)
 {
     struct ink_ir_inst inst;
-    struct ink_ast *const tree = astgen->tree;
-    struct ink_ir_byte_vec *const strings = &astgen->ircode->string_bytes;
-    const size_t pos = strings->count;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ir_byte_vec *const strings = &global->ircode->string_bytes;
+    struct ink_ast *const tree = global->tree;
     const uint8_t *const chars = &tree->source_bytes[node->start_offset];
     const size_t len = node->end_offset - node->start_offset;
+    const size_t pos = strings->count;
 
     for (size_t i = 0; i < len; i++) {
         ink_ir_byte_vec_push(strings, chars[i]);
@@ -389,7 +451,8 @@ static size_t ink_astgen_identifier(struct ink_astgen *astgen,
 {
     struct ink_symbol symbol;
     struct ink_ir_inst inst;
-    const struct ink_ast *const tree = astgen->tree;
+    struct ink_astgen_global *const global = astgen->global;
+    const struct ink_ast *const tree = global->tree;
 
     if (ink_scope_lookup(scope, tree, node, &symbol) < 0) {
         ink_astgen_error(astgen, INK_AST_IDENT_UNKNOWN, node);
@@ -456,188 +519,189 @@ static size_t ink_astgen_inline_logic(struct ink_astgen *astgen,
     return ink_astgen_expr(astgen, scope, node->lhs);
 }
 
-static size_t ink_astgen_simple_conditional(
-    struct ink_astgen *astgen, struct ink_scope *scope,
-    const struct ink_ast_node *cond_expr, const struct ink_ast_node *inner)
+struct ink_conditional_info {
+    bool has_initial;
+    bool has_block;
+    bool has_else;
+};
+
+static void ink_astgen_block_expr(struct ink_astgen *astgen,
+                                  struct ink_scope *scope,
+                                  const struct ink_ast_node *node)
 {
-    size_t block = INK_IR_INVALID;
-    struct ink_ir_inst_seq *then_seq = NULL;
-    struct ink_ir_inst_seq *else_seq = NULL;
-    struct ink_ast_seq *const seq = inner->seq;
-    struct ink_ast_node *const first = seq->nodes[0];
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
-    const size_t stmt_start = scratch->count;
-
-    assert(seq->count <= 2);
-
-    if (first->type == INK_NODE_BLOCK) {
-        const size_t expr_index = ink_astgen_expr(astgen, scope, cond_expr);
-        const size_t condbr =
-            ink_astgen_add_condbr(astgen, INK_IR_INST_CONDBR, expr_index);
-        const size_t then_start = scratch->count;
-
-        block = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
-        ink_astgen_block_stmt(astgen, scope, first);
-        ink_astgen_add_br(astgen, INK_IR_INST_BR, block);
-
-        then_seq =
-            ink_astgen_seq_from_scratch(astgen, then_start, scratch->count);
-
-        if (seq->count == 2) {
-            struct ink_ast_node *const else_ = seq->nodes[1];
-            const size_t else_start = scratch->count;
-
-            assert(else_->type == INK_NODE_CONDITIONAL_ELSE_BRANCH);
-            ink_astgen_block_stmt(astgen, scope, else_->rhs);
-            ink_astgen_add_br(astgen, INK_IR_INST_BR, block);
-            else_seq =
-                ink_astgen_seq_from_scratch(astgen, else_start, scratch->count);
-        }
-        ink_astgen_set_condbr(astgen, condbr, then_seq, else_seq);
-    } else {
-        assert(false);
-    }
-
-    ink_astgen_set_block(
-        astgen, block,
-        ink_astgen_seq_from_scratch(astgen, stmt_start, scratch->count));
-
-    return block;
+    ink_astgen_block_stmt(astgen, scope, node->rhs);
 }
 
-static size_t ink_astgen_multi_conditional(struct ink_astgen *astgen,
-                                           const struct ink_ast_node *node)
+static size_t ink_astgen_if_expr(struct ink_astgen *astgen,
+                                 struct ink_scope *scope,
+                                 const struct ink_ast_node *expr_node,
+                                 const struct ink_ast_node *then_node,
+                                 const struct ink_ast_node *else_node,
+                                 const struct ink_conditional_info *info)
 {
-    /*
-    size_t then_jmp, else_jmp;
-    struct ink_block condbr;
-    struct ink_block_stack *const block_stack = &astgen->blocks;
-    struct ink_ast_seq *const seq = node->seq;
-    const size_t block_top = block_stack->count;
+    struct ink_astgen then_ctx, else_ctx;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    const size_t scratch_top = scratch->count;
+    const size_t payload_index = ink_astgen_expr(astgen, scope, expr_node);
+    const size_t condbr_index = ink_astgen_add_condbr(astgen, payload_index);
+    const size_t block_index = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
 
-    for (size_t i = 0; i < seq->count; i++) {
-        const struct ink_ast_node *const node = seq->nodes[i];
+    ink_astgen_make(&then_ctx, astgen);
+    ink_astgen_block_expr(&then_ctx, scope, then_node);
+    ink_astgen_add_br(astgen, block_index);
+    ink_astgen_make(&else_ctx, astgen);
 
-        switch (node->type) {
+    if (info->has_else) {
+        ink_astgen_block_expr(&else_ctx, scope, else_node);
+        ink_astgen_add_br(astgen, block_index);
+    }
+
+    ink_astgen_set_condbr(astgen, condbr_index, &then_ctx, &else_ctx);
+    ink_astgen_set_block(astgen, block_index, scratch_top);
+    return block_index;
+}
+
+static size_t ink_astgen_if_else_expr(struct ink_astgen *astgen,
+                                      struct ink_scope *scope,
+                                      struct ink_ast_seq *children,
+                                      size_t node_index)
+{
+    struct ink_astgen then_ctx, else_ctx;
+
+    if (node_index >= children->count) {
+        return INK_IR_INVALID;
+    }
+
+    const struct ink_ast_node *const then_node = children->nodes[node_index];
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    const size_t scratch_top = scratch->count;
+    const size_t payload_index = ink_astgen_expr(astgen, scope, then_node->lhs);
+    const size_t condbr_index = ink_astgen_add_condbr(astgen, payload_index);
+    const size_t block_index = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
+
+    ink_astgen_make(&then_ctx, astgen);
+    ink_astgen_block_expr(&then_ctx, scope, then_node);
+    ink_astgen_add_br(astgen, block_index);
+    ink_astgen_make(&else_ctx, astgen);
+
+    if (node_index + 1 < children->count) {
+        const size_t alt_block_index =
+            ink_astgen_if_else_expr(&else_ctx, scope, children, node_index + 1);
+
+        ink_astgen_scratch_push(scratch, alt_block_index);
+        ink_astgen_add_br(astgen, block_index);
+    } else {
+        ink_astgen_add_br(astgen, block_index);
+    }
+
+    ink_astgen_set_condbr(astgen, condbr_index, &then_ctx, &else_ctx);
+    ink_astgen_set_block(astgen, block_index, scratch_top);
+    return block_index;
+}
+
+static size_t ink_astgen_switch_expr(struct ink_astgen *astgen,
+                                     struct ink_scope *scope,
+                                     const struct ink_ast_node *expr,
+                                     const struct ink_ast_node *body,
+                                     const struct ink_conditional_info *info)
+{
+    return INK_IR_INVALID;
+}
+
+static size_t ink_astgen_conditional(struct ink_astgen *astgen,
+                                     struct ink_scope *scope,
+                                     const struct ink_ast_node *node)
+
+{
+    struct ink_conditional_info info;
+
+    if (!node->rhs) {
+        return ink_astgen_error(astgen, INK_AST_CONDITIONAL_EMPTY, node);
+    }
+    if (!node->lhs && (!node->rhs->seq || node->rhs->seq->count == 0)) {
+        return ink_astgen_error(astgen, INK_AST_CONDITIONAL_EMPTY, node);
+    }
+
+    struct ink_ast_seq *const children = node->rhs->seq;
+    struct ink_ast_node *const first = children->nodes[0];
+    struct ink_ast_node *const last = children->nodes[children->count - 1];
+
+    info.has_block = false;
+    info.has_else = false;
+    info.has_initial = node->lhs != NULL;
+
+    for (size_t i = 0; i < children->count; i++) {
+        struct ink_ast_node *const child = children->nodes[i];
+
+        switch (child->type) {
+        case INK_NODE_BLOCK: {
+            info.has_block = true;
+            break;
+        }
         case INK_NODE_CONDITIONAL_BRANCH: {
-            ink_astgen_expr(astgen, node->lhs);
-            then_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
-            ink_astgen_block_stmt(astgen, node->rhs);
-            else_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
-            ink_astgen_patch_jmp(astgen, then_jmp);
+            if (info.has_block) {
+                return ink_astgen_error(
+                    astgen, INK_AST_CONDITIONAL_EXPECTED_ELSE, child);
+            }
             break;
         }
         case INK_NODE_CONDITIONAL_ELSE_BRANCH: {
-            ink_astgen_block_stmt(astgen, node->rhs);
-            else_jmp = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
+            /* Only the last branch can be an else. */
+            if (child != last) {
+                return ink_astgen_error(astgen, INK_AST_CONDITIONAL_FINAL_ELSE,
+                                        child);
+            }
+            if (info.has_else) {
+                return ink_astgen_error(
+                    astgen, INK_AST_CONDITIONAL_MULTIPLE_ELSE, child);
+            }
             break;
         }
         default:
             assert(false);
             break;
         }
-
-        condbr.tmp = else_jmp;
-        ink_block_stack_push(block_stack, condbr);
     }
-    while (!ink_block_stack_is_empty(block_stack) &&
-           block_stack->count >= block_top) {
-        ink_block_stack_pop(block_stack, &condbr);
-        ink_astgen_patch_jmp(astgen, condbr.tmp);
+    if (info.has_initial && info.has_block) {
+        return ink_astgen_if_expr(astgen, scope, node->lhs, first, last, &info);
+    } else if (info.has_initial) {
+        return ink_astgen_switch_expr(astgen, scope, node->lhs, node->rhs,
+                                      &info);
+    } else {
+        return ink_astgen_if_else_expr(astgen, scope, node->rhs->seq, 0);
     }
-*/
-    return INK_IR_INVALID;
-}
-
-static size_t ink_astgen_conditional_content(struct ink_astgen *astgen,
-                                             struct ink_scope *scope,
-                                             const struct ink_ast_node *node)
-
-{
-    bool has_block = false;
-    const struct ink_ast_seq *const seq = node->rhs->seq;
-
-    if (!node->lhs) {
-        if (!seq || seq->count == 0) {
-            ink_astgen_error(astgen, INK_AST_CONDITIONAL_EMPTY, node);
-            return INK_IR_INVALID;
-        }
-    }
-
-    const struct ink_ast_node *const last = seq->nodes[seq->count - 1];
-
-    for (size_t i = 0; i < seq->count; i++) {
-        const struct ink_ast_node *const node = seq->nodes[i];
-
-        switch (node->type) {
-        case INK_NODE_BLOCK: {
-            has_block = true;
-            break;
-        }
-        case INK_NODE_CONDITIONAL_BRANCH: {
-            if (has_block) {
-                ink_astgen_error(astgen, INK_AST_CONDITIONAL_EXPECTED_ELSE,
-                                 node);
-                return INK_IR_INVALID;
-            }
-            break;
-        }
-        case INK_NODE_CONDITIONAL_ELSE_BRANCH: {
-            /* Only the last branch can be an else. */
-            if (node != last) {
-                if (last->type == node->type) {
-                    ink_astgen_error(astgen, INK_AST_CONDITIONAL_MULTIPLE_ELSE,
-                                     node);
-                    return INK_IR_INVALID;
-                } else {
-                    ink_astgen_error(astgen, INK_AST_CONDITIONAL_FINAL_ELSE,
-                                     node);
-                    return INK_IR_INVALID;
-                }
-            }
-            break;
-        }
-        default:
-            break;
-        }
-    }
-    if (node->lhs) {
-        return ink_astgen_simple_conditional(astgen, scope, node->lhs,
-                                             node->rhs);
-    }
-    return ink_astgen_multi_conditional(astgen, node->rhs);
 }
 
 static void ink_astgen_content_expr(struct ink_astgen *astgen,
                                     struct ink_scope *scope,
                                     const struct ink_ast_node *node)
 {
-    size_t inst_index;
-    struct ink_ast_seq *const seq = node->seq;
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
+    size_t node_index;
+    struct ink_ast_seq *const children = node->seq;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
 
-    for (size_t i = 0; i < seq->count; i++) {
-        struct ink_ast_node *const node = seq->nodes[i];
+    for (size_t i = 0; i < children->count; i++) {
+        struct ink_ast_node *const child = children->nodes[i];
 
-        switch (node->type) {
+        switch (child->type) {
         case INK_NODE_STRING: {
-            inst_index = ink_astgen_string(astgen, node);
+            const size_t lhs = ink_astgen_string(astgen, child);
+            ink_astgen_add_unary(astgen, INK_IR_INST_CONTENT_PUSH, lhs);
             break;
         }
         case INK_NODE_INLINE_LOGIC: {
-            inst_index = ink_astgen_inline_logic(astgen, scope, node);
+            ink_astgen_inline_logic(astgen, scope, child);
             break;
         }
         case INK_NODE_CONDITIONAL_CONTENT: {
-            inst_index = ink_astgen_conditional_content(astgen, scope, node);
+            node_index = ink_astgen_conditional(astgen, scope, child);
+            ink_astgen_scratch_push(scratch, node_index);
             break;
         }
         default:
             assert(false);
             break;
         }
-
-        ink_astgen_scratch_push(scratch, inst_index);
     }
 }
 
@@ -646,8 +710,9 @@ static size_t ink_astgen_var_decl(struct ink_astgen *astgen,
                                   const struct ink_ast_node *node)
 {
     struct ink_ir_inst inst;
-    struct ink_ast *const tree = astgen->tree;
-    struct ink_ir_inst_vec *const code = &astgen->ircode->instructions;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ast *const tree = global->tree;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
     const struct ink_symbol symbol = {
         .node = node,
         .index = code->count,
@@ -672,6 +737,55 @@ static void ink_astgen_content_stmt(struct ink_astgen *astgen,
     ink_astgen_content_expr(astgen, scope, node->lhs);
 }
 
+static void ink_astgen_divert_expr(struct ink_astgen *astgen,
+                                   struct ink_scope *scope,
+                                   const struct ink_ast_node *node)
+{
+    struct ink_symbol symbol;
+    struct ink_ast_node *const ident = node->lhs;
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ast *const tree = global->tree;
+    const uint8_t *const chars = &tree->source_bytes[ident->start_offset];
+    const size_t len = ident->end_offset - ident->start_offset;
+
+    switch (len) {
+    case 3: {
+        if (memcmp(chars, "END", len) == 0) {
+            ink_astgen_add_simple(astgen, INK_IR_INST_END);
+            return;
+        }
+        goto identifier;
+    }
+    case 4: {
+        if (memcmp(chars, "DONE", len) == 0) {
+            ink_astgen_add_simple(astgen, INK_IR_INST_DONE);
+            return;
+        }
+        goto identifier;
+    }
+    default:
+        break;
+    }
+identifier:
+    if (ink_scope_lookup(scope, tree, ident, &symbol) < 0) {
+        ink_astgen_error(astgen, INK_AST_IDENT_UNKNOWN, node);
+        return;
+    }
+}
+
+static void ink_astgen_divert_stmt(struct ink_astgen *astgen,
+                                   struct ink_scope *scope,
+                                   const struct ink_ast_node *node)
+{
+    struct ink_ast_seq *const seq = node->seq;
+
+    for (size_t i = 0; i < seq->count; i++) {
+        struct ink_ast_node *const node = seq->nodes[i];
+
+        ink_astgen_divert_expr(astgen, scope, node);
+    }
+}
+
 static size_t ink_astgen_expr_stmt(struct ink_astgen *astgen,
                                    struct ink_scope *scope,
                                    const struct ink_ast_node *node)
@@ -691,6 +805,10 @@ static void ink_astgen_stmt(struct ink_astgen *astgen, struct ink_scope *scope,
     }
     case INK_NODE_CONTENT_STMT: {
         ink_astgen_content_stmt(astgen, scope, node);
+        break;
+    }
+    case INK_NODE_DIVERT_STMT: {
+        ink_astgen_divert_stmt(astgen, scope, node);
         break;
     }
     case INK_NODE_EXPR_STMT: {
@@ -730,25 +848,31 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
     }
 }
 
-static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen *astgen,
+static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen_global *global,
                                                const struct ink_ast_node *node)
 {
     size_t i, inst_index;
     struct ink_scope file_scope;
     struct ink_ast_node *first;
     struct ink_ast_seq *const node_seq = node->seq;
-    struct ink_astgen_scratch *const scratch = &astgen->scratch;
+    struct ink_astgen_scratch *const scratch = &global->scratch;
     const size_t scratch_offset = scratch->count;
 
     if (node_seq->count == 0) {
         return NULL;
     }
 
+    struct ink_astgen astgen = {
+        .scratch_offset = scratch_offset,
+        .scratch = scratch,
+        .global = global,
+    };
+
     ink_scope_init(&file_scope, NULL);
     first = node_seq->nodes[0];
 
     if (first->type == INK_NODE_BLOCK) {
-        ink_astgen_block_stmt(astgen, &file_scope, first);
+        ink_astgen_block_stmt(&astgen, &file_scope, first);
         i = 1;
     } else {
         i = 0;
@@ -766,20 +890,20 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen *astgen,
     }
 
     ink_scope_deinit(&file_scope);
-    return ink_astgen_seq_from_scratch(astgen, scratch_offset, scratch->count);
+    return ink_astgen_seq_from_scratch(&astgen, scratch_offset, scratch->count);
 }
 
 int ink_astgen(struct ink_ast *tree, struct ink_ir *ircode, int flags)
 {
-    struct ink_astgen astgen;
+    struct ink_astgen_global global_store;
 
     if (!ink_ast_error_vec_is_empty(&tree->errors)) {
         return -1;
     }
 
-    ink_astgen_init(&astgen, tree, ircode);
-    ink_astgen_file(&astgen, tree->root);
-    ink_astgen_deinit(&astgen);
+    ink_astgen_global_init(&global_store, tree, ircode);
+    ink_astgen_file(&global_store, tree->root);
+    ink_astgen_global_deinit(&global_store);
 
     if (!ink_ast_error_vec_is_empty(&tree->errors)) {
         ink_ast_render_errors(tree);

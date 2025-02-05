@@ -12,6 +12,8 @@ static const char *ink_ir_inst_op_strz(enum ink_ir_inst_op op)
     return INK_IR_TYPE_STR[op];
 }
 
+/* TODO(Brett): Make the IR rendering code better. */
+
 static void ink_ir_dump_seq(const struct ink_ir *,
                             const struct ink_ir_inst_seq *, const char *);
 
@@ -44,7 +46,7 @@ static void ink_ir_dump_string(const struct ink_ir *ir,
     const unsigned char *const bytes =
         &ir->string_bytes.entries[inst->as.string];
 
-    printf("%s%%%zu = %s(%s)\n", prefix, index, ink_ir_inst_op_strz(inst->op),
+    printf("%s%%%zu = %s(`%s`)\n", prefix, index, ink_ir_inst_op_strz(inst->op),
            bytes);
 }
 
@@ -118,6 +120,7 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
             break;
         }
         case INK_IR_INST_LOAD:
+        case INK_IR_INST_CONTENT_PUSH:
         case INK_IR_INST_BR:
         case INK_IR_INST_NEG: {
             ink_ir_dump_unary(ir, inst, inst_index, new_prefix);
@@ -129,7 +132,8 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         }
         case INK_IR_INST_CONDBR: {
             ink_ir_dump_condbr(ir, inst, inst_index, new_prefix);
-        } break;
+            break;
+        }
         case INK_IR_INST_STORE:
         case INK_IR_INST_ADD:
         case INK_IR_INST_SUB:
@@ -147,6 +151,8 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         }
         case INK_IR_INST_TRUE:
         case INK_IR_INST_FALSE:
+        case INK_IR_INST_DONE:
+        case INK_IR_INST_END:
         case INK_IR_INST_ALLOC:
         case INK_IR_INST_RET: {
             ink_ir_dump_simple(ir, inst, inst_index, new_prefix);

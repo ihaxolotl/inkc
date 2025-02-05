@@ -34,8 +34,13 @@ extern "C" {
     T(CMP_GTE, "cmp_gte")                                                      \
     T(BOOL_NOT, "bool_not")                                                    \
     T(BLOCK, "block")                                                          \
-    T(CONDBR, "condbr")                                                        \
+    T(CONDBR, "cond_br")                                                       \
     T(BR, "br")                                                                \
+    T(SWITCH_BR, "switch_br")                                                  \
+    T(SWITCH_CASE, "switch_case")                                              \
+    T(CONTENT_PUSH, "content_push")                                            \
+    T(DONE, "done")                                                            \
+    T(END, "end")                                                              \
     T(RET, "ret")
 
 #define T(name, description) INK_IR_INST_##name,
@@ -77,14 +82,15 @@ struct ink_ir_inst {
         } cond_br;
 
         struct {
+            bool has_else;
+            size_t payload_index;
+            struct ink_ir_inst_seq *cases;
+        } switch_block;
+
+        struct {
             size_t payload_index;
             struct ink_ir_inst_seq *body;
         } switch_case;
-
-        struct {
-            bool has_else;
-            struct ink_ir_inst_seq *cases;
-        } switch_br;
 
         struct {
             size_t callee_index;
