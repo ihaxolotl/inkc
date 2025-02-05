@@ -525,19 +525,11 @@ struct ink_conditional_info {
     bool has_else;
 };
 
-static void ink_astgen_block_expr(struct ink_astgen *astgen,
-                                  struct ink_scope *scope,
-                                  const struct ink_ast_node *node)
-{
-    ink_astgen_block_stmt(astgen, scope, node->rhs);
-}
-
 static size_t ink_astgen_if_expr(struct ink_astgen *astgen,
                                  struct ink_scope *scope,
                                  const struct ink_ast_node *expr_node,
                                  const struct ink_ast_node *then_node,
-                                 const struct ink_ast_node *else_node,
-                                 const struct ink_conditional_info *info)
+                                 const struct ink_ast_node *else_node)
 {
     struct ink_astgen then_ctx, else_ctx;
     struct ink_astgen_scratch *const scratch = astgen->scratch;
@@ -547,15 +539,15 @@ static size_t ink_astgen_if_expr(struct ink_astgen *astgen,
     const size_t block_index = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
 
     ink_astgen_make(&then_ctx, astgen);
-    ink_astgen_block_expr(&then_ctx, scope, then_node);
+    ink_astgen_block_stmt(&then_ctx, scope, then_node);
     ink_astgen_add_br(astgen, block_index);
     ink_astgen_make(&else_ctx, astgen);
 
-    if (info->has_else) {
-        ink_astgen_block_expr(&else_ctx, scope, else_node);
-        ink_astgen_add_br(astgen, block_index);
+    if (else_node && else_node->type == INK_NODE_CONDITIONAL_ELSE_BRANCH) {
+        ink_astgen_block_stmt(&else_ctx, scope, else_node->rhs);
     }
 
+    ink_astgen_add_br(astgen, block_index);
     ink_astgen_set_condbr(astgen, condbr_index, &then_ctx, &else_ctx);
     ink_astgen_set_block(astgen, block_index, scratch_top);
     return block_index;
@@ -572,7 +564,7 @@ static size_t ink_astgen_if_else_expr(struct ink_astgen *astgen,
         return INK_IR_INVALID;
     }
 
-    const struct ink_ast_node *const then_node = children->nodes[node_index];
+    struct ink_ast_node *const then_node = children->nodes[node_index];
     struct ink_astgen_scratch *const scratch = astgen->scratch;
     const size_t scratch_top = scratch->count;
     const size_t payload_index = ink_astgen_expr(astgen, scope, then_node->lhs);
@@ -580,20 +572,24 @@ static size_t ink_astgen_if_else_expr(struct ink_astgen *astgen,
     const size_t block_index = ink_astgen_add_block(astgen, INK_IR_INST_BLOCK);
 
     ink_astgen_make(&then_ctx, astgen);
-    ink_astgen_block_expr(&then_ctx, scope, then_node);
+    ink_astgen_block_stmt(&then_ctx, scope, then_node->rhs);
     ink_astgen_add_br(astgen, block_index);
     ink_astgen_make(&else_ctx, astgen);
 
     if (node_index + 1 < children->count) {
-        const size_t alt_block_index =
-            ink_astgen_if_else_expr(&else_ctx, scope, children, node_index + 1);
+        struct ink_ast_node *const else_node = children->nodes[node_index + 1];
 
-        ink_astgen_scratch_push(scratch, alt_block_index);
-        ink_astgen_add_br(astgen, block_index);
-    } else {
-        ink_astgen_add_br(astgen, block_index);
+        if (else_node->type == INK_NODE_CONDITIONAL_ELSE_BRANCH) {
+            ink_astgen_block_stmt(astgen, scope, else_node->rhs);
+        } else {
+            const size_t alt_index = ink_astgen_if_else_expr(
+                &else_ctx, scope, children, node_index + 1);
+
+            ink_astgen_scratch_push(scratch, alt_index);
+        }
     }
 
+    ink_astgen_add_br(astgen, block_index);
     ink_astgen_set_condbr(astgen, condbr_index, &then_ctx, &else_ctx);
     ink_astgen_set_block(astgen, block_index, scratch_top);
     return block_index;
@@ -602,8 +598,7 @@ static size_t ink_astgen_if_else_expr(struct ink_astgen *astgen,
 static size_t ink_astgen_switch_expr(struct ink_astgen *astgen,
                                      struct ink_scope *scope,
                                      const struct ink_ast_node *expr,
-                                     const struct ink_ast_node *body,
-                                     const struct ink_conditional_info *info)
+                                     const struct ink_ast_node *body)
 {
     return INK_IR_INVALID;
 }
@@ -655,6 +650,8 @@ static size_t ink_astgen_conditional(struct ink_astgen *astgen,
                 return ink_astgen_error(
                     astgen, INK_AST_CONDITIONAL_MULTIPLE_ELSE, child);
             }
+
+            info.has_else = true;
             break;
         }
         default:
@@ -663,10 +660,10 @@ static size_t ink_astgen_conditional(struct ink_astgen *astgen,
         }
     }
     if (info.has_initial && info.has_block) {
-        return ink_astgen_if_expr(astgen, scope, node->lhs, first, last, &info);
+        return ink_astgen_if_expr(astgen, scope, node->lhs, first,
+                                  first == last ? NULL : last);
     } else if (info.has_initial) {
-        return ink_astgen_switch_expr(astgen, scope, node->lhs, node->rhs,
-                                      &info);
+        return ink_astgen_switch_expr(astgen, scope, node->lhs, node->rhs);
     } else {
         return ink_astgen_if_else_expr(astgen, scope, node->rhs->seq, 0);
     }
@@ -685,8 +682,8 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
 
         switch (child->type) {
         case INK_NODE_STRING: {
-            const size_t lhs = ink_astgen_string(astgen, child);
-            ink_astgen_add_unary(astgen, INK_IR_INST_CONTENT_PUSH, lhs);
+            node_index = ink_astgen_string(astgen, child);
+            ink_astgen_add_unary(astgen, INK_IR_INST_CONTENT_PUSH, node_index);
             break;
         }
         case INK_NODE_INLINE_LOGIC: {
