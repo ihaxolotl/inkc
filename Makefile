@@ -40,7 +40,8 @@ lib_srcs := src/logging.c                  \
             src/ir.c                       \
             src/scanner.c                  \
             src/parse.c                    \
-            src/astgen.c
+            src/astgen.c                   \
+            src/codegen.c
 
 bin_srcs := src/option.c                   \
             src/main.c

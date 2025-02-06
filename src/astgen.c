@@ -898,6 +898,7 @@ int ink_astgen(struct ink_ast *tree, struct ink_ir *ircode, int flags)
         return -1;
     }
 
+    ink_ir_init(ircode);
     ink_astgen_global_init(&global_store, tree, ircode);
     ink_astgen_file(&global_store, tree->root);
     ink_astgen_global_deinit(&global_store);

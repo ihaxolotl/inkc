@@ -7,7 +7,7 @@
 static const char *INK_IR_TYPE_STR[] = {INK_IR_OP(T)};
 #undef T
 
-static const char *ink_ir_inst_op_strz(enum ink_ir_inst_op op)
+const char *ink_ir_inst_op_strz(enum ink_ir_inst_op op)
 {
     return INK_IR_TYPE_STR[op];
 }

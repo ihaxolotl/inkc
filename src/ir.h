@@ -117,6 +117,7 @@ struct ink_ir {
 extern void ink_ir_init(struct ink_ir *ir);
 extern void ink_ir_deinit(struct ink_ir *ir);
 extern void ink_ir_dump(const struct ink_ir *ir);
+extern const char *ink_ir_inst_op_strz(enum ink_ir_inst_op op);
 
 #ifdef __cplusplus
 }

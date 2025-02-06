@@ -5,6 +5,7 @@
 
 #include "arena.h"
 #include "astgen.h"
+#include "codegen.h"
 #include "ir.h"
 #include "object.h"
 #include "opcode.h"
@@ -182,7 +183,6 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
     }
 
     ink_story_init(story, flags);
-    ink_ir_init(&ircode);
 
     rc = ink_astgen(&ast, &ircode, flags);
     if (rc < 0) {
@@ -190,6 +190,11 @@ int ink_story_load(struct ink_story *story, const char *text, int flags)
     }
     if (flags & INK_F_DUMP_IR) {
         ink_ir_dump(&ircode);
+    }
+
+    rc = ink_codegen(&ircode, story, flags);
+    if (rc < 0) {
+        goto out;
     }
     if (flags & INK_F_DUMP_CODE) {
         for (size_t off = 0; off < story->code.count;) {
