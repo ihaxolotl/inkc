@@ -28,6 +28,8 @@ struct ink_symtab_key {
 INK_VEC_T(ink_astgen_scratch, size_t)
 INK_HASHMAP_T(ink_symtab, struct ink_symtab_key, struct ink_symbol)
 
+static const char *INK_DEFAULT_PATH = "@main";
+
 static uint32_t ink_symtab_hash(const void *bytes, size_t length)
 {
     const struct ink_symtab_key *const key = bytes;
@@ -343,21 +345,68 @@ static size_t ink_astgen_add_br(struct ink_astgen *astgen, size_t payload_index)
 }
 
 /**
- * Create a switch case operation.
-static size_t ink_astgen_add_switch_case(struct ink_astgen *astgen, size_t lhs,
-                                         struct ink_ir_inst_seq *body)
-{
-    const struct ink_ir_inst inst = {
-        .op = INK_IR_INST_SWITCH_CASE,
-        .as.switch_case =
-            {
-                .payload_index = lhs,
-                .body = body,
-            },
-    };
-    return ink_astgen_add_inst(astgen, inst);
-}
+ * Create a content path declaration.
  */
+static size_t ink_astgen_add_knot(struct ink_astgen *astgen,
+                                  enum ink_ir_inst_op op, size_t name_index)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
+    const size_t index = code->count;
+    const struct ink_ir_inst inst = {
+        .op = op,
+        .as.knot_decl.name_offset = name_index,
+    };
+
+    ink_astgen_add_inst(astgen, inst);
+    ink_astgen_scratch_pop(scratch, NULL);
+    return index;
+}
+
+static void ink_astgen_set_knot(struct ink_astgen *astgen, size_t index,
+                                size_t scratch_top)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
+    struct ink_ir_inst *const inst = &code->entries[index];
+
+    inst->as.knot_decl.body =
+        ink_astgen_seq_from_scratch(astgen, scratch_top, scratch->count);
+}
+
+static size_t ink_astgen_add_var(struct ink_astgen *astgen,
+                                 enum ink_ir_inst_op op, size_t name_index,
+                                 bool is_const)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
+    const size_t index = code->count;
+    const struct ink_ir_inst inst = {
+        .op = op,
+        .as.var_decl.name_offset = name_index,
+        .as.var_decl.is_const = is_const,
+    };
+
+    ink_astgen_add_inst(astgen, inst);
+    return index;
+}
+
+static size_t ink_astgen_add_str(struct ink_astgen *astgen,
+                                 const uint8_t *chars, size_t length)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_ir_byte_vec *const strings = &global->ircode->string_bytes;
+    const size_t pos = strings->count;
+
+    for (size_t i = 0; i < length; i++) {
+        ink_ir_byte_vec_push(strings, chars[i]);
+    }
+
+    ink_ir_byte_vec_push(strings, '\0');
+    return pos;
+}
 
 static size_t ink_astgen_expr(struct ink_astgen *, struct ink_scope *,
                               const struct ink_ast_node *);
@@ -428,20 +477,12 @@ static size_t ink_astgen_string(struct ink_astgen *astgen,
 {
     struct ink_ir_inst inst;
     struct ink_astgen_global *const global = astgen->global;
-    struct ink_ir_byte_vec *const strings = &global->ircode->string_bytes;
     struct ink_ast *const tree = global->tree;
     const uint8_t *const chars = &tree->source_bytes[node->start_offset];
     const size_t len = node->end_offset - node->start_offset;
-    const size_t pos = strings->count;
-
-    for (size_t i = 0; i < len; i++) {
-        ink_ir_byte_vec_push(strings, chars[i]);
-    }
-
-    ink_ir_byte_vec_push(strings, '\0');
 
     inst.op = INK_IR_INST_STRING;
-    inst.as.string = pos;
+    inst.as.string = ink_astgen_add_str(astgen, chars, len);
     return ink_astgen_add_inst(astgen, inst);
 }
 
@@ -706,25 +747,39 @@ static size_t ink_astgen_var_decl(struct ink_astgen *astgen,
                                   struct ink_scope *scope,
                                   const struct ink_ast_node *node)
 {
-    struct ink_ir_inst inst;
+    size_t name_index;
     struct ink_astgen_global *const global = astgen->global;
     struct ink_ast *const tree = global->tree;
+    struct ink_ast_node *const name_node = node->lhs;
+    struct ink_ast_node *const expr_node = node->rhs;
     struct ink_ir_inst_vec *const code = &global->ircode->instructions;
-    const struct ink_symbol symbol = {
+    struct ink_symbol symbol = {
         .node = node,
         .index = code->count,
         .is_const = node->type == INK_NODE_CONST_DECL,
     };
 
-    inst.op = INK_IR_INST_ALLOC;
-    ink_astgen_add_inst(astgen, inst);
+    if (node->type == INK_NODE_TEMP_DECL) {
+        const struct ink_ir_inst inst = {
+            .op = INK_IR_INST_ALLOC,
+        };
 
-    if (ink_scope_insert(scope, tree, node->lhs, symbol) < 0) {
-        ink_astgen_error(astgen, INK_AST_IDENT_REDEFINED, node->lhs);
+        ink_astgen_add_inst(astgen, inst);
+    } else {
+        name_index = ink_astgen_add_str(
+            astgen, &tree->source_bytes[name_node->start_offset],
+            name_node->end_offset - name_node->start_offset);
+
+        ink_astgen_add_var(astgen, INK_IR_INST_DECL_VAR, name_index,
+                           symbol.is_const);
+    }
+
+    if (ink_scope_insert(scope, tree, name_node, symbol) < 0) {
+        ink_astgen_error(astgen, INK_AST_IDENT_REDEFINED, name_node);
         return INK_IR_INVALID;
     }
     return ink_astgen_add_binary(astgen, INK_IR_INST_STORE, symbol.index,
-                                 ink_astgen_expr(astgen, scope, node->rhs));
+                                 ink_astgen_expr(astgen, scope, expr_node));
 }
 
 static void ink_astgen_content_stmt(struct ink_astgen *astgen,
@@ -787,7 +842,10 @@ static size_t ink_astgen_expr_stmt(struct ink_astgen *astgen,
                                    struct ink_scope *scope,
                                    const struct ink_ast_node *node)
 {
-    return ink_astgen_expr(astgen, scope, node->lhs);
+    const size_t payload_index = ink_astgen_expr(astgen, scope, node->lhs);
+
+    return ink_astgen_add_unary(astgen, INK_IR_INST_CHECK_RESULT,
+                                payload_index);
 }
 
 static void ink_astgen_stmt(struct ink_astgen *astgen, struct ink_scope *scope,
@@ -831,7 +889,6 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
 
             ink_astgen_stmt(astgen, scope, node);
         }
-
     } else {
         ink_scope_init(&block_scope, scope);
 
@@ -848,19 +905,19 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
 static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen_global *global,
                                                const struct ink_ast_node *node)
 {
-    size_t i, inst_index;
+    size_t i, inst_index = 0;
     struct ink_scope file_scope;
     struct ink_ast_node *first;
     struct ink_ast_seq *const node_seq = node->seq;
     struct ink_astgen_scratch *const scratch = &global->scratch;
-    const size_t scratch_offset = scratch->count;
+    const size_t scratch_top = scratch->count;
 
     if (node_seq->count == 0) {
         return NULL;
     }
 
     struct ink_astgen astgen = {
-        .scratch_offset = scratch_offset,
+        .scratch_offset = scratch_top,
         .scratch = scratch,
         .global = global,
     };
@@ -869,7 +926,16 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen_global *global,
     first = node_seq->nodes[0];
 
     if (first->type == INK_NODE_BLOCK) {
+        const size_t scratch_top = scratch->count;
+        const size_t name_index = ink_astgen_add_str(
+            &astgen, (uint8_t *)INK_DEFAULT_PATH, strlen(INK_DEFAULT_PATH));
+        const size_t knot_index =
+            ink_astgen_add_knot(&astgen, INK_IR_INST_DECL_KNOT, name_index);
+
         ink_astgen_block_stmt(&astgen, &file_scope, first);
+        ink_astgen_add_unary(&astgen, INK_IR_INST_RET_IMPLICIT, 0);
+        ink_astgen_set_knot(&astgen, knot_index, scratch_top);
+        ink_astgen_scratch_push(scratch, knot_index);
         i = 1;
     } else {
         i = 0;
@@ -885,9 +951,8 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen_global *global,
 
         ink_astgen_scratch_push(scratch, inst_index);
     }
-
     ink_scope_deinit(&file_scope);
-    return ink_astgen_seq_from_scratch(&astgen, scratch_offset, scratch->count);
+    return ink_astgen_seq_from_scratch(&astgen, scratch_top, scratch->count);
 }
 
 int ink_astgen(struct ink_ast *tree, struct ink_ir *ircode, int flags)

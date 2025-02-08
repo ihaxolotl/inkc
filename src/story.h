@@ -40,33 +40,14 @@ enum ink_flags {
 struct ink_story {
     bool can_continue;
     int flags;
-    /**
-     * Program counter / instruction pointer.
-     */
     uint8_t *pc;
-    /**
-     * Stack top offset.
-     */
     size_t stack_top;
-    /**
-     * Story content buffer.
-     */
     struct ink_byte_vec content;
-    /**
-     * Bytecode instructions.
-     */
     struct ink_byte_vec code;
-    /**
-     * Constant value table.
-     */
     struct ink_object_vec constants;
-    /**
-     * Object chain for tracking.
-     */
+    struct ink_object *globals;
+    struct ink_object *paths;
     struct ink_object *objects;
-    /**
-     * Evaluation stack.
-     */
     struct ink_object *stack[INK_STORY_STACK_MAX];
 };
 

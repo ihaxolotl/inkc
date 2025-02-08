@@ -39,8 +39,12 @@ extern "C" {
     T(SWITCH_BR, "switch_br")                                                  \
     T(SWITCH_CASE, "switch_case")                                              \
     T(CONTENT_PUSH, "content_push")                                            \
+    T(CHECK_RESULT, "check_result")                                            \
     T(DONE, "done")                                                            \
     T(END, "end")                                                              \
+    T(DECL_KNOT, "decl_knot")                                                  \
+    T(DECL_VAR, "decl_var")                                                    \
+    T(RET_IMPLICIT, "ret_implicit")                                            \
     T(RET, "ret")
 
 #define T(name, description) INK_IR_INST_##name,
@@ -98,9 +102,14 @@ struct ink_ir_inst {
         } activation;
 
         struct {
+            bool is_const;
+            size_t name_offset;
+        } var_decl;
+
+        struct {
             size_t name_offset;
             struct ink_ir_inst_seq *body;
-        } declaration;
+        } knot_decl;
     } as;
 };
 

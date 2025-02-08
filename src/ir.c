@@ -76,6 +76,32 @@ static void ink_ir_dump_block(const struct ink_ir *ir,
     printf("%s})\n", prefix);
 }
 
+static void ink_ir_dump_decl_knot(const struct ink_ir *ir,
+                                  const struct ink_ir_inst *inst, size_t index,
+                                  const char *prefix)
+{
+    const size_t name_index = inst->as.knot_decl.name_offset;
+    const struct ink_ir_inst_seq *body = inst->as.knot_decl.body;
+    const unsigned char *const bytes = &ir->string_bytes.entries[name_index];
+
+    printf("%s%%%zu = %s(%s: {\n", prefix, index, ink_ir_inst_op_strz(inst->op),
+           bytes);
+    ink_ir_dump_seq(ir, body, prefix);
+    printf("%s})\n", prefix);
+}
+
+static void ink_ir_dump_decl_var(const struct ink_ir *ir,
+                                 const struct ink_ir_inst *inst, size_t index,
+                                 const char *prefix)
+{
+    const size_t name_index = inst->as.var_decl.name_offset;
+    const bool is_const = inst->as.var_decl.is_const;
+    const unsigned char *const bytes = &ir->string_bytes.entries[name_index];
+
+    printf("%s%%%zu = %s(%s, is_const: %s)\n", prefix, index,
+           ink_ir_inst_op_strz(inst->op), bytes, is_const ? "true" : "false");
+}
+
 static void ink_ir_dump_condbr(const struct ink_ir *ir,
                                const struct ink_ir_inst *inst, size_t index,
                                const char *prefix)
@@ -130,6 +156,14 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
             ink_ir_dump_block(ir, inst, inst_index, new_prefix);
             break;
         }
+        case INK_IR_INST_DECL_KNOT: {
+            ink_ir_dump_decl_knot(ir, inst, inst_index, new_prefix);
+            break;
+        }
+        case INK_IR_INST_DECL_VAR: {
+            ink_ir_dump_decl_var(ir, inst, inst_index, new_prefix);
+            break;
+        }
         case INK_IR_INST_CONDBR: {
             ink_ir_dump_condbr(ir, inst, inst_index, new_prefix);
             break;
@@ -154,8 +188,13 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         case INK_IR_INST_DONE:
         case INK_IR_INST_END:
         case INK_IR_INST_ALLOC:
+        case INK_IR_INST_RET_IMPLICIT:
         case INK_IR_INST_RET: {
             ink_ir_dump_simple(ir, inst, inst_index, new_prefix);
+            break;
+        }
+        case INK_IR_INST_CHECK_RESULT: {
+            ink_ir_dump_unary(ir, inst, inst_index, new_prefix);
             break;
         }
         default:
