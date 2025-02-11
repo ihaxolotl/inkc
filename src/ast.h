@@ -37,7 +37,7 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_ADD_EXPR, "AddExpr")                                                 \
     T(AST_AND_EXPR, "AndExpr")                                                 \
     T(AST_ARG_LIST, "ArgumentList")                                            \
-    T(AST_ASSIGN_EXPR, "AssignExpr")                                           \
+    T(AST_ASSIGN_STMT, "AssignStmt")                                           \
     T(AST_BLOCK, "BlockStmt")                                                  \
     T(AST_CALL_EXPR, "CallExpr")                                               \
     T(AST_CHOICE_PLUS_STMT, "ChoicePlusStmt")                                  \
@@ -87,6 +87,7 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_REF_PARAM_DECL, "ParamRefDecl")                                      \
     T(AST_RETURN_STMT, "ReturnStmt")                                           \
     T(AST_SELECTED_LIST_ELEMENT, "SelectionListElementExpr")                   \
+    T(AST_SELECTOR_EXPR, "SelectorExpr")                                       \
     T(AST_SEQUENCE_EXPR, "SequenceExpr")                                       \
     T(AST_STITCH_DECL, "StitchDecl")                                           \
     T(AST_STITCH_PROTO, "StitchProto")                                         \

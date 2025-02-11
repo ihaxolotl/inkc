@@ -292,6 +292,11 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
                 state = INK_LEX_GREATER_THAN;
                 break;
             }
+            case '.': {
+                token->type = INK_TT_DOT;
+                scanner->cursor_offset++;
+                goto exit_loop;
+            }
             case '[': {
                 token->type = INK_TT_LEFT_BRACKET;
                 scanner->cursor_offset++;
