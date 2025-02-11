@@ -513,39 +513,39 @@ static size_t ink_astgen_expr(struct ink_astgen *astgen,
         return INK_IR_INVALID;
     }
     switch (node->type) {
-    case INK_NODE_NUMBER:
+    case INK_AST_NUMBER:
         return ink_astgen_number(astgen, node);
-    case INK_NODE_TRUE:
+    case INK_AST_TRUE:
         return ink_astgen_true(astgen);
-    case INK_NODE_FALSE:
+    case INK_AST_FALSE:
         return ink_astgen_false(astgen);
-    case INK_NODE_IDENTIFIER:
+    case INK_AST_IDENTIFIER:
         return ink_astgen_identifier(astgen, scope, node);
-    case INK_NODE_ADD_EXPR:
+    case INK_AST_ADD_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_ADD);
-    case INK_NODE_SUB_EXPR:
+    case INK_AST_SUB_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_SUB);
-    case INK_NODE_MUL_EXPR:
+    case INK_AST_MUL_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_MUL);
-    case INK_NODE_DIV_EXPR:
+    case INK_AST_DIV_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_DIV);
-    case INK_NODE_MOD_EXPR:
+    case INK_AST_MOD_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_MOD);
-    case INK_NODE_EQUAL_EXPR:
+    case INK_AST_EQUAL_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_EQ);
-    case INK_NODE_NOT_EQUAL_EXPR:
+    case INK_AST_NOT_EQUAL_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_NEQ);
-    case INK_NODE_LESS_EXPR:
+    case INK_AST_LESS_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_LT);
-    case INK_NODE_LESS_EQUAL_EXPR:
+    case INK_AST_LESS_EQUAL_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_LTE);
-    case INK_NODE_GREATER_EXPR:
+    case INK_AST_GREATER_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_GT);
-    case INK_NODE_GREATER_EQUAL_EXPR:
+    case INK_AST_GREATER_EQUAL_EXPR:
         return ink_astgen_binary_op(astgen, scope, node, INK_IR_INST_CMP_GTE);
-    case INK_NODE_NEGATE_EXPR:
+    case INK_AST_NEGATE_EXPR:
         return ink_astgen_unary_op(astgen, scope, node, INK_IR_INST_NEG);
-    case INK_NODE_NOT_EXPR:
+    case INK_AST_NOT_EXPR:
         return ink_astgen_unary_op(astgen, scope, node, INK_IR_INST_BOOL_NOT);
     default:
         assert(false);
@@ -584,7 +584,7 @@ static size_t ink_astgen_if_expr(struct ink_astgen *astgen,
     ink_astgen_add_br(astgen, block_index);
     ink_astgen_make(&else_ctx, astgen);
 
-    if (else_node && else_node->type == INK_NODE_CONDITIONAL_ELSE_BRANCH) {
+    if (else_node && else_node->type == INK_AST_CONDITIONAL_ELSE_BRANCH) {
         ink_astgen_block_stmt(&else_ctx, scope, else_node->rhs);
     }
 
@@ -620,7 +620,7 @@ static size_t ink_astgen_if_else_expr(struct ink_astgen *astgen,
     if (node_index + 1 < children->count) {
         struct ink_ast_node *const else_node = children->nodes[node_index + 1];
 
-        if (else_node->type == INK_NODE_CONDITIONAL_ELSE_BRANCH) {
+        if (else_node->type == INK_AST_CONDITIONAL_ELSE_BRANCH) {
             ink_astgen_block_stmt(astgen, scope, else_node->rhs);
         } else {
             const size_t alt_index = ink_astgen_if_else_expr(
@@ -670,18 +670,18 @@ static size_t ink_astgen_conditional(struct ink_astgen *astgen,
         struct ink_ast_node *const child = children->nodes[i];
 
         switch (child->type) {
-        case INK_NODE_BLOCK: {
+        case INK_AST_BLOCK: {
             info.has_block = true;
             break;
         }
-        case INK_NODE_CONDITIONAL_BRANCH: {
+        case INK_AST_CONDITIONAL_BRANCH: {
             if (info.has_block) {
                 return ink_astgen_error(
                     astgen, INK_AST_CONDITIONAL_EXPECTED_ELSE, child);
             }
             break;
         }
-        case INK_NODE_CONDITIONAL_ELSE_BRANCH: {
+        case INK_AST_CONDITIONAL_ELSE_BRANCH: {
             /* Only the last branch can be an else. */
             if (child != last) {
                 return ink_astgen_error(astgen, INK_AST_CONDITIONAL_FINAL_ELSE,
@@ -722,16 +722,16 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
         struct ink_ast_node *const child = children->nodes[i];
 
         switch (child->type) {
-        case INK_NODE_STRING: {
+        case INK_AST_STRING: {
             node_index = ink_astgen_string(astgen, child);
             ink_astgen_add_unary(astgen, INK_IR_INST_CONTENT_PUSH, node_index);
             break;
         }
-        case INK_NODE_INLINE_LOGIC: {
+        case INK_AST_INLINE_LOGIC: {
             ink_astgen_inline_logic(astgen, scope, child);
             break;
         }
-        case INK_NODE_CONDITIONAL_CONTENT: {
+        case INK_AST_CONDITIONAL_CONTENT: {
             node_index = ink_astgen_conditional(astgen, scope, child);
             ink_astgen_scratch_push(scratch, node_index);
             break;
@@ -756,10 +756,10 @@ static size_t ink_astgen_var_decl(struct ink_astgen *astgen,
     struct ink_symbol symbol = {
         .node = node,
         .index = code->count,
-        .is_const = node->type == INK_NODE_CONST_DECL,
+        .is_const = node->type == INK_AST_CONST_DECL,
     };
 
-    if (node->type == INK_NODE_TEMP_DECL) {
+    if (node->type == INK_AST_TEMP_DECL) {
         const struct ink_ir_inst inst = {
             .op = INK_IR_INST_ALLOC,
         };
@@ -852,21 +852,21 @@ static void ink_astgen_stmt(struct ink_astgen *astgen, struct ink_scope *scope,
                             const struct ink_ast_node *node)
 {
     switch (node->type) {
-    case INK_NODE_VAR_DECL:
-    case INK_NODE_CONST_DECL:
-    case INK_NODE_TEMP_DECL: {
+    case INK_AST_VAR_DECL:
+    case INK_AST_CONST_DECL:
+    case INK_AST_TEMP_DECL: {
         ink_astgen_var_decl(astgen, scope, node);
         break;
     }
-    case INK_NODE_CONTENT_STMT: {
+    case INK_AST_CONTENT_STMT: {
         ink_astgen_content_stmt(astgen, scope, node);
         break;
     }
-    case INK_NODE_DIVERT_STMT: {
+    case INK_AST_DIVERT_STMT: {
         ink_astgen_divert_stmt(astgen, scope, node);
         break;
     }
-    case INK_NODE_EXPR_STMT: {
+    case INK_AST_EXPR_STMT: {
         ink_astgen_expr_stmt(astgen, scope, node);
         break;
     }
@@ -925,7 +925,7 @@ static struct ink_ir_inst_seq *ink_astgen_file(struct ink_astgen_global *global,
     ink_scope_init(&file_scope, NULL);
     first = node_seq->nodes[0];
 
-    if (first->type == INK_NODE_BLOCK) {
+    if (first->type == INK_AST_BLOCK) {
         const size_t scratch_top = scratch->count;
         const size_t name_index = ink_astgen_add_str(
             &astgen, (uint8_t *)INK_DEFAULT_PATH, strlen(INK_DEFAULT_PATH));

@@ -49,7 +49,7 @@ INK_VEC_T(ink_node_buffer, struct ink_ast_node *)
 INK_VEC_T(ink_line_buffer, struct ink_source_range)
 
 #define T(name, description) description,
-static const char *INK_NODE_TYPE_STR[] = {INK_NODE(T)};
+static const char *INK_AST_TYPE_STR[] = {INK_MAKE_AST_NODES(T)};
 #undef T
 
 static const char *INK_AST_FMT_EMPTY[] = {"", ""};
@@ -62,7 +62,7 @@ static const char *INK_AST_FMT_FINAL[] = {"`--", "   "};
  */
 const char *ink_ast_node_type_strz(enum ink_ast_node_type type)
 {
-    return INK_NODE_TYPE_STR[type];
+    return INK_AST_TYPE_STR[type];
 }
 
 static void ink_render_error_info(const uint8_t *source_bytes,
@@ -252,46 +252,46 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
                                         char *buffer, size_t length)
 {
     switch (node->type) {
-    case INK_NODE_FILE: {
+    case INK_AST_FILE: {
         snprintf(buffer, length, "%s \"%s\"", context->node_type_strz,
                  context->filename);
         break;
     }
-    case INK_NODE_BLOCK:
-    case INK_NODE_CHOICE_STMT:
-    case INK_NODE_KNOT_DECL:
-    case INK_NODE_STITCH_DECL:
-    case INK_NODE_GATHERED_CHOICE_STMT: {
+    case INK_AST_BLOCK:
+    case INK_AST_CHOICE_STMT:
+    case INK_AST_KNOT_DECL:
+    case INK_AST_STITCH_DECL:
+    case INK_AST_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
     }
-    case INK_NODE_CHOICE_PLUS_STMT:
-    case INK_NODE_CHOICE_STAR_STMT:
-    case INK_NODE_CONST_DECL:
-    case INK_NODE_CONTENT_STMT:
-    case INK_NODE_DIVERT_STMT:
-    case INK_NODE_EXPR_STMT:
-    case INK_NODE_GATHER_STMT:
-    case INK_NODE_LIST_DECL:
-    case INK_NODE_RETURN_STMT:
-    case INK_NODE_TEMP_DECL:
-    case INK_NODE_VAR_DECL:
-    case INK_NODE_STRING_EXPR: {
+    case INK_AST_CHOICE_PLUS_STMT:
+    case INK_AST_CHOICE_STAR_STMT:
+    case INK_AST_CONST_DECL:
+    case INK_AST_CONTENT_STMT:
+    case INK_AST_DIVERT_STMT:
+    case INK_AST_EXPR_STMT:
+    case INK_AST_GATHER_STMT:
+    case INK_AST_LIST_DECL:
+    case INK_AST_RETURN_STMT:
+    case INK_AST_TEMP_DECL:
+    case INK_AST_VAR_DECL:
+    case INK_AST_STRING_EXPR: {
         snprintf(buffer, length, "%s <line:%zu, col:%zu:%zu>",
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
     }
-    case INK_NODE_STRING:
-    case INK_NODE_NUMBER:
-    case INK_NODE_IDENTIFIER:
-    case INK_NODE_CHOICE_START_EXPR:
-    case INK_NODE_CHOICE_OPTION_EXPR:
-    case INK_NODE_CHOICE_INNER_EXPR:
-    case INK_NODE_PARAM_DECL:
-    case INK_NODE_REF_PARAM_DECL: {
+    case INK_AST_STRING:
+    case INK_AST_NUMBER:
+    case INK_AST_IDENTIFIER:
+    case INK_AST_CHOICE_START_EXPR:
+    case INK_AST_CHOICE_OPTION_EXPR:
+    case INK_AST_CHOICE_INNER_EXPR:
+    case INK_AST_PARAM_DECL:
+    case INK_AST_REF_PARAM_DECL: {
         snprintf(buffer, length, "%s `%.*s` <col:%zu, col:%zu>",
                  context->node_type_strz, (int)context->lexeme_length,
                  context->lexeme, context->column_start, context->column_end);
@@ -310,18 +310,18 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                                       char *buffer, size_t length)
 {
     switch (node->type) {
-    case INK_NODE_FILE: {
+    case INK_AST_FILE: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "\"%s\"",
                  context->node_type_strz, context->filename);
         break;
     }
-    case INK_NODE_BLOCK:
-    case INK_NODE_CHOICE_STMT:
-    case INK_NODE_KNOT_DECL:
-    case INK_NODE_STITCH_DECL:
-    case INK_NODE_GATHERED_CHOICE_STMT: {
+    case INK_AST_BLOCK:
+    case INK_AST_CHOICE_STMT:
+    case INK_AST_KNOT_DECL:
+    case INK_AST_STITCH_DECL:
+    case INK_AST_GATHERED_CHOICE_STMT: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -330,18 +330,18 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->line_end);
         break;
     }
-    case INK_NODE_CHOICE_PLUS_STMT:
-    case INK_NODE_CHOICE_STAR_STMT:
-    case INK_NODE_CONST_DECL:
-    case INK_NODE_CONTENT_STMT:
-    case INK_NODE_DIVERT_STMT:
-    case INK_NODE_EXPR_STMT:
-    case INK_NODE_GATHER_STMT:
-    case INK_NODE_LIST_DECL:
-    case INK_NODE_RETURN_STMT:
-    case INK_NODE_TEMP_DECL:
-    case INK_NODE_VAR_DECL:
-    case INK_NODE_STRING_EXPR: {
+    case INK_AST_CHOICE_PLUS_STMT:
+    case INK_AST_CHOICE_STAR_STMT:
+    case INK_AST_CONST_DECL:
+    case INK_AST_CONTENT_STMT:
+    case INK_AST_DIVERT_STMT:
+    case INK_AST_EXPR_STMT:
+    case INK_AST_GATHER_STMT:
+    case INK_AST_LIST_DECL:
+    case INK_AST_RETURN_STMT:
+    case INK_AST_TEMP_DECL:
+    case INK_AST_VAR_DECL:
+    case INK_AST_STRING_EXPR: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -350,14 +350,14 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->column_start, context->column_end);
         break;
     }
-    case INK_NODE_STRING:
-    case INK_NODE_NUMBER:
-    case INK_NODE_IDENTIFIER:
-    case INK_NODE_CHOICE_START_EXPR:
-    case INK_NODE_CHOICE_OPTION_EXPR:
-    case INK_NODE_CHOICE_INNER_EXPR:
-    case INK_NODE_PARAM_DECL:
-    case INK_NODE_REF_PARAM_DECL: {
+    case INK_AST_STRING:
+    case INK_AST_NUMBER:
+    case INK_AST_IDENTIFIER:
+    case INK_AST_CHOICE_START_EXPR:
+    case INK_AST_CHOICE_OPTION_EXPR:
+    case INK_AST_CHOICE_INNER_EXPR:
+    case INK_AST_PARAM_DECL:
+    case INK_AST_REF_PARAM_DECL: {
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN
