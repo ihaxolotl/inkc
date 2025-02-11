@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "astgen.h"
 #include "codegen.h"
 #include "ir.h"
@@ -11,7 +12,6 @@
 #include "opcode.h"
 #include "parse.h"
 #include "story.h"
-#include "tree.h"
 
 /* TODO(Brett): Add opcode stuff to new module. */
 #define T(name, description) description,

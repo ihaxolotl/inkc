@@ -36,7 +36,7 @@ lib_srcs := src/logging.c                  \
             src/story.c                    \
             src/source.c                   \
             src/token.c                    \
-            src/tree.c                     \
+            src/ast.c                      \
             src/ir.c                       \
             src/scanner.c                  \
             src/parse.c                    \

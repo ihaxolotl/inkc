@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "arena.h"
-#include "tree.h"
+#include "ast.h"
 #include "vec.h"
 
 #define ANSI_COLOR_RED "\x1b[31m"

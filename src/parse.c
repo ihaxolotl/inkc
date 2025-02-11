@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "common.h"
 #include "hashmap.h"
 #include "logging.h"
@@ -12,7 +13,6 @@
 #include "scanner.h"
 #include "story.h"
 #include "token.h"
-#include "tree.h"
 #include "vec.h"
 
 #define INK_PARSER_ARGS_MAX 255

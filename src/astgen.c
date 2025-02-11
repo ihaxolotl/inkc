@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
 #include "astgen.h"
 #include "common.h"
 #include "hashmap.h"
 #include "ir.h"
-#include "tree.h"
 #include "vec.h"
 
 #define INK_NUMBER_BUFSZ 24
