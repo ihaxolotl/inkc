@@ -1060,6 +1060,7 @@ static size_t ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
 static size_t ink_astgen_knot_decl(struct ink_astgen *parent_scope,
                                    const struct ink_ast_node *node)
 {
+    size_t i = 0;
     struct ink_symbol sym;
     struct ink_astgen knot_scope;
     struct ink_ast_node *const proto_node = node->lhs;
@@ -1083,23 +1084,24 @@ static size_t ink_astgen_knot_decl(struct ink_astgen *parent_scope,
                             knot_scope.scratch_offset);
         return node_index;
     }
-    for (size_t i = 0; i < body_list->count; i++) {
-        struct ink_ast_node *const body_node = body_list->nodes[i];
 
-        if (body_node->type == INK_AST_BLOCK) {
-            ink_astgen_block_stmt(&knot_scope, body_node);
-            ink_astgen_add_unary(&knot_scope, INK_IR_INST_RET_IMPLICIT, 0);
-        } else if (body_node->type == INK_AST_STITCH_DECL) {
-            ink_astgen_scratch_push(
-                knot_scope.scratch,
-                ink_astgen_stitch_decl(&knot_scope, body_list->nodes[i]));
+    struct ink_ast_node *const first = body_list->nodes[0];
 
-        } else {
-            assert(false);
-        }
+    if (first->type == INK_AST_BLOCK) {
+        ink_astgen_block_stmt(&knot_scope, first);
+        i++;
     }
 
+    ink_astgen_add_unary(&knot_scope, INK_IR_INST_RET_IMPLICIT, 0);
     ink_astgen_set_knot(parent_scope, node_index, knot_scope.scratch_offset);
+
+    for (; i < body_list->count; i++) {
+        struct ink_ast_node *const body_node = body_list->nodes[i];
+        const size_t body_index =
+            ink_astgen_stitch_decl(&knot_scope, body_node);
+
+        ink_astgen_scratch_push(knot_scope.scratch, body_index);
+    }
     return node_index;
 }
 
