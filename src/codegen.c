@@ -84,6 +84,17 @@ static struct ink_object *ink_codegen_add_str(struct ink_codegen *codegen,
     return ink_string_new(story, bytes, length);
 }
 
+static void ink_codegen_patch_jump(struct ink_codegen *codegen,
+                                   size_t inst_offset)
+{
+    struct ink_byte_vec *const code = &codegen->story->code;
+
+    code->entries[inst_offset + 1] = (uint8_t)code->count;
+}
+
+static void ink_codegen_body(struct ink_codegen *,
+                             const struct ink_ir_inst_seq *);
+
 static void ink_codegen_ir_true(struct ink_codegen *codegen,
                                 const struct ink_ir_inst *inst)
 {
@@ -250,10 +261,56 @@ static void ink_codegen_ir_ret(struct ink_codegen *codegen,
     ink_codegen_add_inst(codegen, INK_OP_RET, 0);
 }
 
+static void ink_codegen_ir_block(struct ink_codegen *codegen,
+                                 const struct ink_ir_inst *inst,
+                                 size_t inst_index)
+{
+    struct ink_ir_inst_seq *const block_list = inst->as.block.seq;
+
+    ink_codegen_body(codegen, block_list);
+}
+
+static void ink_codegen_ir_condbr(struct ink_codegen *codegen,
+                                  const struct ink_ir_inst *inst,
+                                  size_t inst_index)
+{
+    struct ink_content_path *path = codegen->current_path;
+    struct ink_ir_inst_seq *const then_list = inst->as.cond_br.then_;
+    struct ink_ir_inst_seq *const else_list = inst->as.cond_br.else_;
+    const size_t then_offset = path->code_length;
+
+    ink_codegen_add_inst(codegen, INK_OP_JMP_F, 0xFF);
+    ink_codegen_add_inst(codegen, INK_OP_POP, 0x00);
+    ink_codegen_body(codegen, then_list);
+
+    const size_t else_offset = path->code_length;
+
+    ink_codegen_add_inst(codegen, INK_OP_JMP, 0xFF);
+    ink_codegen_patch_jump(codegen, then_offset);
+    ink_codegen_add_inst(codegen, INK_OP_POP, 0x00);
+
+    if (else_list) {
+        ink_codegen_body(codegen, else_list);
+    }
+
+    ink_codegen_patch_jump(codegen, else_offset);
+}
+
+static void ink_codegen_ir_br(struct ink_codegen *codegen,
+                              const struct ink_ir_inst *inst, size_t inst_index)
+{
+}
+
 static void ink_codegen_ir_check_result(struct ink_codegen *codegen,
                                         const struct ink_ir_inst *inst)
 {
     ink_codegen_add_inst(codegen, INK_OP_POP, 0);
+}
+
+static void ink_codegen_ir_content_push(struct ink_codegen *codegen,
+                                        const struct ink_ir_inst *inst)
+{
+    ink_codegen_add_inst(codegen, INK_OP_CONTENT_PUSH, 0);
 }
 
 static void ink_codegen_ir_var(struct ink_codegen *codegen,
@@ -287,6 +344,7 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
                                 const struct ink_ir_inst *inst)
 {
     const size_t name_index = inst->as.knot_decl.name_offset;
+    const struct ink_ir_inst_seq *body = inst->as.knot_decl.body;
     struct ink_story *const story = codegen->story;
     struct ink_object *const paths_table = story->paths;
     struct ink_object *const path_name =
@@ -303,27 +361,24 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
 
     ink_table_insert(story, paths_table, path_name, path_obj);
     codegen->current_path = INK_OBJ_AS_CONTENT_PATH(path_obj);
+    ink_codegen_body(codegen, body);
 }
 
-static void ink_codegen_ir_content_push(struct ink_codegen *codegen,
-                                        const struct ink_ir_inst *inst)
-{
-    ink_codegen_add_inst(codegen, INK_OP_CONTENT_PUSH, 0);
-}
-
-static void ink_codegen_body(struct ink_codegen *codegen)
+static void ink_codegen_body(struct ink_codegen *codegen,
+                             const struct ink_ir_inst_seq *body_list)
 {
     const struct ink_story *const story = codegen->story;
     const struct ink_ir *const ir = codegen->ir;
-    const struct ink_ir_inst_vec *const inst_list = &ir->instructions;
     const struct ink_byte_vec *const bytes_list = &story->code;
+    const struct ink_ir_inst_vec *const inst_list = &ir->instructions;
 
-    for (size_t i = 0; i < inst_list->count; i++) {
-        struct ink_ir_inst *const inst = &inst_list->entries[i];
+    for (size_t i = 0; i < body_list->count; i++) {
+        const size_t inst_index = body_list->entries[i];
+        struct ink_ir_inst *const inst = &inst_list->entries[inst_index];
 
         switch (inst->op) {
         case INK_IR_INST_ALLOC:
-            ink_codegen_ir_alloc(codegen, inst, i);
+            ink_codegen_ir_alloc(codegen, inst, inst_index);
             break;
         case INK_IR_INST_LOAD:
             ink_codegen_ir_load(codegen, inst);
@@ -365,13 +420,13 @@ static void ink_codegen_body(struct ink_codegen *codegen)
             INK_CODEGEN_TODO("handle BOOL_NOT");
             break;
         case INK_IR_INST_BLOCK:
-            INK_CODEGEN_TODO("handle BOOL_BLOCK");
+            ink_codegen_ir_block(codegen, inst, inst_index);
             break;
         case INK_IR_INST_CONDBR:
-            INK_CODEGEN_TODO("handle CONDBR");
+            ink_codegen_ir_condbr(codegen, inst, inst_index);
             break;
         case INK_IR_INST_BR:
-            INK_CODEGEN_TODO("handle BR");
+            ink_codegen_ir_br(codegen, inst, inst_index);
             break;
         case INK_IR_INST_SWITCH_BR:
             INK_CODEGEN_TODO("handle SWITCH_BR");
@@ -396,10 +451,7 @@ static void ink_codegen_body(struct ink_codegen *codegen)
             ink_codegen_ir_ret(codegen, inst);
             break;
         case INK_IR_INST_DECL_VAR:
-            ink_codegen_ir_var(codegen, inst, i);
-            break;
-        case INK_IR_INST_DECL_KNOT:
-            ink_codegen_ir_knot(codegen, inst);
+            ink_codegen_ir_var(codegen, inst, inst_index);
             break;
         case INK_IR_INST_DIVERT:
             INK_CODEGEN_TODO("handle DIVERT");
@@ -420,6 +472,20 @@ static void ink_codegen_body(struct ink_codegen *codegen)
     }
 }
 
+static void ink_codegen_file(struct ink_codegen *codegen)
+{
+    const struct ink_ir *const file_ir = codegen->ir;
+    const struct ink_ir_inst_seq *const decl_list = file_ir->sequence_list_tail;
+    const struct ink_ir_inst_vec *const inst_list = &file_ir->instructions;
+
+    for (size_t i = 0; i < decl_list->count; i++) {
+        const size_t inst_index = decl_list->entries[i];
+        struct ink_ir_inst *const inst = &inst_list->entries[inst_index];
+
+        ink_codegen_ir_knot(codegen, inst);
+    }
+}
+
 static void ink_codegen_init(struct ink_codegen *codegen,
                              const struct ink_ir *ir, struct ink_story *story)
 {
@@ -435,13 +501,13 @@ static void ink_codegen_deinit(struct ink_codegen *codegen)
     ink_inst_map_deinit(&codegen->inst_map);
 }
 
-int ink_codegen(const struct ink_ir *ircode, struct ink_story *story, int flags)
+int ink_codegen(const struct ink_ir *ir, struct ink_story *story, int flags)
 {
     struct ink_codegen codegen;
 
     ink_story_init(story, flags);
-    ink_codegen_init(&codegen, ircode, story);
-    ink_codegen_body(&codegen);
+    ink_codegen_init(&codegen, ir, story);
+    ink_codegen_file(&codegen);
     ink_codegen_deinit(&codegen);
     return INK_E_OK;
 }

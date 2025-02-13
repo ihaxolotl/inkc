@@ -98,7 +98,7 @@ bool ink_string_equal(struct ink_story *story, const struct ink_object *lhs,
                       const struct ink_object *rhs)
 {
     struct ink_string *const str_lhs = INK_OBJ_AS_STRING(lhs);
-    struct ink_string *const str_rhs = INK_OBJ_AS_STRING(lhs);
+    struct ink_string *const str_rhs = INK_OBJ_AS_STRING(rhs);
 
     (void)story;
 
@@ -139,9 +139,10 @@ void ink_table_free(struct ink_story *story, struct ink_object *obj)
     ink_story_mem_free(story, table->entries);
 }
 
-static struct ink_table_kv *find_slot(struct ink_story *story,
-                                      struct ink_table_kv *entries,
-                                      size_t capacity, struct ink_string *key)
+static struct ink_table_kv *ink_table_find_slot(struct ink_story *story,
+                                                struct ink_table_kv *entries,
+                                                size_t capacity,
+                                                struct ink_string *key)
 {
     size_t index = key->hash & (capacity - 1);
 
@@ -193,7 +194,7 @@ static int ink_table_resize(struct ink_story *story, struct ink_table *table)
     for (size_t i = 0; i < table->capacity; i++) {
         src = &table->entries[i];
         if (src->key) {
-            dst = find_slot(story, entries, capacity, src->key);
+            dst = ink_table_find_slot(story, entries, capacity, src->key);
             dst->key = src->key;
             dst->value = src->value;
             count++;
@@ -214,14 +215,13 @@ int ink_table_lookup(struct ink_story *story, struct ink_object *obj,
     struct ink_table *const table = INK_OBJ_AS_TABLE(obj);
 
     assert(INK_OBJ_IS_TABLE(obj));
-    (void)story;
 
     if (table->count == 0) {
         return -1;
     }
 
-    kv = find_slot(story, table->entries, table->capacity,
-                   INK_OBJ_AS_STRING(key));
+    kv = ink_table_find_slot(story, table->entries, table->capacity,
+                             INK_OBJ_AS_STRING(key));
     if (!kv->key) {
         return -1;
     }
@@ -248,7 +248,8 @@ int ink_table_insert(struct ink_story *story, struct ink_object *obj,
         }
     }
 
-    entry = find_slot(story, table->entries, table->capacity, key_str);
+    entry =
+        ink_table_find_slot(story, table->entries, table->capacity, key_str);
     if (!entry->key) {
         entry->key = key_str;
         entry->value = value;
