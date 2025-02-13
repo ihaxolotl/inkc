@@ -13,6 +13,8 @@
 #include "parse.h"
 #include "story.h"
 
+const char *INK_DEFAULT_PATH = "@main";
+
 /* TODO(Brett): Add opcode stuff to new module. */
 #define T(name, description) description,
 static const char *INK_OPCODE_TYPE_STR[] = {INK_MAKE_OPCODE_LIST(T)};

@@ -322,108 +322,91 @@ static void ink_codegen_body(struct ink_codegen *codegen)
         struct ink_ir_inst *const inst = &inst_list->entries[i];
 
         switch (inst->op) {
-        case INK_IR_INST_ALLOC: {
+        case INK_IR_INST_ALLOC:
             ink_codegen_ir_alloc(codegen, inst, i);
             break;
-        }
-        case INK_IR_INST_LOAD: {
+        case INK_IR_INST_LOAD:
             ink_codegen_ir_load(codegen, inst);
             break;
-        }
-        case INK_IR_INST_STORE: {
+        case INK_IR_INST_STORE:
             ink_codegen_ir_store(codegen, inst);
             break;
-        }
-        case INK_IR_INST_NUMBER: {
+        case INK_IR_INST_NUMBER:
             ink_codegen_ir_number(codegen, inst);
             break;
-        }
-        case INK_IR_INST_STRING: {
+        case INK_IR_INST_STRING:
             ink_codegen_ir_string(codegen, inst);
             break;
-        }
-        case INK_IR_INST_TRUE: {
+        case INK_IR_INST_TRUE:
             ink_codegen_ir_true(codegen, inst);
             break;
-        }
-        case INK_IR_INST_FALSE: {
+        case INK_IR_INST_FALSE:
             ink_codegen_ir_false(codegen, inst);
             break;
-        }
         case INK_IR_INST_ADD:
         case INK_IR_INST_SUB:
         case INK_IR_INST_MUL:
         case INK_IR_INST_DIV:
-        case INK_IR_INST_MOD: {
+        case INK_IR_INST_MOD:
             ink_codegen_ir_arithmetic(codegen, inst);
             break;
-        }
-        case INK_IR_INST_NEG: {
+        case INK_IR_INST_NEG:
             INK_CODEGEN_TODO("handle NEG");
             break;
-        }
         case INK_IR_INST_CMP_EQ:
         case INK_IR_INST_CMP_NEQ:
         case INK_IR_INST_CMP_LT:
         case INK_IR_INST_CMP_LTE:
         case INK_IR_INST_CMP_GT:
-        case INK_IR_INST_CMP_GTE: {
+        case INK_IR_INST_CMP_GTE:
             ink_codegen_ir_cmp(codegen, inst);
             break;
-        }
-        case INK_IR_INST_BOOL_NOT: {
+        case INK_IR_INST_BOOL_NOT:
             INK_CODEGEN_TODO("handle BOOL_NOT");
             break;
-        }
-        case INK_IR_INST_BLOCK: {
+        case INK_IR_INST_BLOCK:
             INK_CODEGEN_TODO("handle BOOL_BLOCK");
             break;
-        }
-        case INK_IR_INST_CONDBR: {
+        case INK_IR_INST_CONDBR:
             INK_CODEGEN_TODO("handle CONDBR");
             break;
-        }
-        case INK_IR_INST_BR: {
+        case INK_IR_INST_BR:
             INK_CODEGEN_TODO("handle BR");
             break;
-        }
-        case INK_IR_INST_SWITCH_BR: {
+        case INK_IR_INST_SWITCH_BR:
             INK_CODEGEN_TODO("handle SWITCH_BR");
             break;
-        }
-        case INK_IR_INST_SWITCH_CASE: {
+        case INK_IR_INST_SWITCH_CASE:
             INK_CODEGEN_TODO("handle SWITCH_CASE");
             break;
-        }
-        case INK_IR_INST_CONTENT_PUSH: {
+        case INK_IR_INST_CONTENT_PUSH:
             ink_codegen_ir_content_push(codegen, inst);
             break;
-        }
-        case INK_IR_INST_CHECK_RESULT: {
+        case INK_IR_INST_CHECK_RESULT:
             ink_codegen_ir_check_result(codegen, inst);
             break;
-        }
-        case INK_IR_INST_DONE: {
+        case INK_IR_INST_DONE:
             INK_CODEGEN_TODO("handle DONE");
             break;
-        }
-        case INK_IR_INST_END: {
+        case INK_IR_INST_END:
             INK_CODEGEN_TODO("handle END");
             break;
-        }
         case INK_IR_INST_RET:
-        case INK_IR_INST_RET_IMPLICIT: {
+        case INK_IR_INST_RET_IMPLICIT:
             ink_codegen_ir_ret(codegen, inst);
             break;
-        }
-        case INK_IR_INST_DECL_VAR: {
+        case INK_IR_INST_DECL_VAR:
             ink_codegen_ir_var(codegen, inst, i);
             break;
-        }
-        case INK_IR_INST_DECL_KNOT: {
+        case INK_IR_INST_DECL_KNOT:
             ink_codegen_ir_knot(codegen, inst);
             break;
-        }
+        case INK_IR_INST_DIVERT:
+            INK_CODEGEN_TODO("handle DIVERT");
+            break;
+        default:
+            INK_CODEGEN_TODO("unhandled ir code");
+            break;
         }
     }
     if (bytes_list->count >= 2) {

@@ -38,6 +38,8 @@ enum ink_status {
 
 extern uint32_t ink_fnv32a(const uint8_t *data, size_t length);
 
+extern const char *INK_DEFAULT_PATH;
+
 #ifdef __cplusplus
 }
 #endif

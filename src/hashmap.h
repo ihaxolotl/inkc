@@ -45,6 +45,7 @@ extern "C" {
         self->entries = (void *)0;                                             \
         self->hasher = hasher;                                                 \
         self->compare = compare;                                               \
+        self->max_load_percentage = max_load_percentage;                       \
     }                                                                          \
                                                                                \
     __attribute__((unused)) static inline void __T##_deinit(struct __T *self)  \

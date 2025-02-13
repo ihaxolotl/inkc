@@ -39,6 +39,7 @@ extern "C" {
     T(SWITCH_BR, "switch_br")                                                  \
     T(SWITCH_CASE, "switch_case")                                              \
     T(CONTENT_PUSH, "content_push")                                            \
+    T(DIVERT, "divert")                                                        \
     T(CHECK_RESULT, "check_result")                                            \
     T(DONE, "done")                                                            \
     T(END, "end")                                                              \

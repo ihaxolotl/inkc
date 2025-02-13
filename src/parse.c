@@ -658,9 +658,11 @@ ink_parser_collect_stitch(struct ink_parser *parser,
         ink_parser_scratch_last(scratch, &tmp);
 
         if (tmp->type == INK_AST_STITCH_PROTO) {
+            const size_t end_offset = node ? node->end_offset : tmp->end_offset;
+
             ink_parser_scratch_pop(scratch, NULL);
             node = ink_ast_node_binary(INK_AST_STITCH_DECL, tmp->start_offset,
-                                       node->end_offset, tmp, node, arena);
+                                       end_offset, tmp, node, arena);
         }
     }
     return node;
