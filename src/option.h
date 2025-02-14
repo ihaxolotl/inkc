@@ -20,4 +20,5 @@ extern char *option_unknown_opt;
 extern void option_setopts(const struct option *opts, char **argv);
 extern int option_nextopt(void);
 extern char *option_nextarg(void);
+
 #endif

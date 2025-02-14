@@ -147,22 +147,18 @@ static void ink_codegen_ir_arithmetic(struct ink_codegen *codegen,
                                       const struct ink_ir_inst *inst)
 {
     switch (inst->op) {
-    case INK_IR_INST_ADD: {
+    case INK_IR_INST_ADD:
         ink_codegen_add_inst(codegen, INK_OP_ADD, 0);
         break;
-    }
-    case INK_IR_INST_SUB: {
+    case INK_IR_INST_SUB:
         ink_codegen_add_inst(codegen, INK_OP_SUB, 0);
         break;
-    }
-    case INK_IR_INST_MUL: {
+    case INK_IR_INST_MUL:
         ink_codegen_add_inst(codegen, INK_OP_MUL, 0);
         break;
-    }
-    case INK_IR_INST_DIV: {
+    case INK_IR_INST_DIV:
         ink_codegen_add_inst(codegen, INK_OP_DIV, 0);
         break;
-    }
     default:
         assert(false);
         break;
@@ -173,31 +169,25 @@ static void ink_codegen_ir_cmp(struct ink_codegen *codegen,
                                const struct ink_ir_inst *inst)
 {
     switch (inst->op) {
-    case INK_IR_INST_CMP_EQ: {
+    case INK_IR_INST_CMP_EQ:
         ink_codegen_add_inst(codegen, INK_OP_CMP_EQ, 0);
         break;
-    }
-    case INK_IR_INST_CMP_NEQ: {
+    case INK_IR_INST_CMP_NEQ:
         ink_codegen_add_inst(codegen, INK_OP_CMP_EQ, 0);
         ink_codegen_add_inst(codegen, INK_OP_NOT, 0);
         break;
-    }
-    case INK_IR_INST_CMP_LT: {
+    case INK_IR_INST_CMP_LT:
         ink_codegen_add_inst(codegen, INK_OP_CMP_LT, 0);
         break;
-    }
-    case INK_IR_INST_CMP_LTE: {
+    case INK_IR_INST_CMP_LTE:
         ink_codegen_add_inst(codegen, INK_OP_CMP_LTE, 0);
         break;
-    }
-    case INK_IR_INST_CMP_GT: {
+    case INK_IR_INST_CMP_GT:
         ink_codegen_add_inst(codegen, INK_OP_CMP_GT, 0);
         break;
-    }
-    case INK_IR_INST_CMP_GTE: {
+    case INK_IR_INST_CMP_GTE:
         ink_codegen_add_inst(codegen, INK_OP_CMP_GTE, 0);
         break;
-    }
     default:
         assert(false);
         break;

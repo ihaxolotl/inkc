@@ -2,28 +2,25 @@
 
 #include "option.h"
 
-// internal globals
 static const struct option *_g_option_opts;
 static char *_g_arg_ptr;
 static char **_g_option_argv;
 
-// exposed global for OPTION_OPERAND option
 char *option_operand;
-// exposed global for OPTION_UNKNOWN option
 char *option_unknown_opt;
 
-//
-// option_setopts - set internal globals to point to opts and argv
-//
+/**
+ * Set internal globals to point to opts and argv.
+ */
 void option_setopts(const struct option *opts, char **argv)
 {
     _g_option_argv = argv;
     _g_option_opts = opts;
 }
 
-//
-// option_nextopt - get the .id field from the next option in the opts array
-//
+/**
+ * Get the .id field from the next option in the opts array
+ */
 int option_nextopt(void)
 {
     if (*_g_option_argv != NULL) {
@@ -58,9 +55,9 @@ int option_nextopt(void)
     return OPTION_UNKNOWN;
 }
 
-//
-// option_nextarg - get the next argument from the last option with arguments
-//
+/**
+ * Get the next argument from the last option with arguments.
+ */
 char *option_nextarg(void)
 {
     char *arg = _g_arg_ptr;
@@ -69,7 +66,6 @@ char *option_nextarg(void)
     while (*arg_p != '\0' && *arg_p != ',') {
         ++arg_p;
     }
-
     if (*arg_p == '\0') {
         _g_arg_ptr = arg_p;
         return arg;
@@ -77,6 +73,5 @@ char *option_nextarg(void)
 
     _g_arg_ptr = arg_p + 1;
     *arg_p = '\0';
-
     return arg;
 }

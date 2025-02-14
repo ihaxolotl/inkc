@@ -95,27 +95,23 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_CMP_GT:
     case INK_OP_CMP_GTE:
     case INK_OP_CONTENT_POST:
-    case INK_OP_CONTENT_PUSH: {
+    case INK_OP_CONTENT_PUSH:
         ink_disassemble_simple_inst(story, bytes, offset, op);
         break;
-    }
     case INK_OP_CONST:
     case INK_OP_LOAD:
-    case INK_OP_STORE: {
+    case INK_OP_STORE:
         ink_disassemble_unary_inst(story, bytes, offset, op);
         break;
-    }
     case INK_OP_LOAD_GLOBAL:
-    case INK_OP_STORE_GLOBAL: {
+    case INK_OP_STORE_GLOBAL:
         ink_disassemble_global_inst(story, bytes, offset, op);
         break;
-    }
     case INK_OP_JMP:
     case INK_OP_JMP_T:
-    case INK_OP_JMP_F: {
+    case INK_OP_JMP_F:
         ink_disassemble_jump_inst(story, bytes, offset, op);
         break;
-    }
     default:
         printf("Unknown opcode 0x%x\n", op);
         break;

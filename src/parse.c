@@ -1079,27 +1079,22 @@ static struct ink_ast_node *ink_parse_primary_expr(struct ink_parser *parser)
     };
 
     switch (parser->token.type) {
-    case INK_TT_NUMBER: {
+    case INK_TT_NUMBER:
         INK_PARSER_RULE(node, ink_parse_number, parser);
         break;
-    }
-    case INK_TT_KEYWORD_TRUE: {
+    case INK_TT_KEYWORD_TRUE:
         INK_PARSER_RULE(node, ink_parse_true, parser);
         break;
-    }
-    case INK_TT_KEYWORD_FALSE: {
+    case INK_TT_KEYWORD_FALSE:
         INK_PARSER_RULE(node, ink_parse_false, parser);
         break;
-    }
-    case INK_TT_IDENTIFIER: {
+    case INK_TT_IDENTIFIER:
         INK_PARSER_RULE(node, ink_parse_identifier_expr, parser);
         break;
-    }
-    case INK_TT_DOUBLE_QUOTE: {
+    case INK_TT_DOUBLE_QUOTE:
         INK_PARSER_RULE(node, ink_parse_string_expr, parser, token_set);
         break;
-    }
-    case INK_TT_LEFT_PAREN: {
+    case INK_TT_LEFT_PAREN:
         ink_parser_advance(parser);
         INK_PARSER_RULE(node, ink_parse_infix_expr, parser, NULL,
                         INK_PREC_NONE);
@@ -1110,7 +1105,6 @@ static struct ink_ast_node *ink_parse_primary_expr(struct ink_parser *parser)
             return NULL;
         }
         break;
-    }
     default:
         break;
     }
@@ -1557,22 +1551,18 @@ ink_parse_content(struct ink_parser *parser,
             INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
         } else {
             switch (parser->token.type) {
-            case INK_TT_LEFT_BRACE: {
+            case INK_TT_LEFT_BRACE:
                 INK_PARSER_RULE(node, ink_parse_inline_logic, parser);
                 break;
-            }
-            case INK_TT_RIGHT_ARROW: {
+            case INK_TT_RIGHT_ARROW:
                 INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
                 break;
-            }
-            case INK_TT_LEFT_ARROW: {
+            case INK_TT_LEFT_ARROW:
                 INK_PARSER_RULE(node, ink_parse_thread_expr, parser);
                 break;
-            }
-            case INK_TT_GLUE: {
+            case INK_TT_GLUE:
                 INK_PARSER_RULE(node, ink_parse_glue, parser);
                 break;
-            }
             default:
                 goto exit_loop;
             }
@@ -1906,16 +1896,14 @@ ink_parse_stmt(struct ink_parser *parser,
     ink_parser_eat(parser, INK_TT_WHITESPACE);
 
     switch (parser->token.type) {
-    case INK_TT_EOF: {
+    case INK_TT_EOF:
         assert(node != NULL);
         break;
-    }
     case INK_TT_STAR:
-    case INK_TT_PLUS: {
+    case INK_TT_PLUS:
         INK_PARSER_RULE(node, ink_parse_choice, parser, context);
         break;
-    }
-    case INK_TT_MINUS: {
+    case INK_TT_MINUS:
         if (context->is_conditional) {
             ink_parser_push_scanner(parser, INK_GRAMMAR_EXPRESSION);
             ink_parser_advance(parser);
@@ -1934,27 +1922,22 @@ ink_parse_stmt(struct ink_parser *parser,
             INK_PARSER_RULE(node, ink_parse_gather, parser, context);
         }
         break;
-    }
-    case INK_TT_TILDE: {
+    case INK_TT_TILDE:
         INK_PARSER_RULE(node, ink_parse_tilde_stmt, parser);
         break;
-    }
-    case INK_TT_LEFT_ARROW: {
+    case INK_TT_LEFT_ARROW:
         INK_PARSER_RULE(node, ink_parse_thread_stmt, parser);
         break;
-    }
-    case INK_TT_RIGHT_ARROW: {
+    case INK_TT_RIGHT_ARROW:
         INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
         break;
-    }
-    case INK_TT_EQUAL: {
+    case INK_TT_EQUAL:
         if (!context->is_conditional) {
             INK_PARSER_RULE(node, ink_parse_knot_decl, parser);
         } else {
             INK_PARSER_RULE(node, ink_parse_content_stmt, parser);
         }
         break;
-    }
     default:
         if (ink_scanner_try_keyword(&parser->scanner, &parser->token,
                                     INK_TT_KEYWORD_CONST)) {
@@ -1972,27 +1955,22 @@ ink_parse_stmt(struct ink_parser *parser,
     }
     switch (node->type) {
     case INK_AST_CONDITIONAL_BRANCH:
-    case INK_AST_CONDITIONAL_ELSE_BRANCH: {
+    case INK_AST_CONDITIONAL_ELSE_BRANCH:
         ink_parser_handle_conditional_branch(parser, context, node);
         break;
-    }
     case INK_AST_CHOICE_STAR_STMT:
-    case INK_AST_CHOICE_PLUS_STMT: {
+    case INK_AST_CHOICE_PLUS_STMT:
         ink_parser_handle_choice_branch(parser, context, node);
         break;
-    }
-    case INK_AST_GATHER_STMT: {
+    case INK_AST_GATHER_STMT:
         ink_parser_handle_gather(parser, context, &node);
         break;
-    }
-    case INK_AST_KNOT_PROTO: {
+    case INK_AST_KNOT_PROTO:
         ink_parser_handle_knot(parser, context);
         break;
-    }
-    case INK_AST_STITCH_PROTO: {
+    case INK_AST_STITCH_PROTO:
         ink_parser_handle_stitch(parser, context);
         break;
-    }
     default:
         ink_parser_handle_content(parser, context, node);
         break;

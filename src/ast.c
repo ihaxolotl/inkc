@@ -149,39 +149,33 @@ static void ink_ast_error_render(const struct ink_ast *tree,
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
-    case INK_AST_IDENT_UNKNOWN: {
+    case INK_AST_IDENT_UNKNOWN:
         ink_ast_error_renderf(tree, error, arena,
                               "use of undeclared identifier '%.*s'",
                               (int)length, bytes);
         break;
-    }
-    case INK_AST_IDENT_REDEFINED: {
+    case INK_AST_IDENT_REDEFINED:
         ink_ast_error_renderf(tree, error, arena, "redefinition of '%.*s'",
                               (int)length, bytes);
         break;
-    }
-    case INK_AST_CONDITIONAL_EMPTY: {
+    case INK_AST_CONDITIONAL_EMPTY:
         ink_ast_error_renderf(tree, error, arena,
                               "condition block with no conditions");
         break;
-    }
-    case INK_AST_CONDITIONAL_EXPECTED_ELSE: {
+    case INK_AST_CONDITIONAL_EXPECTED_ELSE:
         ink_ast_error_renderf(
             tree, error, arena,
             "expected '- else:' clause rather than extra condition");
         break;
-    }
-    case INK_AST_CONDITIONAL_MULTIPLE_ELSE: {
+    case INK_AST_CONDITIONAL_MULTIPLE_ELSE:
         ink_ast_error_renderf(tree, error, arena,
                               "multiple 'else' cases in conditional");
         break;
-    }
-    case INK_AST_CONDITIONAL_FINAL_ELSE: {
+    case INK_AST_CONDITIONAL_FINAL_ELSE:
         ink_ast_error_renderf(
             tree, error, arena,
             "'else' case should always be the final case in conditional");
         break;
-    }
     default:
         assert(false);
         return;
@@ -252,21 +246,19 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
                                         char *buffer, size_t length)
 {
     switch (node->type) {
-    case INK_AST_FILE: {
+    case INK_AST_FILE:
         snprintf(buffer, length, "%s \"%s\"", context->node_type_strz,
                  context->filename);
         break;
-    }
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT: {
+    case INK_AST_GATHERED_CHOICE_STMT:
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
-    }
     case INK_AST_CHOICE_PLUS_STMT:
     case INK_AST_CHOICE_STAR_STMT:
     case INK_AST_CONST_DECL:
@@ -278,12 +270,11 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:
     case INK_AST_VAR_DECL:
-    case INK_AST_STRING_EXPR: {
+    case INK_AST_STRING_EXPR:
         snprintf(buffer, length, "%s <line:%zu, col:%zu:%zu>",
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
-    }
     case INK_AST_STRING:
     case INK_AST_NUMBER:
     case INK_AST_IDENTIFIER:
@@ -291,12 +282,11 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
     case INK_AST_PARAM_DECL:
-    case INK_AST_REF_PARAM_DECL: {
+    case INK_AST_REF_PARAM_DECL:
         snprintf(buffer, length, "%s `%.*s` <col:%zu, col:%zu>",
                  context->node_type_strz, (int)context->lexeme_length,
                  context->lexeme, context->column_start, context->column_end);
         break;
-    }
     default:
         snprintf(buffer, length, "%s <col:%zu, col:%zu>",
                  context->node_type_strz, context->column_start,
@@ -310,18 +300,17 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                                       char *buffer, size_t length)
 {
     switch (node->type) {
-    case INK_AST_FILE: {
+    case INK_AST_FILE:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "\"%s\"",
                  context->node_type_strz, context->filename);
         break;
-    }
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT: {
+    case INK_AST_GATHERED_CHOICE_STMT:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -329,7 +318,6 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
-    }
     case INK_AST_CHOICE_PLUS_STMT:
     case INK_AST_CHOICE_STAR_STMT:
     case INK_AST_CONST_DECL:
@@ -341,7 +329,7 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:
     case INK_AST_VAR_DECL:
-    case INK_AST_STRING_EXPR: {
+    case INK_AST_STRING_EXPR:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -349,7 +337,6 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
-    }
     case INK_AST_STRING:
     case INK_AST_NUMBER:
     case INK_AST_IDENTIFIER:
@@ -357,7 +344,7 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
     case INK_AST_PARAM_DECL:
-    case INK_AST_REF_PARAM_DECL: {
+    case INK_AST_REF_PARAM_DECL:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN
@@ -366,7 +353,6 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->node_type_strz, (int)context->lexeme_length,
                  context->lexeme, context->column_start, context->column_end);
         break;
-    }
     default:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON

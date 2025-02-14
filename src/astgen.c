@@ -793,18 +793,16 @@ static size_t ink_astgen_conditional(struct ink_astgen *astgen,
         struct ink_ast_node *const child = children->nodes[i];
 
         switch (child->type) {
-        case INK_AST_BLOCK: {
+        case INK_AST_BLOCK:
             info.has_block = true;
             break;
-        }
-        case INK_AST_CONDITIONAL_BRANCH: {
+        case INK_AST_CONDITIONAL_BRANCH:
             if (info.has_block) {
                 return ink_astgen_error(
                     astgen, INK_AST_CONDITIONAL_EXPECTED_ELSE, child);
             }
             break;
-        }
-        case INK_AST_CONDITIONAL_ELSE_BRANCH: {
+        case INK_AST_CONDITIONAL_ELSE_BRANCH:
             /* Only the last branch can be an else. */
             if (child != last) {
                 return ink_astgen_error(astgen, INK_AST_CONDITIONAL_FINAL_ELSE,
@@ -817,7 +815,6 @@ static size_t ink_astgen_conditional(struct ink_astgen *astgen,
 
             info.has_else = true;
             break;
-        }
         default:
             assert(false);
             break;
@@ -844,20 +841,17 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
         struct ink_ast_node *const child = children->nodes[i];
 
         switch (child->type) {
-        case INK_AST_STRING: {
+        case INK_AST_STRING:
             node_index = ink_astgen_string(astgen, child);
             ink_astgen_add_unary(astgen, INK_IR_INST_CONTENT_PUSH, node_index);
             break;
-        }
-        case INK_AST_INLINE_LOGIC: {
+        case INK_AST_INLINE_LOGIC:
             ink_astgen_inline_logic(astgen, child);
             break;
-        }
-        case INK_AST_CONDITIONAL_CONTENT: {
+        case INK_AST_CONDITIONAL_CONTENT:
             node_index = ink_astgen_conditional(astgen, child);
             ink_astgen_scratch_push(scratch, node_index);
             break;
-        }
         default:
             assert(false);
             break;
@@ -926,20 +920,18 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
         ink_astgen_string_ref(astgen, name_node, &str);
 
         switch (str.length) {
-        case 3: {
+        case 3:
             if (memcmp(str.bytes, "END", str.length) == 0) {
                 ink_astgen_add_simple(astgen, INK_IR_INST_END);
                 return;
             }
             break;
-        }
-        case 4: {
+        case 4:
             if (memcmp(str.bytes, "DONE", str.length) == 0) {
                 ink_astgen_add_simple(astgen, INK_IR_INST_DONE);
                 return;
             }
             break;
-        }
         default:
             break;
         }
@@ -979,22 +971,18 @@ static void ink_astgen_stmt(struct ink_astgen *astgen,
     switch (node->type) {
     case INK_AST_VAR_DECL:
     case INK_AST_CONST_DECL:
-    case INK_AST_TEMP_DECL: {
+    case INK_AST_TEMP_DECL:
         ink_astgen_var_decl(astgen, node);
         break;
-    }
-    case INK_AST_CONTENT_STMT: {
+    case INK_AST_CONTENT_STMT:
         ink_astgen_content_stmt(astgen, node);
         break;
-    }
-    case INK_AST_DIVERT_STMT: {
+    case INK_AST_DIVERT_STMT:
         ink_astgen_divert_stmt(astgen, node);
         break;
-    }
-    case INK_AST_EXPR_STMT: {
+    case INK_AST_EXPR_STMT:
         ink_astgen_expr_stmt(astgen, node);
         break;
-    }
     default:
         assert(false);
         break;
