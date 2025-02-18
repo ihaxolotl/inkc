@@ -1337,13 +1337,19 @@ static struct ink_ast_node *ink_parse_thread_stmt(struct ink_parser *parser)
                               node, parser->arena);
 }
 
-static struct ink_ast_node *ink_parse_expr_stmt(struct ink_parser *parser)
+static struct ink_ast_node *ink_parse_expr_stmt(struct ink_parser *parser,
+                                                struct ink_ast_node *lhs)
 {
+    size_t source_start, source_end;
     struct ink_ast_node *node = NULL;
-    const size_t source_start = parser->source_offset;
-    size_t source_end = 0;
 
-    INK_PARSER_RULE(node, ink_parse_expr, parser);
+    if (lhs) {
+        source_start = lhs->start_offset;
+    } else {
+        source_start = parser->source_offset;
+    }
+
+    INK_PARSER_RULE(node, ink_parse_infix_expr, parser, lhs, INK_PREC_NONE);
     source_end = node ? node->end_offset : parser->source_offset;
 
     ink_parser_expect_stmt_end(parser);
@@ -1376,12 +1382,11 @@ static struct ink_ast_node *ink_parse_tilde_stmt(struct ink_parser *parser)
                                       parser->source_offset, lhs, rhs,
                                       parser->arena);
         } else {
-            INK_PARSER_RULE(lhs, ink_parse_infix_expr, parser, lhs,
-                            INK_PREC_NONE);
+            INK_PARSER_RULE(lhs, ink_parse_expr_stmt, parser, lhs);
         }
         break;
     default:
-        INK_PARSER_RULE(lhs, ink_parse_expr_stmt, parser);
+        INK_PARSER_RULE(lhs, ink_parse_expr_stmt, parser, NULL);
         break;
     }
 
