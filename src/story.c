@@ -190,19 +190,22 @@ void ink_story_mem_flush(struct ink_story *story)
     }
 }
 
-int ink_story_load(struct ink_story *story, const char *text, int flags)
+int ink_story_load_opts(struct ink_story *story,
+                        const struct ink_load_opts *opts)
 {
     int rc;
     struct ink_arena arena;
     struct ink_ast ast;
     struct ink_ir ircode;
+    const int flags = opts->flags;
+    const uint8_t *const filename = opts->filename;
+    const uint8_t *const text = opts->source_text;
     static const size_t arena_alignment = 8;
     static const size_t arena_block_size = 8192;
 
     ink_arena_init(&arena, arena_block_size, arena_alignment);
-    ink_ast_init(&ast, "<STDIN>", (uint8_t *)text);
 
-    rc = ink_parse(&ast, &arena, flags);
+    rc = ink_parse(text, filename, &arena, &ast, flags);
     if (rc < 0) {
         goto out;
     }
@@ -230,6 +233,17 @@ out:
     ink_ast_deinit(&ast);
     ink_arena_release(&arena);
     return rc;
+}
+
+int ink_story_load(struct ink_story *story, const char *source, int flags)
+{
+    const struct ink_load_opts opts = {
+        .flags = flags,
+        .source_text = (uint8_t *)source,
+        .filename = (uint8_t *)"<STDIN>",
+    };
+
+    return ink_story_load_opts(story, &opts);
 }
 
 void ink_story_free(struct ink_story *story)

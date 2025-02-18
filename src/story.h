@@ -51,8 +51,16 @@ struct ink_story {
     struct ink_object *stack[INK_STORY_STACK_MAX];
 };
 
+struct ink_load_opts {
+    const uint8_t *filename;
+    const uint8_t *source_text;
+    int flags;
+};
+
 extern void ink_story_init(struct ink_story *story, int flags);
 extern void ink_story_deinit(struct ink_story *story);
+extern int ink_story_load_opts(struct ink_story *story,
+                               const struct ink_load_opts *opts);
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
 extern char *ink_story_continue(struct ink_story *story);

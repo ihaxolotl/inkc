@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
     }
     if (filename == NULL || *filename == '\0') {
         rc = ink_source_load_stdin(&source);
+        filename = "<STDIN>";
     } else {
         rc = ink_source_load(filename, &source);
     }
@@ -143,7 +144,13 @@ int main(int argc, char *argv[])
         return rc;
     }
 
-    rc = ink_story_load(&story, (char *)source.bytes, flags);
+    const struct ink_load_opts opts = {
+        .source_text = source.bytes,
+        .filename = (uint8_t *)filename,
+        .flags = flags,
+    };
+
+    rc = ink_story_load_opts(&story, &opts);
     if (rc < 0) {
         ink_source_free(&source);
         return EXIT_FAILURE;

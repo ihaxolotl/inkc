@@ -109,7 +109,7 @@ static void ink_ast_error_renderf(const struct ink_ast *tree,
     offset = 0;
     info.column = 0;
     info.line = 0;
-    info.filename = tree->filename;
+    info.filename = (char *)tree->filename;
 
     for (;;) {
         if (offset < error->source_start) {
@@ -375,7 +375,7 @@ static void ink_ast_print_node(const struct ink_ast *tree,
     const size_t line_end = ink_calculate_line(lines, node->end_offset);
     const struct ink_source_range line_range = lines->entries[line_start];
     const struct ink_print_context context = {
-        .filename = tree->filename,
+        .filename = (char *)tree->filename,
         .node_type_strz = ink_ast_node_type_strz(node->type),
         .lexeme = tree->source_bytes + node->start_offset,
         .lexeme_length = node->end_offset - node->start_offset,
@@ -487,7 +487,7 @@ struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
 /**
  * Initialize AST.
  */
-void ink_ast_init(struct ink_ast *tree, const char *filename,
+void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
                   const uint8_t *source_bytes)
 {
     tree->filename = filename;

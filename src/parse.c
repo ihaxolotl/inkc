@@ -2007,10 +2007,13 @@ static struct ink_ast_node *ink_parse_file(struct ink_parser *parser)
 /**
  * Parse a source file and output an AST.
  */
-int ink_parse(struct ink_ast *tree, struct ink_arena *arena, int flags)
+int ink_parse(const uint8_t *source_bytes, const uint8_t *filename,
+              struct ink_arena *arena, struct ink_ast *tree, int flags)
 {
     int rc;
     struct ink_parser parser;
+
+    ink_ast_init(tree, filename, source_bytes);
 
     rc = ink_parser_init(&parser, tree, arena, flags);
     if (rc < 0) {
