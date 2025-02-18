@@ -303,7 +303,21 @@ static void ink_codegen_ir_call(struct ink_codegen *codegen,
                                 const struct ink_ir_inst *inst,
                                 size_t inst_index)
 {
+    struct ink_story *const story = codegen->story;
+    const size_t const_index = story->constants.count;
+    const size_t name_index = inst->as.activation.callee_index;
     const struct ink_ir_inst_seq *const args = inst->as.activation.args;
+    struct ink_object *const str_obj = ink_codegen_add_str(codegen, name_index);
+
+    if (!str_obj) {
+        ink_codegen_fail(codegen,
+                         "Could not create runtime object for string.");
+        return;
+    }
+
+    /* TODO(Brett): This emits a constant per invocation, which is not ideal. */
+    ink_codegen_add_const(codegen, str_obj);
+    ink_codegen_add_inst(codegen, INK_OP_CONST, (uint8_t)const_index);
 
     if (args) {
         ink_codegen_add_inst(codegen, INK_OP_CALL, (uint8_t)args->count);
@@ -316,7 +330,21 @@ static void ink_codegen_ir_divert(struct ink_codegen *codegen,
                                   const struct ink_ir_inst *inst,
                                   size_t inst_index)
 {
+    struct ink_story *const story = codegen->story;
+    const size_t const_index = story->constants.count;
+    const size_t name_index = inst->as.activation.callee_index;
     const struct ink_ir_inst_seq *const args = inst->as.activation.args;
+    struct ink_object *const str_obj = ink_codegen_add_str(codegen, name_index);
+
+    if (!str_obj) {
+        ink_codegen_fail(codegen,
+                         "Could not create runtime object for string.");
+        return;
+    }
+
+    /* TODO(Brett): This emits a constant per invocation, which is not ideal. */
+    ink_codegen_add_const(codegen, str_obj);
+    ink_codegen_add_inst(codegen, INK_OP_CONST, (uint8_t)const_index);
 
     if (args) {
         ink_codegen_add_inst(codegen, INK_OP_DIVERT, (uint8_t)args->count);
