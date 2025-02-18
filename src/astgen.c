@@ -11,17 +11,209 @@
 #include "symtab.h"
 #include "vec.h"
 
+#define INK_STRINGSET_CAPACITY_MIN 16
+#define INK_STRINGSET_GROWTH_FACTOR 2u
 #define INK_NUMBER_BUFSZ 24
 #define INK_IR_INVALID (size_t)(-1)
 #define INK_E_FAIL (-1)
 
 INK_VEC_T(ink_astgen_scratch, size_t)
 
+struct ink_stringset_kv {
+    size_t key_length;
+    const uint8_t *key;
+};
+
+/**
+ * Hashset for interning strings.
+ *
+ * No backing store is provided for keys. Keys always point to within the
+ * IR's string bytes region.
+ */
+struct ink_stringset {
+    size_t max_load_percentage;
+    size_t count;
+    size_t capacity;
+    struct ink_stringset_kv *entries;
+    uint32_t (*hasher)(const uint8_t *bytes, size_t length);
+};
+
+/**
+ * Determine if a KV bucket has a value set.
+ *
+ * Returns true if set, false otherwise.
+ */
+static bool ink_stringset_kv_is_set(const struct ink_stringset_kv *self)
+{
+    return self->key_length != 0;
+}
+
+/**
+ * Calculate the next size of a stringset.
+ */
+static size_t ink_stringset_next_size(const struct ink_stringset *self)
+{
+    if (self->capacity < INK_STRINGSET_CAPACITY_MIN) {
+        return INK_STRINGSET_CAPACITY_MIN;
+    }
+    return self->capacity * INK_STRINGSET_GROWTH_FACTOR;
+}
+
+/**
+ * Determine if the set needs to be resized.
+ *
+ * Returns true if a resize is needed, false otherwise.
+ */
+static bool ink_stringset_needs_resize(struct ink_stringset *self)
+{
+    if (self->capacity == 0) {
+        return true;
+    }
+    return ((self->count * 100ul) / self->capacity) > self->max_load_percentage;
+}
+
+/**
+ * Comparison function for string set keys.
+ */
+static bool ink_stringset_cmp(const uint8_t *a, size_t a_length,
+                              const uint8_t *b, size_t b_length)
+{
+    return a_length == b_length && memcmp(a, b, a_length) == 0;
+}
+
+/**
+ * Hash function for string set keys.
+ */
+static uint32_t ink_stringset_hasher(const uint8_t *bytes, size_t length)
+{
+    return ink_fnv32a(bytes, length);
+}
+
+static struct ink_stringset_kv *
+ink_stringset_find_slot(struct ink_stringset_kv *entries, size_t capacity,
+                        const uint8_t *key, size_t key_length,
+                        uint32_t (*hasher)(const uint8_t *bytes, size_t length))
+{
+    size_t i = hasher(key, key_length) & (capacity - 1);
+
+    for (;;) {
+        struct ink_stringset_kv *const slot = &entries[i];
+
+        if (!ink_stringset_kv_is_set(slot) ||
+            ink_stringset_cmp(key, key_length, slot->key, slot->key_length)) {
+            return slot;
+        }
+
+        i = (i + 1) & (capacity - 1);
+    }
+}
+
+static int ink_stringset_resize(struct ink_stringset *self)
+{
+    struct ink_stringset_kv *entries, *src, *dst;
+    size_t count = 0;
+    const size_t capacity = ink_stringset_next_size(self);
+    const size_t size = sizeof(*self->entries) * capacity;
+
+    entries = ink_malloc(size);
+    if (!entries) {
+        return -INK_E_OOM;
+    }
+
+    memset(entries, 0, size);
+
+    for (size_t i = 0; i < self->capacity; i++) {
+        src = &self->entries[i];
+        if (ink_stringset_kv_is_set(src)) {
+            dst = ink_stringset_find_slot(entries, capacity, src->key,
+                                          src->key_length, self->hasher);
+            dst->key = src->key;
+            dst->key_length = src->key_length;
+            count++;
+        }
+    }
+
+    ink_free(self->entries);
+    self->count = count;
+    self->capacity = capacity;
+    self->entries = entries;
+    return INK_E_OK;
+}
+
+/**
+ * Lookup a string within the set.
+ *
+ * When a lookup is successful, return the original bytes backing the key
+ * within the set.
+ */
+static int ink_stringset_lookup(struct ink_stringset *self, const uint8_t *key,
+                                size_t key_length, uint8_t **key_bytes)
+{
+    struct ink_stringset_kv *entry;
+
+    if (self->count == 0) {
+        return -INK_E_OOM;
+    }
+
+    entry = ink_stringset_find_slot(self->entries, self->capacity, key,
+                                    key_length, self->hasher);
+    if (!ink_stringset_kv_is_set(entry)) {
+        return -INK_E_OOM;
+    }
+
+    *key_bytes = (uint8_t *)entry->key;
+    return INK_E_OK;
+}
+
+/**
+ * Insert a string into the set.
+ */
+static int ink_stringset_insert(struct ink_stringset *self, const uint8_t *key,
+                                size_t key_length)
+{
+    struct ink_stringset_kv *entry;
+
+    if (ink_stringset_needs_resize(self)) {
+        int rc = ink_stringset_resize(self);
+        if (rc < 0) {
+            return rc;
+        }
+    }
+
+    entry = ink_stringset_find_slot(self->entries, self->capacity, key,
+                                    key_length, self->hasher);
+    if (!ink_stringset_kv_is_set(entry)) {
+        entry->key = key;
+        entry->key_length = key_length;
+        self->count++;
+        return INK_E_OK;
+    }
+    return -INK_E_OOM;
+}
+
+static void
+ink_stringset_init(struct ink_stringset *self, size_t max_load_percentage,
+                   uint32_t (*hasher)(const uint8_t *bytes, size_t length))
+{
+    assert(max_load_percentage > 0ul && max_load_percentage < 100ul);
+    self->count = 0;
+    self->capacity = 0;
+    self->entries = 0;
+    self->max_load_percentage = max_load_percentage;
+    self->hasher = hasher;
+}
+
+static void ink_stringset_deinit(struct ink_stringset *self)
+{
+    ink_free(self->entries);
+}
+
 struct ink_astgen_global {
     struct ink_ast *tree;
     struct ink_ir *ircode;
     struct ink_symtab_pool symtab_pool;
     struct ink_astgen_scratch scratch;
+    struct ink_stringset string_table;
 };
 
 static void ink_astgen_global_init(struct ink_astgen_global *global,
@@ -30,12 +222,14 @@ static void ink_astgen_global_init(struct ink_astgen_global *global,
     global->tree = tree;
     global->ircode = ircode;
 
+    ink_stringset_init(&global->string_table, 80u, ink_stringset_hasher);
     ink_symtab_pool_init(&global->symtab_pool);
     ink_astgen_scratch_init(&global->scratch);
 }
 
 static void ink_astgen_global_deinit(struct ink_astgen_global *global)
 {
+    ink_stringset_deinit(&global->string_table);
     ink_symtab_pool_deinit(&global->symtab_pool);
     ink_astgen_scratch_deinit(&global->scratch);
 }
@@ -466,19 +660,33 @@ static size_t ink_astgen_add_param(struct ink_astgen *astgen,
     return index;
 }
 
+/**
+ * Intern a string from the source file.
+ *
+ * The position for existing strings is calculated from the base address
+ * of the string_bytes store.
+ *
+ * TODO(Brett): Revisit this. Might be too janky.
+ */
 static size_t ink_astgen_add_str(struct ink_astgen *astgen,
                                  const uint8_t *chars, size_t length)
 {
     struct ink_astgen_global *const global = astgen->global;
+    struct ink_stringset *const string_table = &global->string_table;
     struct ink_ir_byte_vec *const strings = &global->ircode->string_bytes;
     const size_t pos = strings->count;
+    uint8_t *key_out = NULL;
 
-    for (size_t i = 0; i < length; i++) {
-        ink_ir_byte_vec_push(strings, chars[i]);
+    if (ink_stringset_lookup(string_table, chars, length, &key_out) < 0) {
+        for (size_t i = 0; i < length; i++) {
+            ink_ir_byte_vec_push(strings, chars[i]);
+        }
+
+        ink_ir_byte_vec_push(strings, '\0');
+        ink_stringset_insert(string_table, &strings->entries[pos], length);
+        return pos;
     }
-
-    ink_ir_byte_vec_push(strings, '\0');
-    return pos;
+    return (size_t)key_out - (size_t)strings->entries;
 }
 
 static void ink__(struct ink_astgen *astgen, struct ink_string_ref *str)
