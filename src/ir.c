@@ -113,6 +113,17 @@ static void ink_ir_dump_decl_var(const struct ink_ir *ir,
            ink_ir_inst_op_strz(inst->op), bytes, is_const ? "true" : "false");
 }
 
+static void ink_ir_dump_decl_param(const struct ink_ir *ir,
+                                   const struct ink_ir_inst *inst, size_t index,
+                                   const char *prefix)
+{
+    const size_t name_index = inst->as.param_decl.name_offset;
+    const uint8_t *const bytes = &ir->string_bytes.entries[name_index];
+
+    printf("%s%%%zu = %s(\"%s\")\n", prefix, index,
+           ink_ir_inst_op_strz(inst->op), bytes);
+}
+
 static void ink_ir_dump_condbr(const struct ink_ir *ir,
                                const struct ink_ir_inst *inst, size_t index,
                                const char *prefix)
@@ -130,6 +141,28 @@ static void ink_ir_dump_condbr(const struct ink_ir *ir,
     printf("%s})\n", prefix);
 }
 
+static void ink_ir_dump_call(const struct ink_ir *ir,
+                             const struct ink_ir_inst *inst, size_t index,
+                             const char *prefix)
+{
+    const size_t name_index = inst->as.activation.callee_index;
+    const uint8_t *const bytes = &ir->string_bytes.entries[name_index];
+    const struct ink_ir_inst_seq *args = inst->as.activation.args;
+
+    printf("%s%%%zu = %s(\"%s\", [", prefix, index,
+           ink_ir_inst_op_strz(inst->op), bytes);
+
+    if (args) {
+        for (size_t i = 0; i < args->count - 1; i++) {
+            printf("%%%zu, ", args->entries[i]);
+        }
+
+        printf("%%%zu", args->entries[args->count - 1]);
+    }
+
+    printf("])\n");
+}
+
 static void ink_ir_dump_seq(const struct ink_ir *ir,
                             const struct ink_ir_inst_seq *seq,
                             const char *prefix)
@@ -137,7 +170,7 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
     char new_prefix[1024];
     const struct ink_ir_inst_vec *const all = &ir->instructions;
 
-    if (prefix == NULL) {
+    if (!prefix) {
         new_prefix[0] = '\0';
     } else {
         snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, "  ");
@@ -148,6 +181,15 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         struct ink_ir_inst *const inst = &all->entries[inst_index];
 
         switch (inst->op) {
+        case INK_IR_INST_TRUE:
+        case INK_IR_INST_FALSE:
+        case INK_IR_INST_DONE:
+        case INK_IR_INST_END:
+        case INK_IR_INST_ALLOC:
+        case INK_IR_INST_RET_IMPLICIT:
+        case INK_IR_INST_CONTENT_FLUSH:
+            ink_ir_dump_simple(ir, inst, inst_index, new_prefix);
+            break;
         case INK_IR_INST_NUMBER:
             ink_ir_dump_number(ir, inst, inst_index, new_prefix);
             break;
@@ -158,6 +200,8 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         case INK_IR_INST_CONTENT_PUSH:
         case INK_IR_INST_BR:
         case INK_IR_INST_NEG:
+        case INK_IR_INST_RET:
+        case INK_IR_INST_CHECK_RESULT:
             ink_ir_dump_unary(ir, inst, inst_index, new_prefix);
             break;
         case INK_IR_INST_BLOCK:
@@ -168,6 +212,9 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
             break;
         case INK_IR_INST_DECL_VAR:
             ink_ir_dump_decl_var(ir, inst, inst_index, new_prefix);
+            break;
+        case INK_IR_INST_DECL_PARAM:
+            ink_ir_dump_decl_param(ir, inst, inst_index, new_prefix);
             break;
         case INK_IR_INST_CONDBR:
             ink_ir_dump_condbr(ir, inst, inst_index, new_prefix);
@@ -183,24 +230,14 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         case INK_IR_INST_CMP_LT:
         case INK_IR_INST_CMP_LTE:
         case INK_IR_INST_CMP_GT:
-        case INK_IR_INST_CMP_GTE: {
+        case INK_IR_INST_CMP_GTE:
             ink_ir_dump_binary(ir, inst, inst_index, new_prefix);
-            break;
-        }
-        case INK_IR_INST_TRUE:
-        case INK_IR_INST_FALSE:
-        case INK_IR_INST_DONE:
-        case INK_IR_INST_END:
-        case INK_IR_INST_ALLOC:
-        case INK_IR_INST_RET_IMPLICIT:
-        case INK_IR_INST_RET:
-            ink_ir_dump_simple(ir, inst, inst_index, new_prefix);
             break;
         case INK_IR_INST_DIVERT:
             ink_ir_dump_divert(ir, inst, inst_index, new_prefix);
             break;
-        case INK_IR_INST_CHECK_RESULT:
-            ink_ir_dump_unary(ir, inst, inst_index, new_prefix);
+        case INK_IR_INST_CALL:
+            ink_ir_dump_call(ir, inst, inst_index, new_prefix);
             break;
         default:
             ink_ir_dump_invalid(ir, inst, inst_index, new_prefix);

@@ -663,6 +663,12 @@ ink_parser_collect_stitch(struct ink_parser *parser,
             ink_parser_scratch_pop(scratch, NULL);
             node = ink_ast_node_binary(INK_AST_STITCH_DECL, tmp->start_offset,
                                        end_offset, tmp, node, arena);
+        } else if (tmp->type == INK_AST_FUNC_PROTO) {
+            const size_t end_offset = node ? node->end_offset : tmp->end_offset;
+
+            ink_parser_scratch_pop(scratch, NULL);
+            node = ink_ast_node_binary(INK_AST_FUNC_DECL, tmp->start_offset,
+                                       end_offset, tmp, node, arena);
         }
     }
     return node;
@@ -675,8 +681,7 @@ static struct ink_ast_node *
 ink_parser_collect_knot(struct ink_parser *parser,
                         struct ink_parser_node_context *context)
 {
-    struct ink_ast_node *node = NULL;
-    struct ink_ast_node *tmp = NULL;
+    struct ink_ast_node *node, *tmp;
     struct ink_ast_seq *seq = NULL;
     struct ink_arena *const arena = parser->arena;
     struct ink_parser_scratch *const scratch = &parser->scratch;
@@ -687,7 +692,7 @@ ink_parser_collect_knot(struct ink_parser *parser,
         tmp = scratch->entries[context->knot_offset];
 
         if (tmp->type == INK_AST_KNOT_PROTO) {
-            if (node != NULL) {
+            if (node) {
                 ink_parser_scratch_push(scratch, node);
             }
 
@@ -707,15 +712,17 @@ ink_parser_handle_conditional_branch(struct ink_parser *parser,
                                      struct ink_parser_node_context *context,
                                      struct ink_ast_node *node)
 {
+    struct ink_ast_node *tmp;
     struct ink_parser_scratch *const scratch = &parser->scratch;
-    struct ink_ast_node *tmp = NULL;
 
     ink_parser_collect_choices(parser, context, 0);
 
     tmp = ink_parser_collect_block(parser, context);
-    if (tmp != NULL) {
-        ink_parser_scratch_push(scratch, tmp);
+    if (!tmp) {
+        return;
     }
+
+    ink_parser_scratch_push(scratch, tmp);
 }
 
 static void
@@ -856,7 +863,7 @@ static void ink_parser_handle_knot(struct ink_parser *parser,
     struct ink_parser_scratch *const scratch = &parser->scratch;
 
     node = ink_parser_collect_knot(parser, context);
-    if (node != NULL) {
+    if (node) {
         ink_parser_scratch_push(scratch, node);
     }
 
@@ -870,9 +877,15 @@ static void ink_parser_handle_stitch(struct ink_parser *parser,
     struct ink_parser_scratch *const scratch = &parser->scratch;
 
     node = ink_parser_collect_stitch(parser, context);
-    if (node != NULL) {
+    if (node) {
         ink_parser_scratch_push(scratch, node);
     }
+}
+
+static void ink_parser_handle_func(struct ink_parser *parser,
+                                   struct ink_parser_node_context *context)
+{
+    ink_parser_handle_stitch(parser, context);
 }
 
 static int ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
@@ -1290,6 +1303,11 @@ static struct ink_ast_node *ink_parse_glue(struct ink_parser *parser)
                              parser->arena);
 }
 
+/* TODO(Brett): This statement causes some trouble with tokenization.
+ * If a knot is encountered before the mode is popped, we get EQEQ.
+ *
+ * A workaround was added for now...
+ */
 static struct ink_ast_node *ink_parse_temp_decl(struct ink_parser *parser)
 {
     struct ink_ast_node *lhs = NULL;
@@ -1357,6 +1375,9 @@ static struct ink_ast_node *ink_parse_tilde_stmt(struct ink_parser *parser)
             lhs = ink_ast_node_binary(INK_AST_ASSIGN_STMT, lhs->start_offset,
                                       parser->source_offset, lhs, rhs,
                                       parser->arena);
+        } else {
+            INK_PARSER_RULE(lhs, ink_parse_infix_expr, parser, lhs,
+                            INK_PREC_NONE);
         }
         break;
     default:
@@ -1698,7 +1719,6 @@ ink_parse_list_element_def(struct ink_parser *parser)
     if (ink_parser_check(parser, INK_TT_LEFT_PAREN)) {
         ink_parser_advance(parser);
         INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
-        ink_parser_expect(parser, INK_TT_RIGHT_PAREN);
         return ink_ast_node_unary(INK_AST_SELECTED_LIST_ELEMENT, source_start,
                                   parser->source_offset, lhs, parser->arena);
     }
@@ -1867,6 +1887,7 @@ static struct ink_ast_node *ink_parse_knot_decl(struct ink_parser *parser)
     if (ink_scanner_try_keyword(&parser->scanner, &parser->token,
                                 INK_TT_KEYWORD_FUNCTION)) {
         ink_parser_advance(parser);
+        node_type = INK_AST_FUNC_PROTO;
     }
 
     INK_PARSER_RULE(node, ink_parse_identifier, parser);
@@ -1932,6 +1953,7 @@ ink_parse_stmt(struct ink_parser *parser,
         INK_PARSER_RULE(node, ink_parse_divert_stmt, parser);
         break;
     case INK_TT_EQUAL:
+    case INK_TT_EQUAL_EQUAL:
         if (!context->is_conditional) {
             INK_PARSER_RULE(node, ink_parse_knot_decl, parser);
         } else {
@@ -1971,6 +1993,9 @@ ink_parse_stmt(struct ink_parser *parser,
     case INK_AST_STITCH_PROTO:
         ink_parser_handle_stitch(parser, context);
         break;
+    case INK_AST_FUNC_PROTO:
+        ink_parser_handle_func(parser, context);
+        break;
     default:
         ink_parser_handle_content(parser, context, node);
         break;
@@ -1994,7 +2019,7 @@ static struct ink_ast_node *ink_parse_file(struct ink_parser *parser)
     }
 
     node = ink_parser_collect_knot(parser, &context);
-    if (node != NULL) {
+    if (node) {
         ink_parser_scratch_push(scratch, node);
     }
 

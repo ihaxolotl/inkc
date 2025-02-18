@@ -26,12 +26,14 @@ extern "C" {
     T(OP_JMP_T, "jmp_t")                                                       \
     T(OP_JMP_F, "jmp_f")                                                       \
     T(OP_CONST, "const")                                                       \
+    T(OP_CALL, "call")                                                         \
+    T(OP_DIVERT, "divert")                                                     \
     T(OP_LOAD, "load")                                                         \
     T(OP_STORE, "store")                                                       \
     T(OP_LOAD_GLOBAL, "load_global")                                           \
     T(OP_STORE_GLOBAL, "store_global")                                         \
     T(OP_CONTENT_PUSH, "content_push")                                         \
-    T(OP_CONTENT_POST, "content_post")
+    T(OP_CONTENT_FLUSH, "content_flush")
 
 #define T(name, description) INK_##name,
 enum ink_vm_opcode {

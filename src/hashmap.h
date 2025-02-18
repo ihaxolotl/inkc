@@ -175,7 +175,11 @@ extern "C" {
             self->count++;                                                     \
             return INK_E_OK;                                                   \
         }                                                                      \
-        return -INK_E_OOM;                                                     \
+                                                                               \
+        entry->key = key;                                                      \
+        entry->key_length = sizeof(key);                                       \
+        entry->value = value;                                                  \
+        return -INK_E_OVERWRITE;                                               \
     }                                                                          \
                                                                                \
     __attribute__((unused)) static inline int __T##_remove(struct __T *self,   \

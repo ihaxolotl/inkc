@@ -22,6 +22,8 @@ enum ink_ast_error_type {
     INK_AST_CONDITIONAL_EXPECTED_ELSE,
     INK_AST_CONDITIONAL_MULTIPLE_ELSE,
     INK_AST_CONDITIONAL_FINAL_ELSE,
+    INK_AST_E_ARGS_TOO_FEW,
+    INK_AST_E_ARGS_TOO_MANY,
 };
 
 struct ink_ast_error {
@@ -64,6 +66,8 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_EQUAL_EXPR, "LogicalEqualityExpr")                                   \
     T(AST_EXPR_STMT, "ExprStmt")                                               \
     T(AST_FALSE, "False")                                                      \
+    T(AST_FUNC_DECL, "FunctionDecl")                                           \
+    T(AST_FUNC_PROTO, "FunctionProto")                                         \
     T(AST_GATHER_STMT, "GatherStmt")                                           \
     T(AST_GATHERED_CHOICE_STMT, "GatheredChoiceStmt")                          \
     T(AST_GLUE, "GlueExpr")                                                    \

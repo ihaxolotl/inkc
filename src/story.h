@@ -64,6 +64,7 @@ extern int ink_story_load_opts(struct ink_story *story,
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
 extern char *ink_story_continue(struct ink_story *story);
+extern void ink_story_dump(struct ink_story *story);
 extern int ink_story_execute(struct ink_story *story);
 extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,

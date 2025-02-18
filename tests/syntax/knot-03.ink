@@ -1,4 +1,4 @@
-// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
+// RUN: %ink-compiler < %s --dump-ast --compile-only | FileCheck %s
 
 // CHECK: File "<STDIN>"
 // CHECK-NEXT: `--KnotDecl <line:15, line:17>

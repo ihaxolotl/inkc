@@ -217,11 +217,19 @@ static void ink_codegen_ir_load(struct ink_codegen *codegen,
 
     ink_inst_map_lookup(&codegen->inst_map, key, &value);
 
-    if (source_inst->op == INK_IR_INST_ALLOC) {
+    switch (source_inst->op) {
+    case INK_IR_INST_ALLOC:
         ink_codegen_add_inst(codegen, INK_OP_LOAD, (uint8_t)value.stack_slot);
-    } else {
+        break;
+    case INK_IR_INST_DECL_PARAM:
+        ink_codegen_add_inst(codegen, INK_OP_LOAD, (uint8_t)value.stack_slot);
+        break;
+    case INK_IR_INST_DECL_VAR:
         ink_codegen_add_inst(codegen, INK_OP_LOAD_GLOBAL,
                              (uint8_t)value.const_slot);
+        break;
+    default:
+        break;
     }
 }
 
@@ -291,16 +299,42 @@ static void ink_codegen_ir_br(struct ink_codegen *codegen,
 {
 }
 
-static void ink_codegen_ir_check_result(struct ink_codegen *codegen,
-                                        const struct ink_ir_inst *inst)
+static void ink_codegen_ir_call(struct ink_codegen *codegen,
+                                const struct ink_ir_inst *inst,
+                                size_t inst_index)
 {
-    ink_codegen_add_inst(codegen, INK_OP_POP, 0);
+    const struct ink_ir_inst_seq *const args = inst->as.activation.args;
+
+    if (args) {
+        ink_codegen_add_inst(codegen, INK_OP_CALL, (uint8_t)args->count);
+    } else {
+        ink_codegen_add_inst(codegen, INK_OP_CALL, 0);
+    }
 }
 
-static void ink_codegen_ir_content_push(struct ink_codegen *codegen,
-                                        const struct ink_ir_inst *inst)
+static void ink_codegen_ir_divert(struct ink_codegen *codegen,
+                                  const struct ink_ir_inst *inst,
+                                  size_t inst_index)
 {
-    ink_codegen_add_inst(codegen, INK_OP_CONTENT_PUSH, 0);
+    const struct ink_ir_inst_seq *const args = inst->as.activation.args;
+
+    if (args) {
+        ink_codegen_add_inst(codegen, INK_OP_DIVERT, (uint8_t)args->count);
+    } else {
+        ink_codegen_add_inst(codegen, INK_OP_DIVERT, 0);
+    }
+}
+
+static void ink_codegen_ir_param(struct ink_codegen *codegen,
+                                 const struct ink_ir_inst *inst,
+                                 size_t inst_index)
+{
+    const size_t stack_slot = codegen->current_path->locals_count;
+    const struct ink_inst_map_key key = {inst_index};
+    const struct ink_inst_map_data value = {.stack_slot = stack_slot};
+
+    ink_inst_map_insert(&codegen->inst_map, key, value);
+    codegen->current_path->locals_count++;
 }
 
 static void ink_codegen_ir_var(struct ink_codegen *codegen,
@@ -336,6 +370,7 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
     const size_t name_index = inst->as.knot_decl.name_offset;
     const struct ink_ir_inst_seq *body = inst->as.knot_decl.body;
     struct ink_story *const story = codegen->story;
+    struct ink_byte_vec *const code = &story->code;
     struct ink_object *const paths_table = story->paths;
     struct ink_object *const path_name =
         ink_codegen_add_str(codegen, name_index);
@@ -350,16 +385,39 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
     }
 
     ink_table_insert(story, paths_table, path_name, path_obj);
+
+    if (codegen->current_path) {
+        codegen->current_path->code_length =
+            (uint32_t)(code->count - codegen->current_path->code_offset);
+    }
+
     codegen->current_path = INK_OBJ_AS_CONTENT_PATH(path_obj);
+    codegen->current_path->code_offset = (uint32_t)(code->count);
     ink_codegen_body(codegen, body);
+}
+
+static void ink_codegen_ir_check_result(struct ink_codegen *codegen,
+                                        const struct ink_ir_inst *inst)
+{
+    ink_codegen_add_inst(codegen, INK_OP_POP, 0);
+}
+
+static void ink_codegen_ir_content_push(struct ink_codegen *codegen,
+                                        const struct ink_ir_inst *inst)
+{
+    ink_codegen_add_inst(codegen, INK_OP_CONTENT_PUSH, 0);
+}
+
+static void ink_codegen_ir_content_flush(struct ink_codegen *codegen,
+                                         const struct ink_ir_inst *inst)
+{
+    ink_codegen_add_inst(codegen, INK_OP_CONTENT_FLUSH, 0);
 }
 
 static void ink_codegen_body(struct ink_codegen *codegen,
                              const struct ink_ir_inst_seq *body_list)
 {
-    const struct ink_story *const story = codegen->story;
     const struct ink_ir *const ir = codegen->ir;
-    const struct ink_byte_vec *const bytes_list = &story->code;
     const struct ink_ir_inst_vec *const inst_list = &ir->instructions;
 
     for (size_t i = 0; i < body_list->count; i++) {
@@ -427,6 +485,9 @@ static void ink_codegen_body(struct ink_codegen *codegen,
         case INK_IR_INST_CONTENT_PUSH:
             ink_codegen_ir_content_push(codegen, inst);
             break;
+        case INK_IR_INST_CONTENT_FLUSH:
+            ink_codegen_ir_content_flush(codegen, inst);
+            break;
         case INK_IR_INST_CHECK_RESULT:
             ink_codegen_ir_check_result(codegen, inst);
             break;
@@ -443,22 +504,19 @@ static void ink_codegen_body(struct ink_codegen *codegen,
         case INK_IR_INST_DECL_VAR:
             ink_codegen_ir_var(codegen, inst, inst_index);
             break;
+        case INK_IR_INST_DECL_PARAM:
+            ink_codegen_ir_param(codegen, inst, inst_index);
+            break;
         case INK_IR_INST_DIVERT:
-            INK_CODEGEN_TODO("handle DIVERT");
+            ink_codegen_ir_divert(codegen, inst, inst_index);
+            break;
+        case INK_IR_INST_CALL:
+            ink_codegen_ir_call(codegen, inst, inst_index);
             break;
         default:
             INK_CODEGEN_TODO("unhandled ir code");
             break;
         }
-    }
-    if (bytes_list->count >= 2) {
-        const uint8_t last_op = bytes_list->entries[bytes_list->count - 2];
-
-        if (last_op != INK_OP_RET) {
-            ink_codegen_add_inst(codegen, INK_OP_RET, 0);
-        }
-    } else {
-        ink_codegen_add_inst(codegen, INK_OP_RET, 0);
     }
 }
 
@@ -481,6 +539,7 @@ static void ink_codegen_init(struct ink_codegen *codegen,
 {
     codegen->ir = ir;
     codegen->story = story;
+    codegen->current_path = NULL;
 
     ink_inst_map_init(&codegen->inst_map, 80ul, ink_inst_map_hash,
                       ink_inst_map_cmp);
@@ -488,6 +547,9 @@ static void ink_codegen_init(struct ink_codegen *codegen,
 
 static void ink_codegen_deinit(struct ink_codegen *codegen)
 {
+    codegen->ir = NULL;
+    codegen->story = NULL;
+    codegen->current_path = NULL;
     ink_inst_map_deinit(&codegen->inst_map);
 }
 

@@ -32,6 +32,7 @@ enum ink_status {
     INK_E_OOM,
     INK_E_OS,
     INK_E_FILE,
+    INK_E_OVERWRITE,
     INK_E_PARSE_FAIL,
     INK_E_PARSE_PANIC,
 };

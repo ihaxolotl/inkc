@@ -7,6 +7,7 @@ extern "C" {
 
 struct ink_ir;
 struct ink_story;
+struct ink_symtab_pool;
 
 extern int ink_codegen(const struct ink_ir *ircode, struct ink_story *story,
                        int flags);

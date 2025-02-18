@@ -32,6 +32,7 @@ lib_srcs := src/logging.c                  \
             src/common.c                   \
             src/memory.c                   \
             src/arena.c                    \
+            src/symtab.c                   \
             src/object.c                   \
             src/story.c                    \
             src/source.c                   \
@@ -41,7 +42,8 @@ lib_srcs := src/logging.c                  \
             src/scanner.c                  \
             src/parse.c                    \
             src/astgen.c                   \
-            src/codegen.c
+            src/codegen.c                  \
+            src/compile.c
 
 bin_srcs := src/option.c                   \
             src/main.c

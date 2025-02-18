@@ -3,14 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "arena.h"
-#include "ast.h"
-#include "astgen.h"
-#include "codegen.h"
-#include "ir.h"
+#include "compile.h"
 #include "object.h"
 #include "opcode.h"
-#include "parse.h"
 #include "story.h"
 
 const char *INK_DEFAULT_PATH = "@main";
@@ -94,8 +89,8 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_CMP_LTE:
     case INK_OP_CMP_GT:
     case INK_OP_CMP_GTE:
-    case INK_OP_CONTENT_POST:
     case INK_OP_CONTENT_PUSH:
+    case INK_OP_CONTENT_FLUSH:
         ink_disassemble_simple_inst(story, bytes, offset, op);
         break;
     case INK_OP_CONST:
@@ -110,6 +105,8 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_JMP:
     case INK_OP_JMP_T:
     case INK_OP_JMP_F:
+    case INK_OP_CALL:
+    case INK_OP_DIVERT:
         ink_disassemble_jump_inst(story, bytes, offset, op);
         break;
     default:
@@ -119,7 +116,7 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     return offset + 2;
 }
 
-static void ink_story_dump(const struct ink_story *story)
+void ink_story_dump(struct ink_story *story)
 {
     const uint8_t *bytes;
     size_t length;
@@ -193,46 +190,11 @@ void ink_story_mem_flush(struct ink_story *story)
 int ink_story_load_opts(struct ink_story *story,
                         const struct ink_load_opts *opts)
 {
-    int rc;
-    struct ink_arena arena;
-    struct ink_ast ast;
-    struct ink_ir ircode;
     const int flags = opts->flags;
     const uint8_t *const filename = opts->filename;
-    const uint8_t *const text = opts->source_text;
-    static const size_t arena_alignment = 8;
-    static const size_t arena_block_size = 8192;
+    const uint8_t *const source_bytes = opts->source_text;
 
-    ink_arena_init(&arena, arena_block_size, arena_alignment);
-
-    rc = ink_parse(text, filename, &arena, &ast, flags);
-    if (rc < 0) {
-        goto out;
-    }
-    if (flags & INK_F_DUMP_AST) {
-        ink_ast_print(&ast, flags & INK_F_COLOR);
-    }
-
-    rc = ink_astgen(&ast, &ircode, flags);
-    if (rc < 0) {
-        goto out;
-    }
-    if (flags & INK_F_DUMP_IR) {
-        ink_ir_dump(&ircode);
-    }
-
-    rc = ink_codegen(&ircode, story, flags);
-    if (rc < 0) {
-        goto out;
-    }
-    if (flags & INK_F_DUMP_CODE) {
-        ink_story_dump(story);
-    }
-out:
-    ink_ir_deinit(&ircode);
-    ink_ast_deinit(&ast);
-    ink_arena_release(&arena);
-    return rc;
+    return ink_compile(source_bytes, filename, story, flags);
 }
 
 int ink_story_load(struct ink_story *story, const char *source, int flags)
@@ -468,7 +430,7 @@ int ink_story_execute(struct ink_story *story)
             ink_story_content_push(story, arg);
             break;
         }
-        case INK_OP_CONTENT_POST: {
+        case INK_OP_CONTENT_FLUSH: {
             rc = INK_STORY_OK;
             goto exit_loop;
         }

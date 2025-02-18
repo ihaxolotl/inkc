@@ -39,10 +39,13 @@ extern "C" {
     T(SWITCH_BR, "switch_br")                                                  \
     T(SWITCH_CASE, "switch_case")                                              \
     T(CONTENT_PUSH, "content_push")                                            \
+    T(CONTENT_FLUSH, "content_flush")                                          \
     T(DIVERT, "divert")                                                        \
+    T(CALL, "call")                                                            \
     T(CHECK_RESULT, "check_result")                                            \
     T(DONE, "done")                                                            \
     T(END, "end")                                                              \
+    T(DECL_PARAM, "decl_param")                                                \
     T(DECL_KNOT, "decl_knot")                                                  \
     T(DECL_VAR, "decl_var")                                                    \
     T(RET_IMPLICIT, "ret_implicit")                                            \
@@ -58,6 +61,12 @@ struct ink_ir_inst_seq {
     struct ink_ir_inst_seq *next;
     size_t count;
     size_t entries[1];
+};
+
+enum ink_ir_param_type {
+    INK_IR_PARAM_VALUE,
+    INK_IR_PARAM_REF,
+    INK_IR_PARAM_DIVERT,
 };
 
 struct ink_ir_inst {
@@ -101,6 +110,11 @@ struct ink_ir_inst {
             size_t callee_index;
             struct ink_ir_inst_seq *args;
         } activation;
+
+        struct {
+            enum ink_ir_param_type type;
+            size_t name_offset;
+        } param_decl;
 
         struct {
             bool is_const;

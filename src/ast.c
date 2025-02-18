@@ -176,6 +176,15 @@ static void ink_ast_error_render(const struct ink_ast *tree,
             tree, error, arena,
             "'else' case should always be the final case in conditional");
         break;
+    case INK_AST_E_ARGS_TOO_MANY:
+        ink_ast_error_renderf(tree, error, arena,
+                              "too many arguments to '%.*s'", (int)length,
+                              bytes);
+        break;
+    case INK_AST_E_ARGS_TOO_FEW:
+        ink_ast_error_renderf(tree, error, arena, "too few arguments to '%.*s'",
+                              (int)length, bytes);
+        break;
     default:
         assert(false);
         return;
