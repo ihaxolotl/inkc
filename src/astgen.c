@@ -20,8 +20,9 @@
 INK_VEC_T(ink_astgen_scratch, size_t)
 
 struct ink_stringset_kv {
+    const uint8_t *key_bytes;
     size_t key_length;
-    const uint8_t *key;
+    size_t str_index;
 };
 
 /**
@@ -100,7 +101,8 @@ ink_stringset_find_slot(struct ink_stringset_kv *entries, size_t capacity,
         struct ink_stringset_kv *const slot = &entries[i];
 
         if (!ink_stringset_kv_is_set(slot) ||
-            ink_stringset_cmp(key, key_length, slot->key, slot->key_length)) {
+            ink_stringset_cmp(key, key_length, slot->key_bytes,
+                              slot->key_length)) {
             return slot;
         }
 
@@ -125,9 +127,9 @@ static int ink_stringset_resize(struct ink_stringset *self)
     for (size_t i = 0; i < self->capacity; i++) {
         src = &self->entries[i];
         if (ink_stringset_kv_is_set(src)) {
-            dst = ink_stringset_find_slot(entries, capacity, src->key,
+            dst = ink_stringset_find_slot(entries, capacity, src->key_bytes,
                                           src->key_length, self->hasher);
-            dst->key = src->key;
+            dst->key_bytes = src->key_bytes;
             dst->key_length = src->key_length;
             count++;
         }
@@ -142,12 +144,10 @@ static int ink_stringset_resize(struct ink_stringset *self)
 
 /**
  * Lookup a string within the set.
- *
- * When a lookup is successful, return the original bytes backing the key
- * within the set.
  */
-static int ink_stringset_lookup(struct ink_stringset *self, const uint8_t *key,
-                                size_t key_length, uint8_t **key_bytes)
+static int ink_stringset_lookup(struct ink_stringset *self,
+                                const uint8_t *key_bytes, size_t key_length,
+                                size_t *str_index)
 {
     struct ink_stringset_kv *entry;
 
@@ -155,21 +155,22 @@ static int ink_stringset_lookup(struct ink_stringset *self, const uint8_t *key,
         return -INK_E_OOM;
     }
 
-    entry = ink_stringset_find_slot(self->entries, self->capacity, key,
+    entry = ink_stringset_find_slot(self->entries, self->capacity, key_bytes,
                                     key_length, self->hasher);
     if (!ink_stringset_kv_is_set(entry)) {
         return -INK_E_OOM;
     }
 
-    *key_bytes = (uint8_t *)entry->key;
+    *str_index = entry->str_index;
     return INK_E_OK;
 }
 
 /**
  * Insert a string into the set.
  */
-static int ink_stringset_insert(struct ink_stringset *self, const uint8_t *key,
-                                size_t key_length)
+static int ink_stringset_insert(struct ink_stringset *self,
+                                const uint8_t *key_bytes, size_t key_length,
+                                size_t str_index)
 {
     struct ink_stringset_kv *entry;
 
@@ -180,11 +181,12 @@ static int ink_stringset_insert(struct ink_stringset *self, const uint8_t *key,
         }
     }
 
-    entry = ink_stringset_find_slot(self->entries, self->capacity, key,
+    entry = ink_stringset_find_slot(self->entries, self->capacity, key_bytes,
                                     key_length, self->hasher);
     if (!ink_stringset_kv_is_set(entry)) {
-        entry->key = key;
+        entry->key_bytes = key_bytes;
         entry->key_length = key_length;
+        entry->str_index = str_index;
         self->count++;
         return INK_E_OK;
     }
@@ -671,22 +673,22 @@ static size_t ink_astgen_add_param(struct ink_astgen *astgen,
 static size_t ink_astgen_add_str(struct ink_astgen *astgen,
                                  const uint8_t *chars, size_t length)
 {
+    int rc;
     struct ink_astgen_global *const global = astgen->global;
     struct ink_stringset *const string_table = &global->string_table;
     struct ink_ir_byte_vec *const strings = &global->ircode->string_bytes;
-    const size_t pos = strings->count;
-    uint8_t *key_out = NULL;
+    size_t str_index = strings->count;
 
-    if (ink_stringset_lookup(string_table, chars, length, &key_out) < 0) {
+    rc = ink_stringset_lookup(string_table, chars, length, &str_index);
+    if (rc < 0) {
         for (size_t i = 0; i < length; i++) {
             ink_ir_byte_vec_push(strings, chars[i]);
         }
 
         ink_ir_byte_vec_push(strings, '\0');
-        ink_stringset_insert(string_table, &strings->entries[pos], length);
-        return pos;
+        ink_stringset_insert(string_table, chars, length, str_index);
     }
-    return (size_t)key_out - (size_t)strings->entries;
+    return str_index;
 }
 
 static void ink__(struct ink_astgen *astgen, struct ink_string_ref *str)
