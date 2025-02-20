@@ -149,29 +149,29 @@ static void ink_ast_error_render(const struct ink_ast *tree,
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
-    case INK_AST_IDENT_UNKNOWN:
+    case INK_AST_E_IDENT_UNKNOWN:
         ink_ast_error_renderf(tree, error, arena,
                               "use of undeclared identifier '%.*s'",
                               (int)length, bytes);
         break;
-    case INK_AST_IDENT_REDEFINED:
+    case INK_AST_E_IDENT_REDEFINED:
         ink_ast_error_renderf(tree, error, arena, "redefinition of '%.*s'",
                               (int)length, bytes);
         break;
-    case INK_AST_CONDITIONAL_EMPTY:
+    case INK_AST_E_CONDITIONAL_EMPTY:
         ink_ast_error_renderf(tree, error, arena,
                               "condition block with no conditions");
         break;
-    case INK_AST_CONDITIONAL_EXPECTED_ELSE:
+    case INK_AST_E_ELSE_EXPECTED:
         ink_ast_error_renderf(
             tree, error, arena,
             "expected '- else:' clause rather than extra condition");
         break;
-    case INK_AST_CONDITIONAL_MULTIPLE_ELSE:
+    case INK_AST_E_ELSE_MULTIPLE:
         ink_ast_error_renderf(tree, error, arena,
                               "multiple 'else' cases in conditional");
         break;
-    case INK_AST_CONDITIONAL_FINAL_ELSE:
+    case INK_AST_E_ELSE_FINAL:
         ink_ast_error_renderf(
             tree, error, arena,
             "'else' case should always be the final case in conditional");

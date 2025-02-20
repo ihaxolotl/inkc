@@ -16,12 +16,12 @@ struct ink_ast_node;
 
 enum ink_ast_error_type {
     INK_AST_OK = 0,
-    INK_AST_IDENT_UNKNOWN,
-    INK_AST_IDENT_REDEFINED,
-    INK_AST_CONDITIONAL_EMPTY,
-    INK_AST_CONDITIONAL_EXPECTED_ELSE,
-    INK_AST_CONDITIONAL_MULTIPLE_ELSE,
-    INK_AST_CONDITIONAL_FINAL_ELSE,
+    INK_AST_E_IDENT_UNKNOWN,
+    INK_AST_E_IDENT_REDEFINED,
+    INK_AST_E_CONDITIONAL_EMPTY,
+    INK_AST_E_ELSE_EXPECTED,
+    INK_AST_E_ELSE_MULTIPLE,
+    INK_AST_E_ELSE_FINAL,
     INK_AST_E_ARGS_TOO_FEW,
     INK_AST_E_ARGS_TOO_MANY,
 };
@@ -49,15 +49,17 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_CHOICE_START_EXPR, "ChoiceStartContentExpr")                         \
     T(AST_CHOICE_OPTION_EXPR, "ChoiceOptionOnlyContentExpr")                   \
     T(AST_CHOICE_INNER_EXPR, "ChoiceInnerContentExpr")                         \
-    T(AST_CONDITIONAL_BRANCH, "ConditionalBranch")                             \
-    T(AST_CONDITIONAL_CONTENT, "ConditionalContent")                           \
-    T(AST_CONDITIONAL_ELSE_BRANCH, "ConditionalElseBranch")                    \
-    T(AST_CONDITIONAL_INNER, "ConditionalInner")                               \
+    T(AST_MULTI_IF_STMT, "MultiIfStmt")                                        \
+    T(AST_IF_BRANCH, "IfBranch")                                               \
+    T(AST_IF_EXPR, "IfExpr")                                                   \
+    T(AST_IF_STMT, "IfStmt")                                                   \
+    T(AST_ELSE_BRANCH, "ElseBranch")                                           \
+    T(AST_SWITCH_STMT, "SwitchStmt")                                           \
+    T(AST_SWITCH_CASE, "SwitchCase")                                           \
     T(AST_CONTAINS_EXPR, "ContainsExpr")                                       \
     T(AST_CONST_DECL, "ConstDecl")                                             \
     T(AST_CONTENT, "Content")                                                  \
     T(AST_CONTENT_STMT, "ContentStmt")                                         \
-    T(AST_IDENTIFIER, "Identifier")                                            \
     T(AST_DIV_EXPR, "DivideExpr")                                              \
     T(AST_DIVERT, "Divert")                                                    \
     T(AST_DIVERT_EXPR, "DivertExpr")                                           \
@@ -73,6 +75,7 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_GLUE, "GlueExpr")                                                    \
     T(AST_GREATER_EXPR, "LogicalGreaterExpr")                                  \
     T(AST_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                     \
+    T(AST_IDENTIFIER, "Identifier")                                            \
     T(AST_INLINE_LOGIC, "InlineLogicExpr")                                     \
     T(AST_KNOT_DECL, "KnotDecl")                                               \
     T(AST_KNOT_PROTO, "KnotProto")                                             \
@@ -86,8 +89,8 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_NOT_EXPR, "NotExpr")                                                 \
     T(AST_NUMBER, "NumberLiteral")                                             \
     T(AST_OR_EXPR, "OrExpr")                                                   \
-    T(AST_PARAM_LIST, "ParamList")                                             \
     T(AST_PARAM_DECL, "ParamDecl")                                             \
+    T(AST_PARAM_LIST, "ParamList")                                             \
     T(AST_REF_PARAM_DECL, "ParamRefDecl")                                      \
     T(AST_RETURN_STMT, "ReturnStmt")                                           \
     T(AST_SELECTED_LIST_ELEMENT, "SelectionListElementExpr")                   \
