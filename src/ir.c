@@ -67,6 +67,19 @@ static void ink_ir_dump_binary(const struct ink_ir *ir,
            inst->as.binary.rhs);
 }
 
+static void ink_ir_dump_binary_bool_op(const struct ink_ir *ir,
+                                       const struct ink_ir_inst *inst,
+                                       size_t index, const char *prefix)
+{
+    const size_t pl_index = inst->as.bool_br.payload_index;
+    const struct ink_ir_inst_seq *const blk_seq = inst->as.bool_br.lhs;
+    const char *const op_str = ink_ir_inst_op_strz(inst->op);
+
+    printf("%s%%%zu = %s(%%%zu, {\n", prefix, index, op_str, pl_index);
+    ink_ir_dump_seq(ir, blk_seq, prefix);
+    printf("%s})\n", prefix);
+}
+
 static void ink_ir_dump_block(const struct ink_ir *ir,
                               const struct ink_ir_inst *inst, size_t index,
                               const char *prefix)
@@ -232,6 +245,10 @@ static void ink_ir_dump_seq(const struct ink_ir *ir,
         case INK_IR_INST_CMP_GT:
         case INK_IR_INST_CMP_GTE:
             ink_ir_dump_binary(ir, inst, inst_index, new_prefix);
+            break;
+        case INK_IR_INST_BOOL_AND:
+        case INK_IR_INST_BOOL_OR:
+            ink_ir_dump_binary_bool_op(ir, inst, inst_index, new_prefix);
             break;
         case INK_IR_INST_DIVERT:
             ink_ir_dump_divert(ir, inst, inst_index, new_prefix);

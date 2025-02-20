@@ -33,6 +33,8 @@ extern "C" {
     T(CMP_GT, "cmp_gt")                                                        \
     T(CMP_GTE, "cmp_gte")                                                      \
     T(BOOL_NOT, "bool_not")                                                    \
+    T(BOOL_AND, "bool_and")                                                    \
+    T(BOOL_OR, "bool_or")                                                      \
     T(BLOCK, "block")                                                          \
     T(CONDBR, "cond_br")                                                       \
     T(BR, "br")                                                                \
@@ -88,6 +90,11 @@ struct ink_ir_inst {
         struct {
             struct ink_ir_inst_seq *seq;
         } block;
+
+        struct {
+            size_t payload_index;
+            struct ink_ir_inst_seq *lhs;
+        } bool_br;
 
         struct {
             size_t payload_index;

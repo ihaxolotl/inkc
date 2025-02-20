@@ -559,6 +559,32 @@ static void ink_astgen_set_block(struct ink_astgen *astgen, size_t index,
 }
 
 /**
+ * Create a logical binary operation.
+ */
+static size_t ink_astgen_add_boolbr(struct ink_astgen *astgen,
+                                    enum ink_ir_inst_op op,
+                                    size_t payload_index)
+{
+    const struct ink_ir_inst inst = {
+        .op = op,
+        .as.bool_br.payload_index = payload_index,
+    };
+    return ink_astgen_add_inst(astgen, inst);
+}
+
+static void ink_astgen_set_boolbr(struct ink_astgen *astgen,
+                                  size_t boolbr_index, size_t lhs_index)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_astgen_scratch *const scratch = astgen->scratch;
+    struct ink_ir_inst_vec *const code = &global->ircode->instructions;
+    struct ink_ir_inst *const inst = &code->entries[boolbr_index];
+
+    inst->as.bool_br.lhs = ink_astgen_seq_from_scratch(
+        astgen, astgen->scratch_offset, scratch->count);
+}
+
+/**
  * Create a conditional branching operation.
  */
 static size_t ink_astgen_add_condbr(struct ink_astgen *astgen,
@@ -782,6 +808,21 @@ static size_t ink_astgen_binary_op(struct ink_astgen *astgen,
     return ink_astgen_add_binary(astgen, op, lhs, rhs);
 }
 
+static size_t ink_astgen_binary_bool_op(struct ink_astgen *astgen,
+                                        const struct ink_ast_node *node,
+                                        enum ink_ir_inst_op op)
+{
+    struct ink_astgen rhs_ctx;
+    const size_t lhs = ink_astgen_expr(astgen, node->lhs);
+    const size_t boolbr_index = ink_astgen_add_boolbr(astgen, op, lhs);
+
+    ink_astgen_make(&rhs_ctx, astgen, NULL);
+    ink_astgen_expr(&rhs_ctx, node->rhs);
+    ink_astgen_add_br(&rhs_ctx, boolbr_index);
+    ink_astgen_set_boolbr(&rhs_ctx, boolbr_index, lhs);
+    return boolbr_index;
+}
+
 static size_t ink_astgen_true(struct ink_astgen *astgen)
 {
     const struct ink_ir_inst inst = {
@@ -953,9 +994,9 @@ static size_t ink_astgen_expr(struct ink_astgen *astgen,
     case INK_AST_NOT_EXPR:
         return ink_astgen_unary_op(astgen, node, INK_IR_INST_BOOL_NOT);
     case INK_AST_AND_EXPR:
-        return INK_IR_INVALID;
+        return ink_astgen_binary_bool_op(astgen, node, INK_IR_INST_BOOL_AND);
     case INK_AST_OR_EXPR:
-        return INK_IR_INVALID;
+        return ink_astgen_binary_bool_op(astgen, node, INK_IR_INST_BOOL_OR);
     case INK_AST_CALL_EXPR:
         return ink_astgen_call_expr(astgen, node, INK_IR_INST_CALL);
     default:
