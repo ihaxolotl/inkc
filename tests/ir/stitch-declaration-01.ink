@@ -1,4 +1,4 @@
--> parent_knot
+-> parent_knot(true)
 
 == parent_knot(a) ==
 {a == true:
