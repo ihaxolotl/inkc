@@ -304,9 +304,19 @@ struct ink_object *ink_content_path_new(struct ink_story *story,
     obj->name = INK_OBJ_AS_STRING(name);
     obj->args_count = 0;
     obj->locals_count = 0;
-    obj->code_offset = 0;
-    obj->code_length = 0;
+    ink_byte_vec_init(&obj->code);
+    ink_object_vec_init(&obj->const_pool);
     return INK_OBJ(obj);
+}
+
+static void ink_content_path_free(struct ink_story *story,
+                                  struct ink_object *obj)
+{
+    struct ink_content_path *const path = INK_OBJ_AS_CONTENT_PATH(obj);
+
+    assert(INK_OBJ_IS_CONTENT_PATH(obj));
+    ink_byte_vec_deinit(&path->code);
+    ink_object_vec_deinit(&path->const_pool);
 }
 
 struct ink_object *ink_stack_frame_new(struct ink_story *story,
@@ -357,11 +367,13 @@ void ink_object_free(struct ink_story *story, struct ink_object *obj)
     switch (obj->type) {
     case INK_OBJ_NUMBER:
     case INK_OBJ_STRING:
-    case INK_OBJ_CONTENT_PATH:
     case INK_OBJ_STACK_FRAME:
         break;
     case INK_OBJ_TABLE:
         ink_table_free(story, obj);
+        break;
+    case INK_OBJ_CONTENT_PATH:
+        ink_content_path_free(story, obj);
         break;
     }
 

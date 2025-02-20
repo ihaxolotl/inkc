@@ -58,18 +58,20 @@ static void ink_codegen_fail(struct ink_codegen *codegen, const char *msg)
 static void ink_codegen_add_inst(struct ink_codegen *codegen,
                                  enum ink_vm_opcode opcode, uint8_t operand)
 {
-    struct ink_byte_vec *const code = &codegen->story->code;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_byte_vec *const code = &path->code;
 
     ink_byte_vec_push(code, (uint8_t)opcode);
     ink_byte_vec_push(code, operand);
-
-    codegen->current_path->code_length += 2;
 }
 
 static void ink_codegen_add_const(struct ink_codegen *codegen,
                                   struct ink_object *obj)
 {
-    ink_object_vec_push(&codegen->story->constants, obj);
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
+
+    ink_object_vec_push(const_pool, obj);
 }
 
 static struct ink_object *ink_codegen_add_str(struct ink_codegen *codegen,
@@ -87,7 +89,8 @@ static struct ink_object *ink_codegen_add_str(struct ink_codegen *codegen,
 static void ink_codegen_patch_jump(struct ink_codegen *codegen,
                                    size_t inst_offset)
 {
-    struct ink_byte_vec *const code = &codegen->story->code;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_byte_vec *const code = &path->code;
 
     code->entries[inst_offset + 1] = (uint8_t)code->count;
 }
@@ -111,7 +114,9 @@ static void ink_codegen_ir_number(struct ink_codegen *codegen,
                                   const struct ink_ir_inst *inst)
 {
     struct ink_story *const story = codegen->story;
-    const size_t const_index = story->constants.count;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
+    const size_t const_index = const_pool->count;
     const double value = inst->as.number;
     struct ink_object *const obj = ink_number_new(story, value);
 
@@ -128,8 +133,9 @@ static void ink_codegen_ir_number(struct ink_codegen *codegen,
 static void ink_codegen_ir_string(struct ink_codegen *codegen,
                                   const struct ink_ir_inst *inst)
 {
-    struct ink_story *const story = codegen->story;
-    const size_t const_index = story->constants.count;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
+    const size_t const_index = const_pool->count;
     const size_t str_index = inst->as.string;
     struct ink_object *const str_obj = ink_codegen_add_str(codegen, str_index);
 
@@ -275,13 +281,13 @@ static void ink_codegen_ir_condbr(struct ink_codegen *codegen,
     struct ink_content_path *path = codegen->current_path;
     struct ink_ir_inst_seq *const then_list = inst->as.cond_br.then_;
     struct ink_ir_inst_seq *const else_list = inst->as.cond_br.else_;
-    const size_t then_offset = path->code_length;
+    const size_t then_offset = path->code.count;
 
     ink_codegen_add_inst(codegen, INK_OP_JMP_F, 0xFF);
     ink_codegen_add_inst(codegen, INK_OP_POP, 0x00);
     ink_codegen_body(codegen, then_list);
 
-    const size_t else_offset = path->code_length;
+    const size_t else_offset = path->code.count;
 
     ink_codegen_add_inst(codegen, INK_OP_JMP, 0xFF);
     ink_codegen_patch_jump(codegen, then_offset);
@@ -303,8 +309,9 @@ static void ink_codegen_ir_call(struct ink_codegen *codegen,
                                 const struct ink_ir_inst *inst,
                                 size_t inst_index)
 {
-    struct ink_story *const story = codegen->story;
-    const size_t const_index = story->constants.count;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
+    const size_t const_index = const_pool->count;
     const size_t name_index = inst->as.activation.callee_index;
     const struct ink_ir_inst_seq *const args = inst->as.activation.args;
     struct ink_object *const str_obj = ink_codegen_add_str(codegen, name_index);
@@ -330,8 +337,9 @@ static void ink_codegen_ir_divert(struct ink_codegen *codegen,
                                   const struct ink_ir_inst *inst,
                                   size_t inst_index)
 {
-    struct ink_story *const story = codegen->story;
-    const size_t const_index = story->constants.count;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
+    const size_t const_index = const_pool->count;
     const size_t name_index = inst->as.activation.callee_index;
     const struct ink_ir_inst_seq *const args = inst->as.activation.args;
     struct ink_object *const str_obj = ink_codegen_add_str(codegen, name_index);
@@ -369,10 +377,11 @@ static void ink_codegen_ir_var(struct ink_codegen *codegen,
                                const struct ink_ir_inst *inst, size_t index)
 {
     struct ink_story *const story = codegen->story;
-    struct ink_object_vec *const const_list = &story->constants;
+    struct ink_content_path *const path = codegen->current_path;
+    struct ink_object_vec *const const_pool = &path->const_pool;
     struct ink_object *const globals_table = story->globals;
     const size_t name_index = inst->as.var_decl.name_offset;
-    const size_t const_slot = const_list->count;
+    const size_t const_slot = const_pool->count;
     struct ink_object *const var_name =
         ink_codegen_add_str(codegen, name_index);
 
@@ -380,7 +389,7 @@ static void ink_codegen_ir_var(struct ink_codegen *codegen,
         return;
     }
 
-    ink_object_vec_push(const_list, var_name);
+    ink_codegen_add_const(codegen, var_name);
     ink_table_insert(story, globals_table, var_name, NULL);
 
     const struct ink_inst_map_key key = {index};
@@ -398,7 +407,6 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
     const size_t name_index = inst->as.knot_decl.name_offset;
     const struct ink_ir_inst_seq *body = inst->as.knot_decl.body;
     struct ink_story *const story = codegen->story;
-    struct ink_byte_vec *const code = &story->code;
     struct ink_object *const paths_table = story->paths;
     struct ink_object *const path_name =
         ink_codegen_add_str(codegen, name_index);
@@ -413,14 +421,7 @@ static void ink_codegen_ir_knot(struct ink_codegen *codegen,
     }
 
     ink_table_insert(story, paths_table, path_name, path_obj);
-
-    if (codegen->current_path) {
-        codegen->current_path->code_length =
-            (uint32_t)(code->count - codegen->current_path->code_offset);
-    }
-
     codegen->current_path = INK_OBJ_AS_CONTENT_PATH(path_obj);
-    codegen->current_path->code_offset = (uint32_t)(code->count);
     ink_codegen_body(codegen, body);
 }
 

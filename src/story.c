@@ -28,15 +28,15 @@ static void ink_disassemble_simple_inst(const struct ink_story *story,
 }
 
 static void ink_disassemble_unary_inst(const struct ink_story *story,
+                                       const struct ink_object_vec *const_pool,
                                        const uint8_t *bytes, size_t offset,
                                        enum ink_vm_opcode opcode)
 {
-    const struct ink_object_vec *const consts = &story->constants;
     const uint8_t arg = bytes[offset + 1];
 
     if (opcode == INK_OP_CONST) {
         printf("%-16s %4d '", ink_opcode_strz(opcode), arg);
-        ink_object_print(consts->entries[arg]);
+        ink_object_print(const_pool->entries[arg]);
         printf("'\n");
     } else {
         printf("%-16s %4d\n", ink_opcode_strz(opcode), arg);
@@ -44,13 +44,13 @@ static void ink_disassemble_unary_inst(const struct ink_story *story,
 }
 
 static void ink_disassemble_global_inst(const struct ink_story *story,
+                                        const struct ink_object_vec *const_pool,
                                         const uint8_t *bytes, size_t offset,
                                         enum ink_vm_opcode opcode)
 {
-    const struct ink_object_vec *const consts = &story->constants;
     const uint8_t arg = bytes[offset + 1];
     const struct ink_string *global_name =
-        INK_OBJ_AS_STRING(consts->entries[arg]);
+        INK_OBJ_AS_STRING(const_pool->entries[arg]);
 
     printf("%-16s %4d '%s'\n", ink_opcode_strz(opcode), arg,
            global_name->bytes);
@@ -66,6 +66,7 @@ static void ink_disassemble_jump_inst(const struct ink_story *story,
 }
 
 static size_t ink_story_disassemble(const struct ink_story *story,
+                                    const struct ink_object_vec *const_pool,
                                     const uint8_t *bytes, size_t offset)
 {
     const uint8_t op = bytes[offset];
@@ -96,11 +97,11 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_CONST:
     case INK_OP_LOAD:
     case INK_OP_STORE:
-        ink_disassemble_unary_inst(story, bytes, offset, op);
+        ink_disassemble_unary_inst(story, const_pool, bytes, offset, op);
         break;
     case INK_OP_LOAD_GLOBAL:
     case INK_OP_STORE_GLOBAL:
-        ink_disassemble_global_inst(story, bytes, offset, op);
+        ink_disassemble_global_inst(story, const_pool, bytes, offset, op);
         break;
     case INK_OP_JMP:
     case INK_OP_JMP_T:
@@ -118,26 +119,24 @@ static size_t ink_story_disassemble(const struct ink_story *story,
 
 void ink_story_dump(struct ink_story *story)
 {
-    const uint8_t *bytes;
-    size_t length;
-    struct ink_string *path_name;
-    struct ink_content_path *path;
     const struct ink_table *const paths_table = INK_OBJ_AS_TABLE(story->paths);
-    const struct ink_byte_vec *const code_bytes = &story->code;
 
     for (size_t i = 0; i < paths_table->capacity; i++) {
-        if (paths_table->entries[i].key) {
-            path = INK_OBJ_AS_CONTENT_PATH(paths_table->entries[i].value);
-            path_name = INK_OBJ_AS_STRING(path->name);
-            bytes = &code_bytes->entries[path->code_offset];
-            length = path->code_length;
+        struct ink_table_kv *const entry = &paths_table->entries[i];
 
-            assert(path->code_length > 0);
+        if (entry->key) {
+            const struct ink_content_path *const path =
+                INK_OBJ_AS_CONTENT_PATH(entry->value);
+            const struct ink_string *const path_name =
+                INK_OBJ_AS_STRING(path->name);
+
+            assert(path->code.count > 0);
             printf("=== %s(args: %u, locals: %u) ===\n", path_name->bytes,
                    path->args_count, path->locals_count);
 
-            for (size_t offset = 0; offset < length;) {
-                offset = ink_story_disassemble(story, bytes, offset);
+            for (size_t offset = 0; offset < path->code.count;) {
+                offset = ink_story_disassemble(story, &path->const_pool,
+                                               path->code.entries, offset);
             }
         }
     }
@@ -262,17 +261,6 @@ char *ink_story_continue(struct ink_story *story)
     return ink_story_content_copy(story);
 }
 
-int ink_story_constant_get(struct ink_story *story, size_t index,
-                           struct ink_object **obj)
-{
-    if (index > story->constants.count) {
-        return -INK_STORY_ERR_INVALID_ARG;
-    }
-
-    *obj = story->constants.entries[index];
-    return INK_STORY_OK;
-}
-
 int ink_story_stack_push(struct ink_story *story, struct ink_object *object)
 {
     assert(object != NULL);
@@ -339,22 +327,23 @@ void ink_story_stack_print(struct ink_story *story)
 
 int ink_story_execute(struct ink_story *story)
 {
-    int rc;
-    uint8_t byte, arg;
+    int rc = -1;
+    uint8_t byte = 0x00;
+    uint8_t arg = 0x00;
+    struct ink_content_path *path = NULL;
+    struct ink_object_vec *const_pool = NULL;
 
-    if (story->code.count == 0) {
-        return INK_STORY_OK;
-    }
     if (story->pc == NULL) {
-        story->pc = &story->code.entries[0];
+        return -1;
     }
+
     ink_story_content_clear(story);
 
     for (;;) {
         if (story->flags & INK_F_TRACING) {
             ink_story_stack_print(story);
-            ink_story_disassemble(story, story->code.entries,
-                                  (size_t)(story->pc - story->code.entries));
+            ink_story_disassemble(story, const_pool, path->code.entries,
+                                  (size_t)(story->pc - path->code.entries));
         }
 
         byte = *story->pc++;
@@ -371,14 +360,11 @@ int ink_story_execute(struct ink_story *story)
             break;
         }
         case INK_OP_CONST: {
-            struct ink_object *constant;
-
-            rc = ink_story_constant_get(story, arg, &constant);
-            if (rc < 0) {
-                goto exit_loop;
+            if (arg > const_pool->count) {
+                return -INK_STORY_ERR_INVALID_ARG;
             }
 
-            rc = ink_story_stack_push(story, constant);
+            rc = ink_story_stack_push(story, const_pool->entries[arg]);
             if (rc < 0) {
                 goto exit_loop;
             }
@@ -457,8 +443,6 @@ void ink_story_init(struct ink_story *story, int flags)
     story->stack[0] = NULL;
 
     ink_byte_vec_init(&story->content);
-    ink_byte_vec_init(&story->code);
-    ink_object_vec_init(&story->constants);
 
     story->globals = ink_table_new(story);
     story->paths = ink_table_new(story);
@@ -467,8 +451,6 @@ void ink_story_init(struct ink_story *story, int flags)
 void ink_story_deinit(struct ink_story *story)
 {
     ink_byte_vec_deinit(&story->content);
-    ink_byte_vec_deinit(&story->code);
-    ink_object_vec_deinit(&story->constants);
     ink_story_mem_flush(story);
     memset(story, 0, sizeof(*story));
 }

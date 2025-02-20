@@ -9,6 +9,7 @@ extern "C" {
 #include <stddef.h>
 
 #include "story.h"
+#include "vec.h"
 
 enum ink_object_type {
     INK_OBJ_NUMBER,
@@ -52,8 +53,8 @@ struct ink_content_path {
     struct ink_string *name;
     uint32_t args_count;
     uint32_t locals_count;
-    uint32_t code_offset;
-    uint32_t code_length;
+    struct ink_byte_vec code;
+    struct ink_object_vec const_pool;
 };
 
 struct ink_stack_frame {

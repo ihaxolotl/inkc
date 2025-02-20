@@ -43,8 +43,6 @@ struct ink_story {
     uint8_t *pc;
     size_t stack_top;
     struct ink_byte_vec content;
-    struct ink_byte_vec code;
-    struct ink_object_vec constants;
     struct ink_object *globals;
     struct ink_object *paths;
     struct ink_object *objects;
@@ -76,10 +74,6 @@ extern int ink_story_stack_push(struct ink_story *story,
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
 extern struct ink_object *ink_story_stack_peek(struct ink_story *story,
                                                size_t offset);
-extern int ink_story_constant_add(struct ink_story *story,
-                                  struct ink_object *object);
-extern int ink_story_constant_get(struct ink_story *story, size_t index,
-                                  struct ink_object **object);
 extern void ink_story_stack_print(struct ink_story *story);
 
 #ifdef __cplusplus
