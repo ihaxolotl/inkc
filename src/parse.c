@@ -16,6 +16,7 @@
 #include "vec.h"
 
 #define INK_PARSER_ARGS_MAX 255
+#define INK_PARSE_DEPTH 128
 
 #define INK_PARSER_TRACE(node, rule, ...)                                      \
     do {                                                                       \
