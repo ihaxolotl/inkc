@@ -3,7 +3,7 @@
 #include "token.h"
 
 #define T(name, description) description,
-static const char *INK_TT_STR[] = {INK_TT(T)};
+static const char *INK_TT_STR[] = {INK_MAKE_TOKEN_LIST(T)};
 #undef T
 
 const char *ink_token_type_strz(enum ink_token_type type)

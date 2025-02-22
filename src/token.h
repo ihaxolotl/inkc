@@ -8,7 +8,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-#define INK_TT(T)                                                              \
+#define INK_MAKE_TOKEN_LIST(T)                                                 \
     T(TT_EOF, "EndOfFile")                                                     \
     T(TT_NL, "NewLine")                                                        \
     T(TT_AMP, "Ampersand")                                                     \
@@ -73,7 +73,7 @@ extern "C" {
 
 #define T(name, description) INK_##name,
 enum ink_token_type {
-    INK_TT(T)
+    INK_MAKE_TOKEN_LIST(T)
 };
 #undef T
 
