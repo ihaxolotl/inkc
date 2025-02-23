@@ -26,12 +26,22 @@ enum ink_symbol_type {
 
 struct ink_symbol {
     enum ink_symbol_type type;
-    bool is_const;
-    size_t ir_inst_index;
-    size_t ir_str_index;
-    size_t arity;
-    struct ink_symtab *local_names;
     const struct ink_ast_node *node;
+    union {
+        struct {
+            bool is_const;
+            size_t const_slot;
+            size_t stack_slot;
+            size_t str_index;
+        } var;
+
+        struct {
+            size_t arity;
+            size_t const_slot;
+            size_t str_index;
+            struct ink_symtab *local_names;
+        } knot;
+    } as;
 };
 
 struct ink_string_ref {

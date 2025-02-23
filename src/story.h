@@ -68,7 +68,6 @@ extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
                                  size_t size_old, size_t size_new);
 extern void ink_story_mem_free(struct ink_story *story, void *ptr);
-extern void ink_story_mem_flush(struct ink_story *story);
 extern int ink_story_stack_push(struct ink_story *story,
                                 struct ink_object *object);
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);

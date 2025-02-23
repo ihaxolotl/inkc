@@ -101,13 +101,13 @@ static size_t ink_story_disassemble(const struct ink_story *story,
         break;
     case INK_OP_LOAD_GLOBAL:
     case INK_OP_STORE_GLOBAL:
+    case INK_OP_CALL:
+    case INK_OP_DIVERT:
         ink_disassemble_global_inst(story, const_pool, bytes, offset, op);
         break;
     case INK_OP_JMP:
     case INK_OP_JMP_T:
     case INK_OP_JMP_F:
-    case INK_OP_CALL:
-    case INK_OP_DIVERT:
         ink_disassemble_jump_inst(story, bytes, offset, op);
         break;
     default:
@@ -172,18 +172,6 @@ void ink_story_mem_free(struct ink_story *story, void *ptr)
     }
 
     ink_story_mem_alloc(story, ptr, 0, 0);
-}
-
-void ink_story_mem_flush(struct ink_story *story)
-{
-    story->stack_top = 0;
-
-    while (story->objects != NULL) {
-        struct ink_object *obj = story->objects;
-
-        story->objects = story->objects->next;
-        ink_object_free(story, obj);
-    }
 }
 
 int ink_story_load_opts(struct ink_story *story,
@@ -451,6 +439,20 @@ void ink_story_init(struct ink_story *story, int flags)
 void ink_story_deinit(struct ink_story *story)
 {
     ink_byte_vec_deinit(&story->content);
-    ink_story_mem_flush(story);
-    memset(story, 0, sizeof(*story));
+
+    while (story->objects) {
+        struct ink_object *obj = story->objects;
+
+        story->objects = story->objects->next;
+        ink_object_free(story, obj);
+    }
+
+    story->can_continue = false;
+    story->flags = 0;
+    story->pc = NULL;
+    story->stack_top = 0;
+    story->globals = NULL;
+    story->paths = NULL;
+    story->objects = NULL;
+    story->stack[0] = NULL;
 }

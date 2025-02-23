@@ -6,9 +6,9 @@ extern "C" {
 #endif
 
 struct ink_ast;
-struct ink_ir;
+struct ink_story;
 
-extern int ink_astgen(struct ink_ast *tree, struct ink_ir *ircode, int flags);
+extern int ink_astgen(struct ink_ast *tree, struct ink_story *story, int flags);
 
 #ifdef __cplusplus
 }

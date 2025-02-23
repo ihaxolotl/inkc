@@ -38,11 +38,9 @@ lib_srcs := src/logging.c                  \
             src/source.c                   \
             src/token.c                    \
             src/ast.c                      \
-            src/ir.c                       \
             src/scanner.c                  \
             src/parse.c                    \
             src/astgen.c                   \
-            src/codegen.c                  \
             src/compile.c
 
 bin_srcs := src/option.c                   \
