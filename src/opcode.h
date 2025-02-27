@@ -6,10 +6,12 @@ extern "C" {
 #endif
 
 #define INK_MAKE_OPCODE_LIST(T)                                                \
+    T(OP_EXIT, "exit")                                                         \
     T(OP_RET, "ret")                                                           \
     T(OP_POP, "pop")                                                           \
     T(OP_TRUE, "true")                                                         \
     T(OP_FALSE, "false")                                                       \
+    T(OP_CONST, "const")                                                       \
     T(OP_ADD, "add")                                                           \
     T(OP_SUB, "sub")                                                           \
     T(OP_MUL, "mul")                                                           \
@@ -25,7 +27,6 @@ extern "C" {
     T(OP_JMP, "jmp")                                                           \
     T(OP_JMP_T, "jmp_t")                                                       \
     T(OP_JMP_F, "jmp_f")                                                       \
-    T(OP_CONST, "const")                                                       \
     T(OP_CALL, "call")                                                         \
     T(OP_DIVERT, "divert")                                                     \
     T(OP_LOAD, "load")                                                         \

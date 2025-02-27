@@ -7,10 +7,37 @@
 #include "object.h"
 #include "story.h"
 
-#define INK_TABLE_CAPACITY_MIN 8
-#define INK_TABLE_LOAD_MAX 80
-#define INK_TABLE_SCALE_FACTOR 2
-#define INK_OBJ(__x) ((struct ink_object *)(__x))
+#define INK_TABLE_CAPACITY_MIN (8ul)
+#define INK_TABLE_LOAD_MAX (80ul)
+#define INK_TABLE_SCALE_FACTOR (2ul)
+
+struct ink_object *ink_bool_new(struct ink_story *story, bool value)
+{
+    struct ink_bool *const obj =
+        INK_OBJ_AS_BOOL(ink_object_new(story, INK_OBJ_BOOL, sizeof(*obj)));
+
+    if (!obj) {
+        return NULL;
+    }
+
+    obj->value = value;
+    return INK_OBJ(obj);
+}
+
+bool ink_bool_eq(struct ink_story *story, const struct ink_object *lhs,
+                 const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_BOOL(lhs) && INK_OBJ_IS_BOOL(rhs));
+    return (INK_OBJ_AS_BOOL(lhs)->value == INK_OBJ_AS_BOOL(rhs)->value);
+}
+
+void ink_bool_print(const struct ink_object *obj)
+{
+    struct ink_bool *const bobj = INK_OBJ_AS_BOOL(obj);
+
+    printf("<Bool value=%s, addr=%p>", bobj->value ? "true" : "false",
+           (void *)obj);
+}
 
 struct ink_object *ink_number_new(struct ink_story *story, double value)
 {
@@ -29,53 +56,94 @@ void ink_number_print(const struct ink_object *obj)
 {
     struct ink_number *const num = INK_OBJ_AS_NUMBER(obj);
 
-    printf("%g", num->value);
+    printf("<Number value=%lf, addr=%p>", num->value, (void *)obj);
 }
 
 struct ink_object *ink_number_add(struct ink_story *story,
                                   const struct ink_object *lhs,
                                   const struct ink_object *rhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
     return ink_number_new(story, INK_OBJ_AS_NUMBER(lhs)->value +
                                      INK_OBJ_AS_NUMBER(rhs)->value);
 }
 
-struct ink_object *ink_number_subtract(struct ink_story *story,
-                                       const struct ink_object *lhs,
-                                       const struct ink_object *rhs)
+struct ink_object *ink_number_sub(struct ink_story *story,
+                                  const struct ink_object *lhs,
+                                  const struct ink_object *rhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
     return ink_number_new(story, INK_OBJ_AS_NUMBER(lhs)->value -
                                      INK_OBJ_AS_NUMBER(rhs)->value);
 }
 
-struct ink_object *ink_number_multiply(struct ink_story *story,
-                                       const struct ink_object *lhs,
-                                       const struct ink_object *rhs)
+struct ink_object *ink_number_mul(struct ink_story *story,
+                                  const struct ink_object *lhs,
+                                  const struct ink_object *rhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
     return ink_number_new(story, INK_OBJ_AS_NUMBER(lhs)->value *
                                      INK_OBJ_AS_NUMBER(rhs)->value);
 }
 
-struct ink_object *ink_number_divide(struct ink_story *story,
-                                     const struct ink_object *lhs,
-                                     const struct ink_object *rhs)
+struct ink_object *ink_number_div(struct ink_story *story,
+                                  const struct ink_object *lhs,
+                                  const struct ink_object *rhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
     return ink_number_new(story, INK_OBJ_AS_NUMBER(lhs)->value /
                                      INK_OBJ_AS_NUMBER(rhs)->value);
 }
 
-struct ink_object *ink_number_modulo(struct ink_story *story,
-                                     const struct ink_object *lhs,
-                                     const struct ink_object *rhs)
+struct ink_object *ink_number_mod(struct ink_story *story,
+                                  const struct ink_object *lhs,
+                                  const struct ink_object *rhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
     return ink_number_new(story, fmod(INK_OBJ_AS_NUMBER(lhs)->value,
                                       INK_OBJ_AS_NUMBER(rhs)->value));
 }
 
-struct ink_object *ink_number_negate(struct ink_story *story,
-                                     const struct ink_object *lhs)
+struct ink_object *ink_number_neg(struct ink_story *story,
+                                  const struct ink_object *lhs)
 {
+    assert(INK_OBJ_IS_NUMBER(lhs));
     return ink_number_new(story, -INK_OBJ_AS_NUMBER(lhs)->value);
+}
+
+bool ink_number_eq(struct ink_story *story, const struct ink_object *lhs,
+                   const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
+    return (INK_OBJ_AS_NUMBER(lhs)->value == INK_OBJ_AS_NUMBER(rhs)->value);
+}
+
+bool ink_number_lt(struct ink_story *story, const struct ink_object *lhs,
+                   const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
+    return (INK_OBJ_AS_NUMBER(lhs)->value < INK_OBJ_AS_NUMBER(rhs)->value);
+}
+
+bool ink_number_lte(struct ink_story *story, const struct ink_object *lhs,
+                    const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
+    return (INK_OBJ_AS_NUMBER(lhs)->value <= INK_OBJ_AS_NUMBER(rhs)->value);
+}
+
+bool ink_number_gt(struct ink_story *story, const struct ink_object *lhs,
+                   const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
+    return (INK_OBJ_AS_NUMBER(lhs)->value > INK_OBJ_AS_NUMBER(rhs)->value);
+}
+
+bool ink_number_gte(struct ink_story *story, const struct ink_object *lhs,
+                    const struct ink_object *rhs)
+{
+    assert(INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs));
+    return (INK_OBJ_AS_NUMBER(lhs)->value >= INK_OBJ_AS_NUMBER(rhs)->value);
 }
 
 struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
@@ -94,16 +162,13 @@ struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
     return INK_OBJ(obj);
 }
 
-bool ink_string_equal(struct ink_story *story, const struct ink_object *lhs,
-                      const struct ink_object *rhs)
+bool ink_string_eq(struct ink_story *story, const struct ink_object *lhs,
+                   const struct ink_object *rhs)
 {
     struct ink_string *const str_lhs = INK_OBJ_AS_STRING(lhs);
     struct ink_string *const str_rhs = INK_OBJ_AS_STRING(rhs);
 
-    (void)story;
-
-    assert(INK_OBJ_IS_STRING(lhs));
-    assert(INK_OBJ_IS_STRING(rhs));
+    assert(INK_OBJ_IS_STRING(lhs) && INK_OBJ_IS_STRING(rhs));
     return str_lhs->length == str_rhs->length &&
            memcmp(str_lhs->bytes, str_rhs->bytes, str_lhs->length) == 0;
 }
@@ -113,7 +178,7 @@ void ink_string_print(const struct ink_object *obj)
     struct ink_string *const str = INK_OBJ_AS_STRING(obj);
 
     assert(INK_OBJ_IS_STRING(obj));
-    printf("\"%s\"", str->bytes);
+    printf("<String value=\"%s\", addr=%p>", str->bytes, (void *)obj);
 }
 
 struct ink_object *ink_table_new(struct ink_story *story)
@@ -150,7 +215,7 @@ static struct ink_table_kv *ink_table_find_slot(struct ink_story *story,
         struct ink_table_kv *const entry = &entries[index];
 
         if (entry->key == NULL ||
-            ink_string_equal(story, INK_OBJ(entry->key), INK_OBJ(key))) {
+            ink_string_eq(story, INK_OBJ(entry->key), INK_OBJ(key))) {
             return entry;
         }
 
@@ -302,7 +367,7 @@ struct ink_object *ink_content_path_new(struct ink_story *story,
     assert(name != NULL);
 
     obj->name = INK_OBJ_AS_STRING(name);
-    obj->args_count = 0;
+    obj->arity = 0;
     obj->locals_count = 0;
     ink_byte_vec_init(&obj->code);
     ink_object_vec_init(&obj->const_pool);
@@ -317,31 +382,6 @@ static void ink_content_path_free(struct ink_story *story,
     assert(INK_OBJ_IS_CONTENT_PATH(obj));
     ink_byte_vec_deinit(&path->code);
     ink_object_vec_deinit(&path->const_pool);
-}
-
-struct ink_object *ink_stack_frame_new(struct ink_story *story,
-                                       struct ink_content_path *path,
-                                       uint8_t *return_addr)
-{
-    const size_t total_locals = path->args_count + path->locals_count;
-    const size_t stack_size = total_locals * sizeof(struct ink_object *);
-    struct ink_stack_frame *const obj = INK_OBJ_AS_STACK_FRAME(
-        ink_object_new(story, INK_OBJ_STACK_FRAME, sizeof(*obj) + stack_size));
-
-    if (!obj) {
-        ink_story_mem_panic(story);
-        return NULL;
-    }
-
-    assert(path != NULL);
-    assert(return_addr != NULL);
-
-    obj->path = path;
-    obj->return_value = NULL;
-    obj->return_addr = return_addr;
-    obj->locals_count = stack_size;
-    memset(obj->locals, 0, stack_size);
-    return INK_OBJ(obj);
 }
 
 struct ink_object *ink_object_new(struct ink_story *story,
@@ -365,9 +405,9 @@ struct ink_object *ink_object_new(struct ink_story *story,
 void ink_object_free(struct ink_story *story, struct ink_object *obj)
 {
     switch (obj->type) {
+    case INK_OBJ_BOOL:
     case INK_OBJ_NUMBER:
     case INK_OBJ_STRING:
-    case INK_OBJ_STACK_FRAME:
         break;
     case INK_OBJ_TABLE:
         ink_table_free(story, obj);
@@ -380,9 +420,43 @@ void ink_object_free(struct ink_story *story, struct ink_object *obj)
     ink_story_mem_free(story, obj);
 }
 
+struct ink_object *ink_object_eq(struct ink_story *story,
+                                 const struct ink_object *lhs,
+                                 const struct ink_object *rhs)
+{
+    bool value = false;
+
+    if (lhs->type != rhs->type) {
+        value = false;
+    } else {
+        switch (lhs->type) {
+        case INK_OBJ_BOOL:
+            value = ink_bool_eq(story, lhs, rhs);
+            break;
+        case INK_OBJ_NUMBER:
+            value = ink_number_eq(story, lhs, rhs);
+            break;
+        case INK_OBJ_STRING:
+            value = ink_string_eq(story, lhs, rhs);
+            break;
+        default:
+            value = false;
+            break;
+        }
+    }
+    return ink_bool_new(story, value);
+}
+
 void ink_object_print(const struct ink_object *obj)
 {
+    if (!obj) {
+        printf("<NULL>");
+        return;
+    }
     switch (obj->type) {
+    case INK_OBJ_BOOL:
+        ink_bool_print(obj);
+        break;
     case INK_OBJ_NUMBER:
         ink_number_print(obj);
         break;
@@ -393,7 +467,7 @@ void ink_object_print(const struct ink_object *obj)
         ink_table_print(obj);
         break;
     case INK_OBJ_CONTENT_PATH:
-    case INK_OBJ_STACK_FRAME:
+        printf("<Path addr=%p>", (void *)obj);
         break;
     }
 }

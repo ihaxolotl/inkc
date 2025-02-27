@@ -229,6 +229,7 @@ static void ink_astgen_global_init(struct ink_astgen_global *global,
     global->story = story;
     global->current_path = NULL;
 
+    ink_byte_vec_init(&global->string_bytes);
     ink_stringset_init(&global->string_table, INK_STRINGSET_LOAD_MAX,
                        ink_stringset_hasher);
     ink_symtab_pool_init(&global->symtab_pool);
@@ -254,6 +255,8 @@ static int ink_astgen_make(struct ink_astgen *scope,
 {
     struct ink_astgen_global *const global = parent_scope->global;
     struct ink_symtab_pool *const st_pool = &global->symtab_pool;
+
+    scope->global = parent_scope->global;
 
     if (!symbol_table) {
         symbol_table = ink_symtab_make(st_pool);
@@ -283,17 +286,38 @@ static void ink_astgen_fail(struct ink_astgen *astgen, const char *msg)
 }
 
 /**
- * Retrieve source byte range from an AST node.
+ * Retrieve a string reference from an AST node.
+ *
+ * The string reference is backed with memory from the source bytes.
  */
 static inline struct ink_string_ref
-ink_astgen_string_ref(const struct ink_astgen *astgen,
-                      const struct ink_ast_node *node)
+ink_string_from_node(const struct ink_astgen *astgen,
+                     const struct ink_ast_node *node)
 {
     struct ink_astgen_global *const global = astgen->global;
     const struct ink_ast *const tree = global->tree;
     const struct ink_string_ref ref = {
         .bytes = &tree->source_bytes[node->start_offset],
         .length = node->end_offset - node->start_offset,
+    };
+
+    return ref;
+}
+
+/**
+ * Retrieve a string reference by index.
+ *
+ * The string reference is backed with memory from the string table.
+ */
+static inline struct ink_string_ref
+ink_string_from_index(const struct ink_astgen *astgen, const size_t index)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_byte_vec *const string_bytes = &global->string_bytes;
+    const uint8_t *const bytes = &string_bytes->entries[index];
+    const struct ink_string_ref ref = {
+        .bytes = bytes,
+        .length = strlen((char *)bytes),
     };
 
     return ref;
@@ -308,7 +332,7 @@ static int ink_astgen_insert_name(struct ink_astgen *scope,
                                   const struct ink_ast_node *node,
                                   const struct ink_symbol *sym)
 {
-    const struct ink_string_ref key = ink_astgen_string_ref(scope, node);
+    const struct ink_string_ref key = ink_string_from_node(scope, node);
 
     return ink_symtab_insert(scope->symbol_table, key, *sym);
 }
@@ -324,7 +348,7 @@ static int ink_astgen_lookup_name(struct ink_astgen *scope,
                                   struct ink_symbol *sym)
 {
     int rc = INK_E_FAIL;
-    const struct ink_string_ref key = ink_astgen_string_ref(scope, node);
+    const struct ink_string_ref key = ink_string_from_node(scope, node);
 
     while (scope) {
         rc = ink_symtab_lookup(scope->symbol_table, key, sym);
@@ -371,7 +395,7 @@ int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
 
         rc = ink_astgen_lookup_expr_r(scope, lhs->rhs, rhs, sym);
     } else if (lhs->type == INK_AST_IDENTIFIER) {
-        const struct ink_string_ref lhs_key = ink_astgen_string_ref(scope, lhs);
+        const struct ink_string_ref lhs_key = ink_string_from_node(scope, lhs);
 
         rc = ink_symtab_lookup(scope->symbol_table, lhs_key, sym);
         if (rc < 0) {
@@ -379,7 +403,7 @@ int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
         }
         if (sym->as.knot.local_names) {
             const struct ink_string_ref rhs_key =
-                ink_astgen_string_ref(scope, rhs);
+                ink_string_from_node(scope, rhs);
 
             return ink_symtab_lookup(sym->as.knot.local_names, rhs_key, sym);
         }
@@ -545,8 +569,14 @@ static void ink_astgen_patch_jmp(struct ink_astgen *astgen, size_t inst_offset)
     struct ink_astgen_global *const global = astgen->global;
     struct ink_content_path *const path = global->current_path;
     struct ink_byte_vec *const code = &path->code;
+    const size_t jump = code->count - inst_offset;
 
-    code->entries[inst_offset + 1] = (uint8_t)code->count;
+    if (jump > UINT8_MAX) {
+        ink_astgen_fail(astgen, "Too much code to jump over.");
+        return;
+    }
+
+    code->entries[inst_offset + 1] = (uint8_t)jump;
 }
 
 static const uint8_t *ink_astgen_str_bytes(const struct ink_astgen *astgen,
@@ -615,7 +645,7 @@ static void ink_astgen_false(struct ink_astgen *astgen)
 static void ink_astgen_number(struct ink_astgen *astgen,
                               const struct ink_ast_node *node)
 {
-    const struct ink_string_ref str = ink_astgen_string_ref(astgen, node);
+    const struct ink_string_ref str = ink_string_from_node(astgen, node);
     const size_t str_index = ink_astgen_add_str(astgen, str.bytes, str.length);
     const uint8_t *const str_bytes = ink_astgen_str_bytes(astgen, str_index);
     const double value = strtod((char *)str_bytes, NULL);
@@ -633,7 +663,7 @@ static void ink_astgen_number(struct ink_astgen *astgen,
 static void ink_astgen_string(struct ink_astgen *astgen,
                               const struct ink_ast_node *node)
 {
-    const struct ink_string_ref str = ink_astgen_string_ref(astgen, node);
+    const struct ink_string_ref str = ink_string_from_node(astgen, node);
     const size_t str_index = ink_astgen_add_str(astgen, str.bytes, str.length);
     struct ink_object *const obj =
         ink_string_new(astgen->global->story, str.bytes, str.length);
@@ -713,7 +743,7 @@ static void ink_astgen_call_expr(struct ink_astgen *astgen,
         }
     }
 
-    const struct ink_string_ref str = ink_astgen_string_ref(astgen, name_node);
+    const struct ink_string_ref str = ink_string_from_node(astgen, name_node);
     struct ink_object *const obj =
         ink_string_new(astgen->global->story, str.bytes, str.length);
 
@@ -799,6 +829,7 @@ static void ink_astgen_inline_logic(struct ink_astgen *astgen,
     ink_astgen_expr(astgen, node->lhs);
 }
 
+/* TODO(Brett): There may be a bug here regarding fallthrough branches. */
 static void ink_astgen_if_expr(struct ink_astgen *astgen,
                                const struct ink_ast_node *node)
 {
@@ -807,11 +838,11 @@ static void ink_astgen_if_expr(struct ink_astgen *astgen,
 
     ink_astgen_expr(astgen, expr_node);
 
-    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t then_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
 
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
     ink_astgen_content_expr(astgen, body_node);
-    ink_astgen_patch_jmp(astgen, else_branch);
+    ink_astgen_patch_jmp(astgen, then_branch);
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
 }
 
@@ -827,7 +858,7 @@ static void ink_astgen_if_stmt(struct ink_astgen *astgen,
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
     ink_astgen_block_stmt(astgen, then_node);
 
-    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
 
     ink_astgen_patch_jmp(astgen, then_branch);
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
@@ -837,7 +868,6 @@ static void ink_astgen_if_stmt(struct ink_astgen *astgen,
     }
 
     ink_astgen_patch_jmp(astgen, else_branch);
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
 }
 
 static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
@@ -857,7 +887,7 @@ static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
     ink_astgen_block_stmt(astgen, then_node->rhs);
 
-    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
 
     ink_astgen_patch_jmp(astgen, then_branch);
     ink_astgen_add_inst(astgen, INK_OP_POP, 0);
@@ -982,15 +1012,16 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
                                 const struct ink_ast_node *node)
 {
     struct ink_astgen_global *const global = astgen->global;
+    struct ink_content_path *const path = global->current_path;
     struct ink_ast_node *const name_node = node->lhs;
     struct ink_ast_node *const expr_node = node->rhs;
-    const struct ink_string_ref str = ink_astgen_string_ref(astgen, name_node);
+    const struct ink_string_ref str = ink_string_from_node(astgen, name_node);
     const size_t str_index = ink_astgen_add_str(astgen, str.bytes, str.length);
 
     ink_astgen_expr(astgen, expr_node);
 
     if (node->type == INK_AST_TEMP_DECL) {
-        const size_t stack_slot = global->current_path->locals_count++;
+        const size_t stack_slot = path->arity + path->locals_count++;
         const struct ink_symbol sym = {
             .type = INK_SYMBOL_VAR,
             .node = node,
@@ -1022,6 +1053,8 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
 
         ink_astgen_add_inst(astgen, INK_OP_STORE_GLOBAL, (uint8_t)const_index);
     }
+
+    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
 }
 
 static void ink_astgen_divert_expr(struct ink_astgen *astgen,
@@ -1040,20 +1073,22 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
         ink_astgen_add_inst(astgen, INK_OP_DIVERT, 0);
         break;
     case INK_AST_IDENTIFIER: {
-        const struct ink_string_ref str =
-            ink_astgen_string_ref(astgen, name_node);
+        const struct ink_string_ref unqualified_name =
+            ink_string_from_node(astgen, name_node);
 
-        switch (str.length) {
+        switch (unqualified_name.length) {
         case 3:
-            if (memcmp(str.bytes, "END", str.length) == 0) {
-                ink_astgen_add_inst(astgen, INK_OP_RET, 0);
-                break;
+            if (memcmp(unqualified_name.bytes, "END",
+                       unqualified_name.length) == 0) {
+                ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+                return;
             }
             break;
         case 4:
-            if (memcmp(str.bytes, "DONE", str.length) == 0) {
-                ink_astgen_add_inst(astgen, INK_OP_RET, 0);
-                break;
+            if (memcmp(unqualified_name.bytes, "DONE",
+                       unqualified_name.length) == 0) {
+                ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+                return;
             }
             break;
         default:
@@ -1064,8 +1099,10 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
             return;
         }
 
-        struct ink_object *const obj =
-            ink_string_new(astgen->global->story, str.bytes, str.length);
+        const struct ink_string_ref qualified_str =
+            ink_string_from_index(astgen, sym.as.knot.str_index);
+        struct ink_object *const obj = ink_string_new(
+            astgen->global->story, qualified_str.bytes, qualified_str.length);
 
         ink_astgen_add_inst(astgen, INK_OP_DIVERT,
                             (uint8_t)ink_astgen_add_const(astgen, obj));
@@ -1158,7 +1195,7 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
         }
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_RET, 0);
+    ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
 }
 
 static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
@@ -1185,11 +1222,7 @@ static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
                 return;
             }
 
-            if (ink_astgen_update_name(parent_scope, param, &param_sym) < 0) {
-                return;
-            }
-
-            global->current_path->locals_count++;
+            global->current_path->arity++;
         }
     }
 }
@@ -1246,7 +1279,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     ink_astgen_knot_proto(&stitch_scope, proto_node, &stitch_sym);
 
     if (!body_list) {
-        ink_astgen_add_inst(&stitch_scope, INK_OP_RET, 0);
+        ink_astgen_add_inst(&stitch_scope, INK_OP_EXIT, 0);
         return;
     }
 
@@ -1255,7 +1288,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     struct ink_ast_node *const body_node = body_list->nodes[0];
 
     ink_astgen_block_stmt(&stitch_scope, body_node);
-    ink_astgen_add_inst(&stitch_scope, INK_OP_RET, 0);
+    ink_astgen_add_inst(&stitch_scope, INK_OP_EXIT, 0);
 }
 
 static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
@@ -1278,7 +1311,7 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
     ink_astgen_knot_proto(&knot_scope, proto_node, &knot_sym);
 
     if (!body_list) {
-        ink_astgen_add_inst(&knot_scope, INK_OP_RET, 0);
+        ink_astgen_add_inst(&knot_scope, INK_OP_EXIT, 0);
         return;
     }
 
@@ -1289,7 +1322,7 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
         i++;
     }
 
-    ink_astgen_add_inst(&knot_scope, INK_OP_RET, 0);
+    ink_astgen_add_inst(&knot_scope, INK_OP_EXIT, 0);
 
     for (; i < body_list->count; i++) {
         struct ink_ast_node *const body_node = body_list->nodes[i];
@@ -1307,7 +1340,7 @@ static void ink_astgen_default_body(struct ink_astgen *parent_scope,
 
     ink_astgen_add_knot(parent_scope, name_index);
     ink_astgen_block_stmt(parent_scope, node);
-    ink_astgen_add_inst(parent_scope, INK_OP_RET, 0);
+    ink_astgen_add_inst(parent_scope, INK_OP_EXIT, 0);
 }
 
 static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
@@ -1320,7 +1353,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
     struct ink_ast_seq *const proto_list = proto_node->seq;
     struct ink_ast_node *const name_node = proto_list->nodes[0];
     struct ink_string_ref knot_str =
-        ink_astgen_string_ref(parent_scope, name_node);
+        ink_string_from_node(parent_scope, name_node);
     struct ink_symtab *const local_symtab = ink_symtab_make(st_pool);
 
     if (!local_symtab) {
@@ -1352,11 +1385,12 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
         for (size_t i = 0; i < args_list->count; i++) {
             const struct ink_ast_node *const param_node = args_list->nodes[i];
             const struct ink_string_ref param_str =
-                ink_astgen_string_ref(child_scope, param_node);
+                ink_string_from_node(child_scope, param_node);
             const struct ink_symbol param_sym = {
                 .type = INK_SYMBOL_PARAM,
                 .node = param_node,
-                .as.knot.str_index = ink_astgen_add_str(
+                .as.var.stack_slot = i,
+                .as.var.str_index = ink_astgen_add_str(
                     child_scope, param_str.bytes, param_str.length),
             };
 
@@ -1518,9 +1552,8 @@ int ink_astgen(struct ink_ast *tree, struct ink_story *story, int flags)
         return INK_E_FAIL;
     }
 
-    ink_story_init(story, flags);
-    ink_byte_vec_push(&global_store.string_bytes, '\0');
     ink_astgen_global_init(&global_store, tree, story);
+    ink_byte_vec_push(&global_store.string_bytes, '\0');
     ink_astgen_file(&global_store, tree->root);
     ink_astgen_global_deinit(&global_store);
 

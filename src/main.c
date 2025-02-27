@@ -159,10 +159,14 @@ int main(int argc, char *argv[])
     }
     if (!compile_only) {
         while (story.can_continue) {
-            char *content = ink_story_continue(&story);
+            char *const content = ink_story_continue(&story);
 
-            printf("%s\n", content);
-            ink_free(content);
+            if (content) {
+                printf("%s\n", content);
+                ink_free(content);
+            } else {
+                break;
+            }
         }
     }
 

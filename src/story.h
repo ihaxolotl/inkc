@@ -34,19 +34,28 @@ enum ink_flags {
     INK_F_DUMP_CODE = (1 << 5),
 };
 
+struct ink_call_frame {
+    struct ink_content_path *callee;
+    struct ink_content_path *caller;
+    uint8_t *ip;
+    struct ink_object **sp;
+};
+
 /**
  * Ink Story Context
  */
 struct ink_story {
     bool can_continue;
     int flags;
-    uint8_t *pc;
     size_t stack_top;
+    size_t call_stack_top;
     struct ink_byte_vec content;
     struct ink_object *globals;
     struct ink_object *paths;
     struct ink_object *objects;
+    struct ink_object *current_path;
     struct ink_object *stack[INK_STORY_STACK_MAX];
+    struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
 };
 
 struct ink_load_opts {
@@ -55,15 +64,12 @@ struct ink_load_opts {
     int flags;
 };
 
-extern void ink_story_init(struct ink_story *story, int flags);
-extern void ink_story_deinit(struct ink_story *story);
 extern int ink_story_load_opts(struct ink_story *story,
                                const struct ink_load_opts *opts);
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
 extern char *ink_story_continue(struct ink_story *story);
 extern void ink_story_dump(struct ink_story *story);
-extern int ink_story_execute(struct ink_story *story);
 extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
                                  size_t size_old, size_t size_new);
@@ -73,7 +79,6 @@ extern int ink_story_stack_push(struct ink_story *story,
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
 extern struct ink_object *ink_story_stack_peek(struct ink_story *story,
                                                size_t offset);
-extern void ink_story_stack_print(struct ink_story *story);
 
 #ifdef __cplusplus
 }
