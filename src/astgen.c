@@ -453,21 +453,49 @@ static void ink_astgen_error(struct ink_astgen *astgen,
 }
 
 /**
- * Push a new instruction to the current content path.
+ * Emit an instruction byte to the current chunk.
  */
-static size_t ink_astgen_add_inst(struct ink_astgen *astgen,
-                                  enum ink_vm_opcode op, uint8_t arg)
+static void ink_astgen_emit_byte(struct ink_astgen *astgen, uint8_t byte)
 {
     struct ink_astgen_global *const global = astgen->global;
-    struct ink_content_path *const path = global->current_path;
-    struct ink_byte_vec *const code = &path->code;
-    const size_t offset = code->count;
+    struct ink_byte_vec *const code = &global->current_path->code;
 
-    ink_byte_vec_push(code, (uint8_t)op);
-    ink_byte_vec_push(code, arg);
-    return offset;
+    ink_byte_vec_push(code, (uint8_t)byte);
 }
 
+/**
+ * Emit a two-byte constant instruction to the current chunk.
+ */
+static void ink_astgen_emit_const(struct ink_astgen *astgen,
+                                  enum ink_vm_opcode op, uint8_t arg)
+{
+    ink_astgen_emit_byte(astgen, (uint8_t)op);
+    ink_astgen_emit_byte(astgen, (uint8_t)arg);
+}
+
+/**
+ * Emit a three-byte jump instruction to the current chunk.
+ *
+ * The address bytes will be contain a sentinel value until backpatching is
+ * performed.
+ *
+ * Returns the instruction offset to the instruction argument.
+ */
+static size_t ink_astgen_emit_jump(struct ink_astgen *astgen,
+                                   enum ink_vm_opcode op)
+{
+    struct ink_astgen_global *const global = astgen->global;
+    struct ink_byte_vec *const code = &global->current_path->code;
+
+    ink_byte_vec_push(code, (uint8_t)op);
+    ink_byte_vec_push(code, 0xff);
+    ink_byte_vec_push(code, 0xff);
+    return code->count - 2;
+}
+
+/**
+ * Add a constant value to the current chunk.
+ */
 static size_t ink_astgen_add_const(struct ink_astgen *astgen,
                                    struct ink_object *obj)
 {
@@ -564,19 +592,19 @@ static void ink_astgen_add_knot(struct ink_astgen *astgen, size_t str_index)
     astgen->global->current_path = INK_OBJ_AS_CONTENT_PATH(path_obj);
 }
 
-static void ink_astgen_patch_jmp(struct ink_astgen *astgen, size_t inst_offset)
+static void ink_astgen_patch_jump(struct ink_astgen *astgen, size_t offset)
 {
     struct ink_astgen_global *const global = astgen->global;
-    struct ink_content_path *const path = global->current_path;
-    struct ink_byte_vec *const code = &path->code;
-    const size_t jump = code->count - inst_offset;
+    struct ink_byte_vec *const code = &global->current_path->code;
+    const size_t jump = code->count - offset - 2;
 
     if (jump > UINT8_MAX) {
         ink_astgen_fail(astgen, "Too much code to jump over.");
         return;
     }
 
-    code->entries[inst_offset + 1] = (uint8_t)jump;
+    code->entries[offset] = (jump >> 8) & 0xff;
+    code->entries[offset + 1] = jump & 0xff;
 }
 
 static const uint8_t *ink_astgen_str_bytes(const struct ink_astgen *astgen,
@@ -606,7 +634,7 @@ static void ink_astgen_unary_op(struct ink_astgen *astgen,
                                 enum ink_vm_opcode op)
 {
     ink_astgen_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, op, 0);
+    ink_astgen_emit_byte(astgen, (uint8_t)op);
 }
 
 static void ink_astgen_binary_op(struct ink_astgen *astgen,
@@ -615,7 +643,7 @@ static void ink_astgen_binary_op(struct ink_astgen *astgen,
 {
     ink_astgen_expr(astgen, node->lhs);
     ink_astgen_expr(astgen, node->rhs);
-    ink_astgen_add_inst(astgen, op, 0);
+    ink_astgen_emit_byte(astgen, (uint8_t)op);
 }
 
 static void ink_astgen_logical_op(struct ink_astgen *astgen,
@@ -624,22 +652,22 @@ static void ink_astgen_logical_op(struct ink_astgen *astgen,
 {
     ink_astgen_expr(astgen, node->lhs);
 
-    const size_t else_branch = ink_astgen_add_inst(
-        astgen, binary_or ? INK_OP_JMP_T : INK_OP_JMP_F, 0xff);
+    const size_t else_branch =
+        ink_astgen_emit_jump(astgen, binary_or ? INK_OP_JMP_T : INK_OP_JMP_F);
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
     ink_astgen_expr(astgen, node->rhs);
-    ink_astgen_patch_jmp(astgen, else_branch);
+    ink_astgen_patch_jump(astgen, else_branch);
 }
 
 static void ink_astgen_true(struct ink_astgen *astgen)
 {
-    ink_astgen_add_inst(astgen, INK_OP_TRUE, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_TRUE);
 }
 
 static void ink_astgen_false(struct ink_astgen *astgen)
 {
-    ink_astgen_add_inst(astgen, INK_OP_FALSE, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_FALSE);
 }
 
 static void ink_astgen_number(struct ink_astgen *astgen,
@@ -656,8 +684,8 @@ static void ink_astgen_number(struct ink_astgen *astgen,
         return;
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_CONST,
-                        (uint8_t)ink_astgen_add_const(astgen, obj));
+    ink_astgen_emit_const(astgen, INK_OP_CONST,
+                          (uint8_t)ink_astgen_add_const(astgen, obj));
 }
 
 static void ink_astgen_string(struct ink_astgen *astgen,
@@ -675,8 +703,8 @@ static void ink_astgen_string(struct ink_astgen *astgen,
         return;
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_CONST,
-                        (uint8_t)ink_astgen_add_const(astgen, obj));
+    ink_astgen_emit_const(astgen, INK_OP_CONST,
+                          (uint8_t)ink_astgen_add_const(astgen, obj));
 }
 
 static void ink_astgen_identifier(struct ink_astgen *astgen,
@@ -689,7 +717,7 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
         return;
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_LOAD, (uint8_t)sym.as.var.stack_slot);
+    ink_astgen_emit_const(astgen, INK_OP_LOAD, (uint8_t)sym.as.var.stack_slot);
 }
 
 static int ink_astgen_check_args_count(struct ink_astgen *astgen,
@@ -747,7 +775,8 @@ static void ink_astgen_call_expr(struct ink_astgen *astgen,
     struct ink_object *const obj =
         ink_string_new(astgen->global->story, str.bytes, str.length);
 
-    ink_astgen_add_inst(astgen, op, (uint8_t)ink_astgen_add_const(astgen, obj));
+    ink_astgen_emit_const(astgen, op,
+                          (uint8_t)ink_astgen_add_const(astgen, obj));
 }
 
 static void ink_astgen_expr(struct ink_astgen *astgen,
@@ -789,7 +818,7 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
         break;
     case INK_AST_NOT_EQUAL_EXPR:
         ink_astgen_binary_op(astgen, node, INK_OP_CMP_EQ);
-        ink_astgen_add_inst(astgen, INK_OP_NOT, 0);
+        ink_astgen_emit_byte(astgen, INK_OP_NOT);
         break;
     case INK_AST_LESS_EXPR:
         ink_astgen_binary_op(astgen, node, INK_OP_CMP_LT);
@@ -807,7 +836,7 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
         ink_astgen_unary_op(astgen, node, INK_OP_NEG);
         break;
     case INK_AST_NOT_EXPR:
-        ink_astgen_add_inst(astgen, INK_OP_NOT, 0);
+        ink_astgen_emit_byte(astgen, INK_OP_NOT);
         break;
     case INK_AST_AND_EXPR:
         ink_astgen_logical_op(astgen, node, false);
@@ -838,12 +867,12 @@ static void ink_astgen_if_expr(struct ink_astgen *astgen,
 
     ink_astgen_expr(astgen, expr_node);
 
-    const size_t then_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t then_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP_F);
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
     ink_astgen_content_expr(astgen, body_node);
-    ink_astgen_patch_jmp(astgen, then_branch);
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_patch_jump(astgen, then_branch);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
 }
 
 static void ink_astgen_if_stmt(struct ink_astgen *astgen,
@@ -853,21 +882,21 @@ static void ink_astgen_if_stmt(struct ink_astgen *astgen,
 {
     ink_astgen_expr(astgen, expr_node);
 
-    const size_t then_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t then_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP_F);
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
     ink_astgen_block_stmt(astgen, then_node);
 
-    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
+    const size_t else_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP);
 
-    ink_astgen_patch_jmp(astgen, then_branch);
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_patch_jump(astgen, then_branch);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
 
     if (else_node && else_node->type == INK_AST_ELSE_BRANCH) {
         ink_astgen_block_stmt(astgen, else_node->rhs);
     }
 
-    ink_astgen_patch_jmp(astgen, else_branch);
+    ink_astgen_patch_jump(astgen, else_branch);
 }
 
 static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
@@ -882,15 +911,15 @@ static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
 
     ink_astgen_expr(astgen, then_node->lhs);
 
-    const size_t then_branch = ink_astgen_add_inst(astgen, INK_OP_JMP_F, 0xff);
+    const size_t then_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP_F);
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
     ink_astgen_block_stmt(astgen, then_node->rhs);
 
-    const size_t else_branch = ink_astgen_add_inst(astgen, INK_OP_JMP, 0xff);
+    const size_t else_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP);
 
-    ink_astgen_patch_jmp(astgen, then_branch);
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_patch_jump(astgen, then_branch);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
 
     if (node_index + 1 < children->count) {
         struct ink_ast_node *const else_node = children->nodes[node_index + 1];
@@ -902,7 +931,7 @@ static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
         }
     }
 
-    ink_astgen_patch_jmp(astgen, else_branch);
+    ink_astgen_patch_jump(astgen, else_branch);
 }
 
 static void ink_astgen_switch_block(struct ink_astgen *astgen,
@@ -983,21 +1012,21 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
         switch (expr_node->type) {
         case INK_AST_STRING:
             ink_astgen_string(astgen, expr_node);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
             break;
         case INK_AST_INLINE_LOGIC:
             ink_astgen_inline_logic(astgen, expr_node);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
             break;
         case INK_AST_IF_STMT:
         case INK_AST_MULTI_IF_STMT:
         case INK_AST_SWITCH_STMT:
             ink_astgen_conditional(astgen, expr_node);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
             break;
         case INK_AST_IF_EXPR:
             ink_astgen_if_expr(astgen, expr_node);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
             break;
         case INK_AST_GLUE:
             break;
@@ -1034,7 +1063,7 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
             return;
         }
 
-        ink_astgen_add_inst(astgen, INK_OP_STORE, (uint8_t)stack_slot);
+        ink_astgen_emit_const(astgen, INK_OP_STORE, (uint8_t)stack_slot);
     } else {
         struct ink_object *const name_obj =
             ink_string_new(global->story, str.bytes, str.length);
@@ -1051,10 +1080,11 @@ static void ink_astgen_var_decl(struct ink_astgen *astgen,
             return;
         }
 
-        ink_astgen_add_inst(astgen, INK_OP_STORE_GLOBAL, (uint8_t)const_index);
+        ink_astgen_emit_const(astgen, INK_OP_STORE_GLOBAL,
+                              (uint8_t)const_index);
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
 }
 
 static void ink_astgen_divert_expr(struct ink_astgen *astgen,
@@ -1070,7 +1100,8 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
             return;
         }
 
-        ink_astgen_add_inst(astgen, INK_OP_DIVERT, 0);
+        /* FIXME: Bad arg. */
+        ink_astgen_emit_const(astgen, INK_OP_DIVERT, 0);
         break;
     case INK_AST_IDENTIFIER: {
         const struct ink_string_ref unqualified_name =
@@ -1080,14 +1111,14 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
         case 3:
             if (memcmp(unqualified_name.bytes, "END",
                        unqualified_name.length) == 0) {
-                ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+                ink_astgen_emit_byte(astgen, INK_OP_EXIT);
                 return;
             }
             break;
         case 4:
             if (memcmp(unqualified_name.bytes, "DONE",
                        unqualified_name.length) == 0) {
-                ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+                ink_astgen_emit_byte(astgen, INK_OP_EXIT);
                 return;
             }
             break;
@@ -1104,8 +1135,8 @@ static void ink_astgen_divert_expr(struct ink_astgen *astgen,
         struct ink_object *const obj = ink_string_new(
             astgen->global->story, qualified_str.bytes, qualified_str.length);
 
-        ink_astgen_add_inst(astgen, INK_OP_DIVERT,
-                            (uint8_t)ink_astgen_add_const(astgen, obj));
+        ink_astgen_emit_const(astgen, INK_OP_DIVERT,
+                              (uint8_t)ink_astgen_add_const(astgen, obj));
         break;
     }
     case INK_AST_CALL_EXPR:
@@ -1121,7 +1152,7 @@ static void ink_astgen_content_stmt(struct ink_astgen *astgen,
                                     const struct ink_ast_node *node)
 {
     ink_astgen_content_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_FLUSH);
 }
 
 static void ink_astgen_divert_stmt(struct ink_astgen *astgen,
@@ -1138,14 +1169,14 @@ static void ink_astgen_expr_stmt(struct ink_astgen *astgen,
                                  const struct ink_ast_node *node)
 {
     ink_astgen_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_POP);
 }
 
 static void ink_astgen_return_stmt(struct ink_astgen *astgen,
                                    const struct ink_ast_node *node)
 {
     ink_astgen_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, INK_OP_RET, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_RET);
 }
 
 struct ink_astgen_choice {
@@ -1191,59 +1222,58 @@ static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
         }
         if (choice->start_expr) {
             ink_astgen_string(astgen, choice->start_expr);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
         }
         if (choice->option_expr) {
             ink_astgen_string(astgen, choice->option_expr);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
         }
 
         choice->constant = (uint8_t)ink_astgen_add_const(astgen, number);
 
-        ink_astgen_add_inst(astgen, INK_OP_CONST, choice->constant);
-        ink_astgen_add_inst(astgen, INK_OP_CHOICE_PUSH, 0);
+        ink_astgen_emit_const(astgen, INK_OP_CONST, choice->constant);
+        ink_astgen_emit_byte(astgen, INK_OP_CHOICE_PUSH);
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_FLUSH);
 
     for (size_t i = 0; i < node_list->count; i++) {
         struct ink_astgen_choice *const choice = &choice_data[i];
 
-        ink_astgen_add_inst(astgen, INK_OP_LOAD_CHOICE_ID, 0);
-        ink_astgen_add_inst(astgen, INK_OP_CONST, choice->constant);
-        ink_astgen_add_inst(astgen, INK_OP_CMP_EQ, 0);
+        ink_astgen_emit_byte(astgen, INK_OP_LOAD_CHOICE_ID);
+        ink_astgen_emit_const(astgen, INK_OP_CONST, choice->constant);
+        ink_astgen_emit_byte(astgen, INK_OP_CMP_EQ);
 
-        choice->label =
-            (uint8_t)ink_astgen_add_inst(astgen, INK_OP_JMP_T, 0xff);
+        choice->label = (uint8_t)ink_astgen_emit_jump(astgen, INK_OP_JMP_T);
 
-        ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+        ink_astgen_emit_byte(astgen, INK_OP_POP);
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_EXIT);
 
     for (size_t i = 0; i < node_list->count; i++) {
         struct ink_astgen_choice *const choice = &choice_data[i];
         struct ink_ast_node *const choice_node = node_list->nodes[i];
         struct ink_ast_node *const body_node = choice_node->rhs;
 
-        ink_astgen_patch_jmp(astgen, choice->label);
-        ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+        ink_astgen_patch_jump(astgen, choice->label);
+        ink_astgen_emit_byte(astgen, INK_OP_POP);
 
         if (choice->start_expr) {
             ink_astgen_string(astgen, choice->start_expr);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
         }
         if (choice->inner_expr) {
             ink_astgen_string(astgen, choice->inner_expr);
-            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
         }
 
-        ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
+        ink_astgen_emit_byte(astgen, INK_OP_FLUSH);
 
         if (body_node) {
             ink_astgen_block_stmt(astgen, body_node);
         } else {
-            ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+            ink_astgen_emit_byte(astgen, INK_OP_EXIT);
         }
     }
 
@@ -1300,7 +1330,7 @@ static void ink_astgen_block_stmt(struct ink_astgen *astgen,
         }
     }
 
-    ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+    ink_astgen_emit_byte(astgen, INK_OP_EXIT);
 }
 
 static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
@@ -1353,14 +1383,14 @@ static void ink_astgen_func_decl(struct ink_astgen *parent_scope,
     ink_astgen_knot_proto(&func_scope, proto_node, &func_sym);
 
     if (!body_node) {
-        ink_astgen_add_inst(&func_scope, INK_OP_RET, 0);
+        ink_astgen_emit_byte(&func_scope, INK_OP_RET);
         return;
     }
 
     ink_astgen_block_stmt(&func_scope, body_node);
 
     if (!ink_astgen_had_return(&func_scope)) {
-        ink_astgen_add_inst(&func_scope, INK_OP_RET, 0);
+        ink_astgen_emit_byte(&func_scope, INK_OP_RET);
     }
 }
 
@@ -1384,7 +1414,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     ink_astgen_knot_proto(&stitch_scope, proto_node, &stitch_sym);
 
     if (!body_list) {
-        ink_astgen_add_inst(&stitch_scope, INK_OP_EXIT, 0);
+        ink_astgen_emit_byte(&stitch_scope, INK_OP_EXIT);
         return;
     }
 
@@ -1393,7 +1423,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     struct ink_ast_node *const body_node = body_list->nodes[0];
 
     ink_astgen_block_stmt(&stitch_scope, body_node);
-    ink_astgen_add_inst(&stitch_scope, INK_OP_EXIT, 0);
+    ink_astgen_emit_byte(&stitch_scope, INK_OP_EXIT);
 }
 
 static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
@@ -1416,7 +1446,7 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
     ink_astgen_knot_proto(&knot_scope, proto_node, &knot_sym);
 
     if (!body_list) {
-        ink_astgen_add_inst(&knot_scope, INK_OP_EXIT, 0);
+        ink_astgen_emit_byte(&knot_scope, INK_OP_EXIT);
         return;
     }
 
@@ -1427,7 +1457,7 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
         i++;
     }
 
-    ink_astgen_add_inst(&knot_scope, INK_OP_EXIT, 0);
+    ink_astgen_emit_byte(&knot_scope, INK_OP_EXIT);
 
     for (; i < body_list->count; i++) {
         struct ink_ast_node *const body_node = body_list->nodes[i];
@@ -1445,7 +1475,7 @@ static void ink_astgen_default_body(struct ink_astgen *parent_scope,
 
     ink_astgen_add_knot(parent_scope, name_index);
     ink_astgen_block_stmt(parent_scope, node);
-    ink_astgen_add_inst(parent_scope, INK_OP_EXIT, 0);
+    ink_astgen_emit_byte(parent_scope, INK_OP_EXIT);
 }
 
 static int ink_astgen_record_proto(struct ink_astgen *parent_scope,

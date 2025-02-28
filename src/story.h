@@ -8,19 +8,12 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+#include "common.h"
 #include "vec.h"
 
 struct ink_object;
 
 #define INK_STORY_STACK_MAX 128
-
-enum ink_story_err {
-    INK_STORY_OK = 0,
-    INK_STORY_ERR_MEMORY,
-    INK_STORY_ERR_STACK_OVERFLOW,
-    INK_STORY_ERR_INVALID_OPCODE,
-    INK_STORY_ERR_INVALID_ARG,
-};
 
 enum ink_flags {
     INK_F_TRACING = (1 << 0),

@@ -2080,7 +2080,7 @@ int ink_parse(const uint8_t *source_bytes, const uint8_t *filename,
     if (tree->root) {
         rc = INK_E_OK;
     } else {
-        rc = -INK_E_PARSE_FAIL;
+        rc = -INK_E_PANIC;
     }
 
     ink_parser_deinit(&parser);

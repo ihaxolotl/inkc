@@ -8,6 +8,19 @@
 extern "C" {
 #endif
 
+enum ink_status {
+    INK_E_OK,
+    INK_E_PANIC,
+    INK_E_OOM,
+    INK_E_OS,
+    INK_E_FILE,
+    INK_E_OVERWRITE,
+    INK_E_INVALID_OPTION,
+    INK_E_INVALID_INST,
+    INK_E_INVALID_ARG,
+    INK_E_STACK_OVERFLOW,
+};
+
 #define INK_VA_ARGS_NTH(_1, _2, _3, _4, _5, N, ...) N
 #define INK_VA_ARGS_COUNT(...) INK_VA_ARGS_NTH(__VA_ARGS__, 5, 4, 3, 2, 1, 0)
 
@@ -26,17 +39,6 @@ extern "C" {
 
 #define INK_DISPATCH(func, ...)                                                \
     INK_DISPATCHER(func, INK_VA_ARGS_COUNT(__VA_ARGS__), __VA_ARGS__)
-
-enum ink_status {
-    INK_E_OK,
-    INK_E_OOM,
-    INK_E_OS,
-    INK_E_FILE,
-    INK_E_OVERWRITE,
-    INK_E_PARSE_FAIL,
-    INK_E_PARSE_PANIC,
-    INK_E_INVALID_INST,
-};
 
 extern uint32_t ink_fnv32a(const uint8_t *data, size_t length);
 
