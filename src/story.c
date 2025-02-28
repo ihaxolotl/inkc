@@ -98,8 +98,10 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_CMP_LTE:
     case INK_OP_CMP_GT:
     case INK_OP_CMP_GTE:
+    case INK_OP_FLUSH:
+    case INK_OP_LOAD_CHOICE_ID:
     case INK_OP_CONTENT_PUSH:
-    case INK_OP_CONTENT_FLUSH:
+    case INK_OP_CHOICE_PUSH:
         ink_disassemble_simple_inst(story, bytes, offset, op);
         break;
     case INK_OP_CONST:
@@ -191,44 +193,6 @@ void ink_story_mem_free(struct ink_story *story, void *ptr)
     }
 
     ink_story_mem_alloc(story, ptr, 0, 0);
-}
-
-static char *ink_story_content_copy(struct ink_story *story)
-{
-    char *str;
-    const size_t size = story->content.count;
-
-    str = ink_malloc(size + 1);
-    if (!str) {
-        return str;
-    }
-
-    memcpy(str, story->content.entries, size);
-    str[size] = '\0';
-    return str;
-}
-
-int ink_story_content_push(struct ink_story *story, struct ink_object *obj)
-{
-    int rc;
-    struct ink_string *const str = INK_OBJ_AS_STRING(obj);
-
-    for (size_t i = 0; i < str->length; i++) {
-        rc = ink_byte_vec_push(&story->content, str->bytes[i]);
-        if (rc < 0) {
-            return rc;
-        }
-    }
-    return INK_E_OK;
-}
-
-static void ink_story_content_clear(struct ink_story *story)
-{
-    ink_byte_vec_shrink(&story->content, 0);
-
-    if (story->content.capacity > 0) {
-        story->content.entries[0] = '\0';
-    }
 }
 
 int ink_story_stack_push(struct ink_story *story, struct ink_object *obj)
@@ -396,8 +360,11 @@ static int ink_story_execute(struct ink_story *story)
     struct ink_object *temp[4];
     struct ink_object *const globals_pool = story->globals;
     struct ink_object *const paths_pool = story->paths;
+    struct ink_byte_vec pending_content;
 
-    ink_story_content_clear(story);
+    ink_byte_vec_init(&pending_content);
+    ink_choice_vec_shrink(&story->current_choices, 0);
+    story->current_content = NULL;
 
     for (;;) {
         struct ink_call_frame *const frame =
@@ -587,17 +554,56 @@ static int ink_story_execute(struct ink_story *story)
                 goto exit_loop;
             }
             break;
-        case INK_OP_CONTENT_PUSH:
+        case INK_OP_CONTENT_PUSH: {
+            struct ink_object *const arg = ink_story_stack_pop(story);
+            struct ink_string *const str = INK_OBJ_AS_STRING(arg);
+
+            for (size_t i = 0; i < str->length; i++) {
+                rc = ink_byte_vec_push(&pending_content, str->bytes[i]);
+                if (rc < 0) {
+                    return rc;
+                }
+            }
             break;
-        case INK_OP_CONTENT_FLUSH:
+        }
+        case INK_OP_CHOICE_PUSH: {
+            struct ink_object *const arg = ink_story_stack_pop(story);
+            struct ink_object *const str = ink_string_new(
+                story, pending_content.entries, pending_content.count);
+            const struct ink_choice choice = {
+                .id = arg,
+                .text = INK_OBJ_AS_STRING(str),
+            };
+
+            ink_choice_vec_push(&story->current_choices, choice);
+            ink_byte_vec_shrink(&pending_content, 0);
+            break;
+        }
+        case INK_OP_LOAD_CHOICE_ID:
+            rc = ink_story_stack_push(story, story->choice_id);
+            if (rc < 0) {
+                goto exit_loop;
+            }
+            break;
+        case INK_OP_FLUSH:
+            rc = ink_byte_vec_push(&pending_content, '\0');
+            if (rc < 0) {
+                return rc;
+            }
+
+            struct ink_object *const str = ink_string_new(
+                story, pending_content.entries, pending_content.count);
+
+            story->current_content = str;
             rc = INK_STORY_OK;
             goto exit_loop;
         default:
-            rc = -1;
+            rc = -INK_E_INVALID_INST;
             goto exit_loop;
         }
     }
 exit_loop:
+    ink_byte_vec_deinit(&pending_content);
     return rc;
 }
 
@@ -607,7 +613,7 @@ static void ink_story_init(struct ink_story *story, int flags)
 {
     memset(story, 0, sizeof(*story));
 
-    ink_byte_vec_init(&story->content);
+    ink_choice_vec_init(&story->current_choices);
 
     story->can_continue = true;
     story->flags = flags;
@@ -617,7 +623,7 @@ static void ink_story_init(struct ink_story *story, int flags)
 
 static void ink_story_deinit(struct ink_story *story)
 {
-    ink_byte_vec_deinit(&story->content);
+    ink_choice_vec_deinit(&story->current_choices);
 
     while (story->objects) {
         struct ink_object *obj = story->objects;
@@ -680,12 +686,32 @@ void ink_story_free(struct ink_story *story)
     ink_story_deinit(story);
 }
 
-char *ink_story_continue(struct ink_story *story)
+int ink_story_continue(struct ink_story *story, struct ink_string **content)
 {
     const int rc = ink_story_execute(story);
 
     if (rc < 0) {
-        return NULL;
+        return rc;
     }
-    return ink_story_content_copy(story);
+    if (content) {
+        *content = INK_OBJ_AS_STRING(story->current_content);
+    }
+    return INK_STORY_OK;
+}
+
+int ink_story_choose(struct ink_story *story, size_t index)
+{
+    if (index < 0) {
+        index = 0;
+    } else if (index > 0) {
+        index--;
+    }
+    if (index < story->current_choices.count) {
+        struct ink_choice *const choice =
+            &story->current_choices.entries[index];
+
+        story->choice_id = choice->id;
+        return INK_E_OK;
+    }
+    return -1;
 }

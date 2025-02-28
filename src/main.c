@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "logging.h"
+#include "object.h"
 #include "option.h"
 #include "source.h"
 #include "story.h"
@@ -157,15 +158,35 @@ int main(int argc, char *argv[])
          * workaround */
         return EXIT_SUCCESS;
     }
-    if (!compile_only) {
-        while (story.can_continue) {
-            char *const content = ink_story_continue(&story);
 
-            if (content) {
-                printf("%s\n", content);
-                ink_free(content);
-            } else {
+    if (!compile_only) {
+        struct ink_string *content = NULL;
+
+        while (story.can_continue) {
+            rc = ink_story_continue(&story, &content);
+            if (rc < 0) {
                 break;
+            }
+            if (content) {
+                printf("%s\n", content->bytes);
+            }
+            if (story.current_choices.count > 0) {
+                size_t choice_index = 0;
+
+                for (size_t i = 0; i < story.current_choices.count; i++) {
+                    struct ink_choice *const choice =
+                        &story.current_choices.entries[i];
+
+                    printf("[%zu] %s\n", i + 1, choice->text->bytes);
+                }
+
+                printf("> ");
+                scanf("%zu", &choice_index);
+
+                rc = ink_story_choose(&story, choice_index);
+                if (rc < 0) {
+                    break;
+                }
             }
         }
     }

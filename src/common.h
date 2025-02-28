@@ -35,6 +35,7 @@ enum ink_status {
     INK_E_OVERWRITE,
     INK_E_PARSE_FAIL,
     INK_E_PARSE_PANIC,
+    INK_E_INVALID_INST,
 };
 
 extern uint32_t ink_fnv32a(const uint8_t *data, size_t length);

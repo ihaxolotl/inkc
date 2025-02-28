@@ -14,9 +14,6 @@ struct ink_object;
 
 #define INK_STORY_STACK_MAX 128
 
-INK_VEC_T(ink_object_vec, struct ink_object *)
-INK_VEC_T(ink_byte_vec, uint8_t)
-
 enum ink_story_err {
     INK_STORY_OK = 0,
     INK_STORY_ERR_MEMORY,
@@ -34,12 +31,21 @@ enum ink_flags {
     INK_F_DUMP_CODE = (1 << 5),
 };
 
+struct ink_choice {
+    struct ink_object *id;
+    struct ink_string *text;
+};
+
 struct ink_call_frame {
     struct ink_content_path *callee;
     struct ink_content_path *caller;
     uint8_t *ip;
     struct ink_object **sp;
 };
+
+INK_VEC_T(ink_object_vec, struct ink_object *)
+INK_VEC_T(ink_choice_vec, struct ink_choice)
+INK_VEC_T(ink_byte_vec, uint8_t)
 
 /**
  * Ink Story Context
@@ -49,11 +55,13 @@ struct ink_story {
     int flags;
     size_t stack_top;
     size_t call_stack_top;
-    struct ink_byte_vec content;
     struct ink_object *globals;
     struct ink_object *paths;
     struct ink_object *objects;
     struct ink_object *current_path;
+    struct ink_object *current_content;
+    struct ink_object *choice_id;
+    struct ink_choice_vec current_choices;
     struct ink_object *stack[INK_STORY_STACK_MAX];
     struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
 };
@@ -68,7 +76,6 @@ extern int ink_story_load_opts(struct ink_story *story,
                                const struct ink_load_opts *opts);
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
-extern char *ink_story_continue(struct ink_story *story);
 extern void ink_story_dump(struct ink_story *story);
 extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
@@ -79,6 +86,9 @@ extern int ink_story_stack_push(struct ink_story *story,
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
 extern struct ink_object *ink_story_stack_peek(struct ink_story *story,
                                                size_t offset);
+extern int ink_story_continue(struct ink_story *story,
+                              struct ink_string **content);
+extern int ink_story_choose(struct ink_story *story, size_t index);
 
 #ifdef __cplusplus
 }

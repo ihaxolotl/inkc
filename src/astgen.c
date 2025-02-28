@@ -1121,7 +1121,7 @@ static void ink_astgen_content_stmt(struct ink_astgen *astgen,
                                     const struct ink_ast_node *node)
 {
     ink_astgen_content_expr(astgen, node->lhs);
-    ink_astgen_add_inst(astgen, INK_OP_CONTENT_FLUSH, 0);
+    ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
 }
 
 static void ink_astgen_divert_stmt(struct ink_astgen *astgen,
@@ -1148,6 +1148,108 @@ static void ink_astgen_return_stmt(struct ink_astgen *astgen,
     ink_astgen_add_inst(astgen, INK_OP_RET, 0);
 }
 
+struct ink_astgen_choice {
+    uint8_t constant;
+    uint8_t label;
+    struct ink_ast_node *start_expr;
+    struct ink_ast_node *option_expr;
+    struct ink_ast_node *inner_expr;
+};
+
+static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
+                                   const struct ink_ast_node *node)
+{
+    struct ink_ast_seq *const node_list = node->seq;
+    struct ink_astgen_choice *const choice_data =
+        ink_malloc(node_list->count * sizeof(*choice_data));
+
+    if (!choice_data) {
+        return;
+    }
+    for (size_t i = 0; i < node_list->count; i++) {
+        struct ink_astgen_choice *const choice = &choice_data[i];
+        struct ink_ast_node *const choice_node = node_list->nodes[i];
+        struct ink_ast_node *const hdr_node = choice_node->lhs;
+        struct ink_ast_seq *const expr_list = hdr_node->seq;
+        struct ink_object *const number =
+            ink_number_new(astgen->global->story, (double)i);
+
+        choice->start_expr = NULL;
+        choice->option_expr = NULL;
+        choice->inner_expr = NULL;
+
+        for (size_t j = 0; j < expr_list->count; j++) {
+            struct ink_ast_node *const expr_node = expr_list->nodes[j];
+
+            if (expr_node->type == INK_AST_CHOICE_START_EXPR) {
+                choice->start_expr = expr_node;
+            } else if (expr_node->type == INK_AST_CHOICE_OPTION_EXPR) {
+                choice->option_expr = expr_node;
+            } else if (expr_node->type == INK_AST_CHOICE_INNER_EXPR) {
+                choice->inner_expr = expr_node;
+            }
+        }
+        if (choice->start_expr) {
+            ink_astgen_string(astgen, choice->start_expr);
+            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+        }
+        if (choice->option_expr) {
+            ink_astgen_string(astgen, choice->option_expr);
+            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+        }
+
+        choice->constant = (uint8_t)ink_astgen_add_const(astgen, number);
+
+        ink_astgen_add_inst(astgen, INK_OP_CONST, choice->constant);
+        ink_astgen_add_inst(astgen, INK_OP_CHOICE_PUSH, 0);
+    }
+
+    ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
+
+    for (size_t i = 0; i < node_list->count; i++) {
+        struct ink_astgen_choice *const choice = &choice_data[i];
+
+        ink_astgen_add_inst(astgen, INK_OP_LOAD_CHOICE_ID, 0);
+        ink_astgen_add_inst(astgen, INK_OP_CONST, choice->constant);
+        ink_astgen_add_inst(astgen, INK_OP_CMP_EQ, 0);
+
+        choice->label =
+            (uint8_t)ink_astgen_add_inst(astgen, INK_OP_JMP_T, 0xff);
+
+        ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+    }
+
+    ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+
+    for (size_t i = 0; i < node_list->count; i++) {
+        struct ink_astgen_choice *const choice = &choice_data[i];
+        struct ink_ast_node *const choice_node = node_list->nodes[i];
+        struct ink_ast_node *const body_node = choice_node->rhs;
+
+        ink_astgen_patch_jmp(astgen, choice->label);
+        ink_astgen_add_inst(astgen, INK_OP_POP, 0);
+
+        if (choice->start_expr) {
+            ink_astgen_string(astgen, choice->start_expr);
+            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+        }
+        if (choice->inner_expr) {
+            ink_astgen_string(astgen, choice->inner_expr);
+            ink_astgen_add_inst(astgen, INK_OP_CONTENT_PUSH, 0);
+        }
+
+        ink_astgen_add_inst(astgen, INK_OP_FLUSH, 0);
+
+        if (body_node) {
+            ink_astgen_block_stmt(astgen, body_node);
+        } else {
+            ink_astgen_add_inst(astgen, INK_OP_EXIT, 0);
+        }
+    }
+
+    ink_free(choice_data);
+}
+
 static void ink_astgen_stmt(struct ink_astgen *astgen,
                             const struct ink_ast_node *node)
 {
@@ -1168,6 +1270,9 @@ static void ink_astgen_stmt(struct ink_astgen *astgen,
         break;
     case INK_AST_RETURN_STMT:
         ink_astgen_return_stmt(astgen, node);
+        break;
+    case INK_AST_CHOICE_STMT:
+        ink_astgen_choice_stmt(astgen, node);
         break;
     default:
         assert(false);
