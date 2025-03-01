@@ -5,11 +5,14 @@
 # Directories
 .cache/
 dist/
+build/
 __pycache__/
 
 # Temporary Files / Logs
 *.log
 .gdb_history
+*.profdata
+*.profraw
 
 # Prerequisites
 *.d

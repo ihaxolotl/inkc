@@ -1,30 +1,42 @@
-.PHONY: all test clean
+.PHONY: all test fuzz clean
 
 Q = @
+
+PROFILE   := debug
+DIST_ROOT := build
+DIST      := $(DIST_ROOT)/$(PROFILE)
+INK_BIN   := $(DIST)/inkc
+INK_LIB   := $(DIST)/libink.a
+TEST_BIN  := $(DIST)/libink-tests
+FUZZ_BIN  := $(DIST)/libink-fuzzer
 
 CC    := clang
 AR    := ar
 RM    := rm -rf
 MKDIR := mkdir -p
 
-DIST     := dist
-INK_BIN  := $(DIST)/inkc
-INK_LIB  := $(DIST)/libink.a
-TEST_BIN := $(DIST)/libink-tests
+CFLAGS.release := -O2 -DNDEBUG
+CFLAGS.debug   := -O0 -g3                      \
+                  -fsanitize=address,undefined \
+                  -fno-omit-frame-pointer      \
 
-CFLAGS  := -Wall                       \
-           -Wextra                     \
-           -Werror                     \
-           -Wpedantic                  \
-           -Wno-unused-parameter       \
-           -Wconversion                \
-           -std=c99 -g3 -ggdb -O0      \
-           -Isrc
+CFLAGS  := -Wall                               \
+           -Wextra                             \
+           -Werror                             \
+           -Wpedantic                          \
+           -Wno-unused-parameter               \
+           -Wconversion                        \
+           -std=c99                            \
+           -Isrc                               \
+           ${CFLAGS.${PROFILE}}
 
-LDFLAGS := -fno-omit-frame-pointer     \
-           -fsanitize=address          \
-           -fsanitize=undefined        \
-           -lm -L/usr/local/lib
+LDFLAGS.debug := -fsanitize=address,undefined  \
+	             -fno-omit-frame-pointer       \
+
+LDFLAGS.release :=
+
+LDFLAGS := -lm -L/usr/local/lib                \
+		   ${LDFLAGS.${PROFILE}}
 
 ARFLAGS  := -crs
 
@@ -46,7 +58,9 @@ lib_srcs := src/logging.c                  \
 bin_srcs := src/option.c                   \
             src/main.c
 
-test_srcs := tests/main.c
+test_srcs := tests/test_main.c
+
+fuzz_srcs := tests/fuzz_main.cc
 
 build-prefix = $(addprefix $(DIST)/,$1)
 source-to-object = $(call build-prefix, $(subst .c,.o,$(filter %.c,$1)))
@@ -71,12 +85,18 @@ $(INK_BIN): $(call source-to-object,$(bin_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+test: $(TEST_BIN)
+
 $(TEST_BIN): $(call source-to-object,$(test_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcmocka
 
-test: $(TEST_BIN)
-	$(Q)$(TEST_BIN)
+fuzz: $(FUZZ_BIN)
+
+$(FUZZ_BIN): $(INK_LIB)
+	$(call msg,LD,$@)
+	$(Q)$(CC) -Isrc -g -fno-omit-frame-pointer -fsanitize=address,undefined,fuzzer \
+	   	-o $(FUZZ_BIN) $(fuzz_srcs) $(INK_LIB) $(LDFLAGS)
 
 clean:
-	$(Q)$(RM) $(DIST)
+	$(Q)$(RM) $(DIST_ROOT)
