@@ -15,7 +15,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     int rc = ink_story_load_opts(&story, &opts);
     if (rc < 0) {
+        ink_story_free(&story);
         return -1;
     }
+
+    ink_story_free(&story);
     return 0;
 }
