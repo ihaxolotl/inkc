@@ -856,24 +856,31 @@ int ink_story_load_opts(struct ink_story *story,
         return -INK_E_PANIC;
     }
 
-    memset(story, 0, sizeof(*story));
-
+    story->can_continue = true;
+    story->flags = opts->flags & ~INK_F_GC_ENABLE;
+    story->stack_top = 0;
+    story->call_stack_top = 0;
     story->gc_allocated = 0;
     story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
     story->gc_gray_count = 0;
     story->gc_gray_capacity = 0;
     story->gc_gray = NULL;
     story->gc_objects = NULL;
-    story->can_continue = true;
-    story->flags = opts->flags & ~INK_F_GC_ENABLE;
     story->globals = ink_table_new(story);
     story->paths = ink_table_new(story);
+    story->current_path = NULL;
+    story->current_content = NULL;
+    story->choice_id = NULL;
+
+    memset(story->stack, 0, sizeof(struct ink_object *) * INK_STORY_STACK_MAX);
+    memset(story->call_stack, 0,
+           sizeof(struct ink_call_frame *) * INK_STORY_STACK_MAX);
 
     ink_choice_vec_init(&story->current_choices);
 
     rc = ink_compile(story, opts);
     if (rc < 0) {
-        return rc;
+        goto err;
     }
     if (opts->flags & INK_F_GC_ENABLE) {
         story->flags |= INK_F_GC_ENABLE;
@@ -896,7 +903,8 @@ int ink_story_load_opts(struct ink_story *story,
             }
         }
     }
-    return 0;
+err:
+    return rc;
 }
 
 int ink_story_load(struct ink_story *story, const char *source, int flags)

@@ -494,29 +494,24 @@ struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
 }
 
 /**
- * Initialize AST.
+ * Initialize abstract syntax tree.
  */
 void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
-                  const uint8_t *source_bytes, size_t source_length)
+                  const uint8_t *source_bytes)
 {
     tree->filename = filename;
     tree->source_bytes = source_bytes;
-    tree->source_length = source_length;
     tree->root = NULL;
-
     ink_ast_error_vec_init(&tree->errors);
 }
 
 /**
- * Free AST.
+ * Cleanup abstract syntax tree.
  */
 void ink_ast_deinit(struct ink_ast *tree)
 {
-
     tree->filename = NULL;
     tree->source_bytes = NULL;
-    tree->source_length = 0;
     tree->root = NULL;
-
     ink_ast_error_vec_deinit(&tree->errors);
 }

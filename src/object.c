@@ -149,6 +149,8 @@ bool ink_number_gte(struct ink_story *story, const struct ink_object *lhs,
 struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
                                   size_t length)
 {
+    assert(bytes != NULL && length != 0);
+
     struct ink_string *const obj = INK_OBJ_AS_STRING(
         ink_object_new(story, INK_OBJ_STRING, sizeof(*obj) + length + 1));
 

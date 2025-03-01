@@ -189,17 +189,11 @@ bool ink_scanner_try_keyword(struct ink_scanner *scanner,
 
 void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
 {
-    uint8_t c = '\0';
     enum ink_lex_state state = INK_LEX_START;
     struct ink_scanner_mode *const mode = ink_scanner_current(scanner);
 
     for (;;) {
-        if (scanner->cursor_offset >= scanner->source_length) {
-            token->type = INK_TT_EOF;
-            goto exit_loop;
-        }
-
-        c = scanner->source_bytes[scanner->cursor_offset];
+        const uint8_t c = scanner->source_bytes[scanner->cursor_offset];
 
         switch (state) {
         case INK_LEX_START: {

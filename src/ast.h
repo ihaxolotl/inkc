@@ -139,8 +139,6 @@ struct ink_ast_seq {
  * Each node's memory is arranged for reasonably efficient storage. Nodes do
  * not directly store token information, instead opting to reference source
  * positions by index.
- *
- * TODO(Brett): Pack node data to reduce node size?
  */
 struct ink_ast_node {
     enum ink_ast_node_type type;
@@ -156,11 +154,10 @@ struct ink_ast_node {
  * Abstract syntax tree.
  */
 struct ink_ast {
-    const uint8_t *filename;
-    const uint8_t *source_bytes;
-    size_t source_length;
-    struct ink_ast_node *root;
-    struct ink_ast_error_vec errors;
+    const uint8_t *filename;         /* Source filename. NULL-Terminated. */
+    const uint8_t *source_bytes;     /* Source code bytes. NULL-Terminated. */
+    struct ink_ast_node *root;       /* Root node for the tree. */
+    struct ink_ast_error_vec errors; /* Syntax errors. */
 };
 
 extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
@@ -172,7 +169,7 @@ ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
                  struct ink_arena *arena);
 
 extern void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
-                         const uint8_t *source_bytes, size_t source_length);
+                         const uint8_t *source_bytes);
 extern void ink_ast_deinit(struct ink_ast *tree);
 extern void ink_ast_print(const struct ink_ast *tree, bool colors);
 extern void ink_ast_render_errors(const struct ink_ast *tree);

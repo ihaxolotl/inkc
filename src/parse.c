@@ -894,15 +894,13 @@ static void ink_parser_handle_func(struct ink_parser *parser,
 static int ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
                            struct ink_arena *arena, int flags)
 {
+    const struct ink_scanner scanner = {
+        .source_bytes = tree->source_bytes,
+        .is_line_start = true,
+    };
+
     parser->arena = arena;
-    parser->scanner.source_bytes = tree->source_bytes;
-    parser->scanner.source_length = tree->source_length;
-    parser->scanner.is_line_start = true;
-    parser->scanner.start_offset = 0;
-    parser->scanner.cursor_offset = 0;
-    parser->scanner.mode_stack[0].type = INK_GRAMMAR_CONTENT;
-    parser->scanner.mode_stack[0].source_offset = 0;
-    parser->scanner.mode_depth = 0;
+    parser->scanner = scanner;
     parser->token.type = 0;
     parser->token.start_offset = 0;
     parser->token.end_offset = 0;
@@ -2062,7 +2060,7 @@ int ink_parse(const uint8_t *source_bytes, size_t source_length,
     int rc;
     struct ink_parser parser;
 
-    ink_ast_init(tree, filename, source_bytes, source_length);
+    ink_ast_init(tree, filename, source_bytes);
 
     rc = ink_parser_init(&parser, tree, arena, flags);
     if (rc < 0) {

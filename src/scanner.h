@@ -24,12 +24,11 @@ struct ink_scanner_mode {
 };
 
 struct ink_scanner {
-    const uint8_t *source_bytes;
-    size_t source_length;
-    size_t cursor_offset;
-    size_t start_offset;
-    size_t mode_depth;
-    bool is_line_start;
+    const uint8_t *source_bytes; /* Source code bytes. NULL-terminated */
+    size_t start_offset;         /* Start offset for current lexeme. */
+    size_t cursor_offset;        /* Current offset */
+    size_t mode_depth;           /* Mode stack depth */
+    bool is_line_start;          /* Did we just see a newline? */
     struct ink_scanner_mode mode_stack[INK_SCANNER_DEPTH_MAX];
 };
 
