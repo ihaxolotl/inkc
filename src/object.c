@@ -251,7 +251,7 @@ static int ink_table_resize(struct ink_story *story, struct ink_table *table)
     entries =
         ink_story_mem_alloc(story, NULL, 0, capacity * (sizeof(*entries)));
     if (!entries) {
-        return -1;
+        return -INK_E_OOM;
     }
 
     memset(entries, 0, size);
@@ -270,7 +270,7 @@ static int ink_table_resize(struct ink_story *story, struct ink_table *table)
     table->entries = entries;
     table->capacity = capacity;
     table->count = count;
-    return 0;
+    return INK_E_OK;
 }
 
 int ink_table_lookup(struct ink_story *story, struct ink_object *obj,
@@ -282,17 +282,17 @@ int ink_table_lookup(struct ink_story *story, struct ink_object *obj,
     assert(INK_OBJ_IS_TABLE(obj));
 
     if (table->count == 0) {
-        return -1;
+        return -INK_E_OOM;
     }
 
     kv = ink_table_find_slot(story, table->entries, table->capacity,
                              INK_OBJ_AS_STRING(key));
     if (!kv->key) {
-        return -1;
+        return -INK_E_OOM;
     }
 
     *value = kv->value;
-    return 0;
+    return INK_E_OK;
 }
 
 int ink_table_insert(struct ink_story *story, struct ink_object *obj,
@@ -319,7 +319,7 @@ int ink_table_insert(struct ink_story *story, struct ink_object *obj,
         entry->key = key_str;
         entry->value = value;
         table->count++;
-        return 0;
+        return INK_E_OK;
     }
 
     entry->key = key_str;
@@ -360,7 +360,6 @@ struct ink_object *ink_content_path_new(struct ink_story *story,
         ink_object_new(story, INK_OBJ_CONTENT_PATH, sizeof(*obj)));
 
     if (!obj) {
-        ink_story_mem_panic(story);
         return NULL;
     }
 
@@ -390,15 +389,15 @@ struct ink_object *ink_object_new(struct ink_story *story,
     struct ink_object *const obj = ink_story_mem_alloc(story, NULL, 0, size);
 
     if (!obj) {
-        ink_story_mem_panic(story);
         return NULL;
     }
 
     assert(size >= sizeof(*obj));
 
-    obj->next = story->objects;
     obj->type = type;
-    story->objects = obj;
+    obj->is_marked = false;
+    obj->next = story->gc_objects;
+    story->gc_objects = obj;
     return obj;
 }
 

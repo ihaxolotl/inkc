@@ -20,8 +20,9 @@ enum ink_object_type {
 };
 
 struct ink_object {
-    struct ink_object *next;
     enum ink_object_type type;
+    bool is_marked;
+    struct ink_object *next;
 };
 
 struct ink_bool {

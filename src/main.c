@@ -20,7 +20,6 @@ enum {
     OPT_DUMP_CODE,
     OPT_COMPILE_ONLY,
     OPT_HELP,
-    OPT_ARG_EXAMPLE
 };
 
 static const struct option opts[] = {
@@ -33,7 +32,6 @@ static const struct option opts[] = {
     {"--compile-only", OPT_COMPILE_ONLY, false},
     {"--help", OPT_HELP, false},
     {"-h", OPT_HELP, false},
-    {"--arg-example", OPT_ARG_EXAMPLE, true},
     (struct option){0},
 };
 
@@ -59,7 +57,7 @@ int main(int argc, char *argv[])
     struct ink_source source;
     struct ink_story story;
     bool compile_only = false;
-    int flags = 0;
+    int flags = INK_F_GC_ENABLE | INK_F_GC_STRESS;
     int opt = 0;
     int rc = -1;
     const char *filename = 0;
@@ -100,13 +98,6 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Unrecognised option %s.\n\n", option_unknown_opt);
             print_usage(argv[0]);
             return EXIT_FAILURE;
-        }
-        case OPT_ARG_EXAMPLE: {
-            char *arg;
-            while (*(arg = option_nextarg())) {
-                printf("--arg-example arg : %s\n", arg);
-            }
-            break;
         }
         case OPT_HELP: {
             print_usage(argv[0]);

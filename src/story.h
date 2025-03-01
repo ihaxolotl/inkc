@@ -22,6 +22,8 @@ enum ink_flags {
     INK_F_DUMP_AST = (1 << 3),
     INK_F_DUMP_IR = (1 << 4),
     INK_F_DUMP_CODE = (1 << 5),
+    INK_F_GC_ENABLE = (1 << 6),
+    INK_F_GC_STRESS = (1 << 7),
 };
 
 struct ink_choice {
@@ -48,9 +50,14 @@ struct ink_story {
     int flags;
     size_t stack_top;
     size_t call_stack_top;
+    size_t gc_allocated;
+    size_t gc_threshold;
+    size_t gc_gray_count;
+    size_t gc_gray_capacity;
+    struct ink_object **gc_gray;
+    struct ink_object *gc_objects;
     struct ink_object *globals;
     struct ink_object *paths;
-    struct ink_object *objects;
     struct ink_object *current_path;
     struct ink_object *current_content;
     struct ink_object *choice_id;
@@ -70,7 +77,6 @@ extern int ink_story_load_opts(struct ink_story *story,
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
 extern void ink_story_dump(struct ink_story *story);
-extern void ink_story_mem_panic(struct ink_story *story);
 extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
                                  size_t size_old, size_t size_new);
 extern void ink_story_mem_free(struct ink_story *story, void *ptr);

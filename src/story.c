@@ -2,11 +2,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "compile.h"
+#include "logging.h"
 #include "object.h"
 #include "opcode.h"
 #include "story.h"
+
+#define INK_GC_GRAY_CAPACITY_MIN (16ul)
+#define INK_GC_GRAY_GROWTH_FACTOR (2ul)
+#define INK_GC_HEAP_SIZE_MIN (1024ul * 1024ul)
+#define INK_GC_HEAP_GROWTH_PERCENT (50ul)
+
+static const char *INK_OBJ_TYPE_STR[] = {
+    [INK_OBJ_BOOL] = "Bool",
+    [INK_OBJ_NUMBER] = "Number",
+    [INK_OBJ_STRING] = "String",
+    [INK_OBJ_TABLE] = "Table",
+    [INK_OBJ_CONTENT_PATH] = "ContentPath",
+};
 
 const char *INK_DEFAULT_PATH = "@main";
 
@@ -157,41 +172,202 @@ void ink_story_dump(struct ink_story *story)
 static void ink_runtime_error(struct ink_story *story, const char *fmt)
 {
     (void)story;
-    fprintf(stdout, "[ERROR] %s!\n", fmt);
+    ink_error("%s!", fmt);
     exit(EXIT_FAILURE);
 }
 
-void ink_story_mem_panic(struct ink_story *story)
+static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
 {
-    (void)story;
-    fprintf(stdout, "[ERROR] Out of memory!\n");
-    exit(EXIT_FAILURE);
+    if (!obj || obj->is_marked) {
+        return;
+    }
+
+    obj->is_marked = true;
+    ink_trace("Marked object %p, type=%s", (void *)obj,
+              INK_OBJ_TYPE_STR[obj->type]);
+
+    if (story->gc_gray_capacity < story->gc_gray_count + 1) {
+        if (story->gc_gray_capacity == 0) {
+            story->gc_gray_capacity = INK_GC_GRAY_CAPACITY_MIN;
+        } else {
+            story->gc_gray_capacity =
+                story->gc_gray_capacity * INK_GC_GRAY_GROWTH_FACTOR;
+        }
+
+        story->gc_gray = (struct ink_object **)ink_realloc(
+            story->gc_gray,
+            sizeof(struct ink_object *) * story->gc_gray_capacity);
+
+        if (!story->gc_gray) {
+            ink_runtime_error(story, "Out of memory!");
+        }
+    }
+
+    story->gc_gray[story->gc_gray_count++] = obj;
+}
+
+static void ink_gc_blacken_object(struct ink_story *story,
+                                  struct ink_object *obj)
+{
+    size_t obj_size = 0;
+
+    assert(obj);
+
+    switch (obj->type) {
+    case INK_OBJ_BOOL:
+        obj_size = sizeof(struct ink_bool);
+        break;
+    case INK_OBJ_NUMBER:
+        obj_size = sizeof(struct ink_number);
+        break;
+    case INK_OBJ_STRING: {
+        struct ink_string *const str_obj = INK_OBJ_AS_STRING(obj);
+
+        obj_size = sizeof(struct ink_string) + str_obj->length + 1;
+        break;
+    }
+    case INK_OBJ_TABLE: {
+        struct ink_table *const table_obj = INK_OBJ_AS_TABLE(obj);
+
+        for (size_t i = 0; i < table_obj->capacity; i++) {
+            struct ink_table_kv *const entry = &table_obj->entries[i];
+
+            if (entry->key) {
+                ink_gc_mark_object(story, INK_OBJ(entry->key));
+                ink_gc_mark_object(story, entry->value);
+            }
+        }
+
+        obj_size = sizeof(struct ink_table) +
+                   table_obj->capacity * sizeof(struct ink_table_kv);
+        break;
+    }
+    case INK_OBJ_CONTENT_PATH: {
+        struct ink_content_path *const path_obj = INK_OBJ_AS_CONTENT_PATH(obj);
+
+        ink_gc_mark_object(story, INK_OBJ(path_obj->name));
+
+        for (size_t i = 0; i < path_obj->const_pool.count; i++) {
+            struct ink_object *const entry = path_obj->const_pool.entries[i];
+
+            ink_gc_mark_object(story, entry);
+        }
+
+        obj_size = sizeof(struct ink_content_path);
+        break;
+    }
+    }
+
+    story->gc_allocated += obj_size;
+
+    ink_trace("Blackened object %p, type=%s, size=%zu", (void *)obj,
+              INK_OBJ_TYPE_STR[obj->type], obj_size);
+}
+
+static void ink_gc_collect(struct ink_story *story)
+{
+    double time_start, time_elapsed;
+    size_t bytes_before, bytes_after;
+
+    if (story->flags & INK_F_TRACING) {
+        time_start = (double)clock() / CLOCKS_PER_SEC;
+        bytes_before = story->gc_allocated;
+        ink_trace("Beginning collection");
+    }
+
+    story->gc_allocated = 0;
+
+    for (size_t i = 0; i < story->stack_top; i++) {
+        struct ink_object *const obj = story->stack[i];
+
+        if (obj) {
+            ink_gc_mark_object(story, obj);
+        }
+    }
+
+    ink_gc_mark_object(story, story->globals);
+    ink_gc_mark_object(story, story->paths);
+    ink_gc_mark_object(story, story->current_path);
+    ink_gc_mark_object(story, story->current_content);
+    ink_gc_mark_object(story, story->choice_id);
+
+    for (size_t i = 0; i < story->current_choices.count; i++) {
+        struct ink_choice *const choice = &story->current_choices.entries[i];
+
+        ink_gc_mark_object(story, choice->id);
+        ink_gc_mark_object(story, INK_OBJ(choice->text));
+    }
+    while (story->gc_gray_count > 0) {
+        struct ink_object *const obj = story->gc_gray[--story->gc_gray_count];
+
+        ink_gc_blacken_object(story, obj);
+    }
+
+    struct ink_object **obj = &story->gc_objects;
+
+    while (*obj != NULL) {
+        if (!((*obj)->is_marked)) {
+            struct ink_object *unreached = *obj;
+
+            *obj = unreached->next;
+
+            ink_object_free(story, unreached);
+        } else {
+            (*obj)->is_marked = false;
+            obj = &(*obj)->next;
+        }
+    }
+
+    story->gc_threshold =
+        story->gc_allocated +
+        ((story->gc_allocated * INK_GC_HEAP_GROWTH_PERCENT) / 100);
+    if (story->gc_threshold < INK_GC_HEAP_SIZE_MIN) {
+        story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
+    }
+    if (story->flags & INK_F_TRACING) {
+        time_elapsed = ((double)clock() / CLOCKS_PER_SEC) - time_start;
+        bytes_after = story->gc_allocated;
+
+        ink_trace("Collection completed in %.3fms, before=%zu, after=%zu, "
+                  "collected=%zu, next at %zu",
+                  time_elapsed * 1000.0, bytes_before, bytes_after,
+                  bytes_before - bytes_after, story->gc_threshold);
+    }
 }
 
 void *ink_story_mem_alloc(struct ink_story *story, void *ptr, size_t size_old,
                           size_t size_new)
 {
-    if (size_new > size_old) {
-        if (story->flags & INK_F_TRACING) {
-            /*
-            fprintf(stdout, "[TRACE] Allocating memory (%p) %zu -> %zu\n", ptr,
-                    size_old, size_new);
-            */
+    if (story->flags & INK_F_TRACING) {
+        if (size_new > size_old) {
+            ink_trace("Allocating memory for %p, before=%zu, after=%zu", ptr,
+                      size_old, size_new);
         }
     }
-    if (size_new == 0) {
-        free(ptr);
+
+    story->gc_allocated += size_new - size_old;
+
+    if (story->flags & INK_F_GC_ENABLE) {
+        if (story->flags & INK_F_GC_STRESS) {
+            if (size_new > 0) {
+                ink_gc_collect(story);
+            }
+        }
+        if (size_new > 0 && story->gc_allocated > story->gc_threshold) {
+            ink_gc_collect(story);
+        }
+    }
+    if (!size_new) {
+        ink_free(ptr);
         return NULL;
     }
-    return realloc(ptr, size_new);
+    return ink_realloc(ptr, size_new);
 }
 
 void ink_story_mem_free(struct ink_story *story, void *ptr)
 {
     if (story->flags & INK_F_TRACING) {
-        /*
-        fprintf(stdout, "[TRACE] Free memory region (%p)\n", ptr);
-        */
+        ink_trace("Free memory %p", ptr);
     }
 
     ink_story_mem_alloc(story, ptr, 0, 0);
@@ -647,16 +823,12 @@ static int ink_story_execute(struct ink_story *story)
             break;
         }
         case INK_OP_FLUSH: {
-            struct ink_object *str = NULL;
+            if (pending_content.count > 0) {
+                struct ink_object *str = ink_string_new(
+                    story, pending_content.entries, pending_content.count);
 
-            rc = ink_byte_vec_push(&pending_content, '\0');
-            if (rc < 0) {
-                return rc;
+                story->current_content = str;
             }
-
-            str = ink_string_new(story, pending_content.entries,
-                                 pending_content.count);
-            story->current_content = str;
             rc = INK_E_OK;
             goto exit_loop;
         }
@@ -675,32 +847,6 @@ exit_loop:
 #undef INK_READ_BYTE
 #undef INK_READ_ADDR
 
-static void ink_story_init(struct ink_story *story, int flags)
-{
-    memset(story, 0, sizeof(*story));
-
-    ink_choice_vec_init(&story->current_choices);
-
-    story->can_continue = true;
-    story->flags = flags;
-    story->globals = ink_table_new(story);
-    story->paths = ink_table_new(story);
-}
-
-static void ink_story_deinit(struct ink_story *story)
-{
-    ink_choice_vec_deinit(&story->current_choices);
-
-    while (story->objects) {
-        struct ink_object *obj = story->objects;
-
-        story->objects = story->objects->next;
-        ink_object_free(story, obj);
-    }
-
-    memset(story, 0, sizeof(*story));
-}
-
 int ink_story_load_opts(struct ink_story *story,
                         const struct ink_load_opts *opts)
 {
@@ -709,11 +855,27 @@ int ink_story_load_opts(struct ink_story *story,
     const uint8_t *const filename = opts->filename;
     const uint8_t *const source_bytes = opts->source_text;
 
-    ink_story_init(story, flags);
+    memset(story, 0, sizeof(*story));
+
+    story->gc_allocated = 0;
+    story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
+    story->gc_gray_count = 0;
+    story->gc_gray_capacity = 0;
+    story->gc_gray = NULL;
+    story->gc_objects = NULL;
+    story->can_continue = true;
+    story->flags = flags & ~INK_F_GC_ENABLE;
+    story->globals = ink_table_new(story);
+    story->paths = ink_table_new(story);
+
+    ink_choice_vec_init(&story->current_choices);
 
     rc = ink_compile(source_bytes, filename, story, flags);
     if (rc < 0) {
         return rc;
+    }
+    if (flags & INK_F_GC_ENABLE) {
+        story->flags |= INK_F_GC_ENABLE;
     }
 
     struct ink_table *const paths_table = INK_OBJ_AS_TABLE(story->paths);
@@ -749,7 +911,17 @@ int ink_story_load(struct ink_story *story, const char *source, int flags)
 
 void ink_story_free(struct ink_story *story)
 {
-    ink_story_deinit(story);
+    ink_choice_vec_deinit(&story->current_choices);
+
+    while (story->gc_objects) {
+        struct ink_object *const obj = story->gc_objects;
+
+        story->gc_objects = story->gc_objects->next;
+        ink_object_free(story, obj);
+    }
+
+    ink_free(story->gc_gray);
+    memset(story, 0, sizeof(*story));
 }
 
 int ink_story_continue(struct ink_story *story, struct ink_string **content)
