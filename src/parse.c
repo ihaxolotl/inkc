@@ -2086,3 +2086,7 @@ int ink_parse(const uint8_t *source_bytes, const uint8_t *filename,
     ink_parser_deinit(&parser);
     return rc;
 }
+
+#undef INK_PARSER_MEMOIZE
+#undef INK_PARSER_TRACE
+#undef INK_PARSER_RULE
