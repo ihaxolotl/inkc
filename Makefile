@@ -19,6 +19,8 @@ CFLAGS.release := -O2 -DNDEBUG
 CFLAGS.debug   := -O0 -g3                      \
                   -fsanitize=address,undefined \
                   -fno-omit-frame-pointer      \
+                  -fprofile-instr-generate     \
+                  -fcoverage-mapping
 
 CFLAGS  := -Wall                               \
            -Wextra                             \
@@ -95,7 +97,11 @@ fuzz: $(FUZZ_BIN)
 
 $(FUZZ_BIN): $(INK_LIB)
 	$(call msg,LD,$@)
-	$(Q)$(CC) -Isrc -g -fno-omit-frame-pointer -fsanitize=address,undefined,fuzzer \
+	$(Q)$(CC) -Isrc -g3 -O0                                \
+        -fno-omit-frame-pointer                            \
+		-fsanitize=address,undefined,fuzzer                \
+		-fprofile-instr-generate                           \
+		-fcoverage-mapping                                 \
 	   	-o $(FUZZ_BIN) $(fuzz_srcs) $(INK_LIB) $(LDFLAGS)
 
 clean:
