@@ -137,7 +137,8 @@ int main(int argc, char *argv[])
     }
 
     const struct ink_load_opts opts = {
-        .source_text = source.bytes,
+        .source_bytes = source.bytes,
+        .source_length = source.length,
         .filename = (uint8_t *)filename,
         .flags = flags,
     };

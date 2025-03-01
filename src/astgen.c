@@ -1474,7 +1474,11 @@ static void ink_astgen_default_body(struct ink_astgen *parent_scope,
     const size_t name_index = ink_astgen_add_str(parent_scope, bytes, length);
 
     ink_astgen_add_knot(parent_scope, name_index);
-    ink_astgen_block_stmt(parent_scope, node);
+
+    if (node) {
+        ink_astgen_block_stmt(parent_scope, node);
+    }
+
     ink_astgen_emit_byte(parent_scope, INK_OP_EXIT);
 }
 
@@ -1648,6 +1652,10 @@ static void ink_astgen_file(struct ink_astgen_global *global,
         .symbol_table = ink_symtab_make(st_pool),
     };
 
+    if (!node_list) {
+        ink_astgen_default_body(&file_scope, NULL);
+        return;
+    }
     if (node_list->count > 0) {
         size_t i = 0;
         struct ink_ast_node *const first = node_list->nodes[0];

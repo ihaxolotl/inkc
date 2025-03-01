@@ -158,6 +158,7 @@ struct ink_ast_node {
 struct ink_ast {
     const uint8_t *filename;
     const uint8_t *source_bytes;
+    size_t source_length;
     struct ink_ast_node *root;
     struct ink_ast_error_vec errors;
 };
@@ -171,7 +172,7 @@ ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
                  struct ink_arena *arena);
 
 extern void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
-                         const uint8_t *source_bytes);
+                         const uint8_t *source_bytes, size_t source_length);
 extern void ink_ast_deinit(struct ink_ast *tree);
 extern void ink_ast_print(const struct ink_ast *tree, bool colors);
 extern void ink_ast_render_errors(const struct ink_ast *tree);

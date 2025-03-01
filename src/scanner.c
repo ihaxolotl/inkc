@@ -91,7 +91,7 @@ static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
                                                size_t start_offset,
                                                size_t end_offset)
 {
-    const uint8_t *lexeme = &scanner->bytes[start_offset];
+    const uint8_t *lexeme = &scanner->source_bytes[start_offset];
     const size_t length = end_offset - start_offset;
 
     switch (length) {
@@ -189,11 +189,17 @@ bool ink_scanner_try_keyword(struct ink_scanner *scanner,
 
 void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
 {
+    uint8_t c = '\0';
     enum ink_lex_state state = INK_LEX_START;
-    const struct ink_scanner_mode *mode = ink_scanner_current(scanner);
+    struct ink_scanner_mode *const mode = ink_scanner_current(scanner);
 
     for (;;) {
-        const uint8_t c = scanner->bytes[scanner->cursor_offset];
+        if (scanner->cursor_offset >= scanner->source_length) {
+            token->type = INK_TT_EOF;
+            goto exit_loop;
+        }
+
+        c = scanner->source_bytes[scanner->cursor_offset];
 
         switch (state) {
         case INK_LEX_START: {

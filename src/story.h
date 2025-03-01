@@ -68,7 +68,8 @@ struct ink_story {
 
 struct ink_load_opts {
     const uint8_t *filename;
-    const uint8_t *source_text;
+    const uint8_t *source_bytes;
+    size_t source_length;
     int flags;
 };
 

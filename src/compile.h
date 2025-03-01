@@ -8,9 +8,10 @@ extern "C" {
 #include <stdint.h>
 
 struct ink_story;
+struct ink_load_opts;
 
-extern int ink_compile(const uint8_t *source_bytes, const uint8_t *filename,
-                       struct ink_story *story, int flags);
+extern int ink_compile(struct ink_story *story,
+                       const struct ink_load_opts *opts);
 
 #ifdef __cplusplus
 }

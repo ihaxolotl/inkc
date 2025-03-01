@@ -8,7 +8,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     struct ink_story story;
     const struct ink_load_opts opts = {
         .filename = (uint8_t *)"<STDIN>",
-        .source_text = data,
+        .source_bytes = data,
+        .source_length = size,
         .flags = 0,
     };
 

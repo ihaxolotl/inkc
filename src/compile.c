@@ -11,28 +11,28 @@
 #define INK_ARENA_ALIGNMENT (8u)
 #define INK_ARENA_BLOCK_SIZE (8192u)
 
-int ink_compile(const uint8_t *source_bytes, const uint8_t *filename,
-                struct ink_story *story, int flags)
+int ink_compile(struct ink_story *story, const struct ink_load_opts *opts)
 {
-    int rc;
+    int rc = -1;
     struct ink_arena arena;
     struct ink_ast ast;
 
     ink_arena_init(&arena, INK_ARENA_BLOCK_SIZE, INK_ARENA_ALIGNMENT);
 
-    rc = ink_parse(source_bytes, filename, &arena, &ast, flags);
+    rc = ink_parse(opts->source_bytes, opts->source_length, opts->filename,
+                   &arena, &ast, opts->flags);
     if (rc < 0) {
         goto out;
     }
-    if (flags & INK_F_DUMP_AST) {
-        ink_ast_print(&ast, flags & INK_F_COLOR);
+    if (opts->flags & INK_F_DUMP_AST) {
+        ink_ast_print(&ast, opts->flags & INK_F_COLOR);
     }
 
-    rc = ink_astgen(&ast, story, flags);
+    rc = ink_astgen(&ast, story, opts->flags);
     if (rc < 0) {
         goto out;
     }
-    if (flags & INK_F_DUMP_CODE) {
+    if (opts->flags & INK_F_DUMP_CODE) {
         ink_story_dump(story);
     }
 out:

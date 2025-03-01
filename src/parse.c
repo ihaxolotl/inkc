@@ -378,7 +378,7 @@ static void *ink_parser_error(struct ink_parser *parser, const char *format,
     va_end(vargs);
 
     parser->panic_mode = true;
-    ink_token_print(parser->scanner.bytes, &parser->token);
+    ink_token_print(parser->scanner.source_bytes, &parser->token);
     return NULL;
 }
 
@@ -894,9 +894,9 @@ static void ink_parser_handle_func(struct ink_parser *parser,
 static int ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
                            struct ink_arena *arena, int flags)
 {
-
     parser->arena = arena;
-    parser->scanner.bytes = tree->source_bytes;
+    parser->scanner.source_bytes = tree->source_bytes;
+    parser->scanner.source_length = tree->source_length;
     parser->scanner.is_line_start = true;
     parser->scanner.start_offset = 0;
     parser->scanner.cursor_offset = 0;
@@ -2055,13 +2055,14 @@ static struct ink_ast_node *ink_parse_file(struct ink_parser *parser)
 /**
  * Parse a source file and output an AST.
  */
-int ink_parse(const uint8_t *source_bytes, const uint8_t *filename,
-              struct ink_arena *arena, struct ink_ast *tree, int flags)
+int ink_parse(const uint8_t *source_bytes, size_t source_length,
+              const uint8_t *filename, struct ink_arena *arena,
+              struct ink_ast *tree, int flags)
 {
     int rc;
     struct ink_parser parser;
 
-    ink_ast_init(tree, filename, source_bytes);
+    ink_ast_init(tree, filename, source_bytes, source_length);
 
     rc = ink_parser_init(&parser, tree, arena, flags);
     if (rc < 0) {

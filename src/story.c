@@ -851,9 +851,10 @@ int ink_story_load_opts(struct ink_story *story,
                         const struct ink_load_opts *opts)
 {
     int rc = -1;
-    const int flags = opts->flags;
-    const uint8_t *const filename = opts->filename;
-    const uint8_t *const source_bytes = opts->source_text;
+
+    if (!opts->source_bytes) {
+        return -INK_E_PANIC;
+    }
 
     memset(story, 0, sizeof(*story));
 
@@ -864,17 +865,17 @@ int ink_story_load_opts(struct ink_story *story,
     story->gc_gray = NULL;
     story->gc_objects = NULL;
     story->can_continue = true;
-    story->flags = flags & ~INK_F_GC_ENABLE;
+    story->flags = opts->flags & ~INK_F_GC_ENABLE;
     story->globals = ink_table_new(story);
     story->paths = ink_table_new(story);
 
     ink_choice_vec_init(&story->current_choices);
 
-    rc = ink_compile(source_bytes, filename, story, flags);
+    rc = ink_compile(story, opts);
     if (rc < 0) {
         return rc;
     }
-    if (flags & INK_F_GC_ENABLE) {
+    if (opts->flags & INK_F_GC_ENABLE) {
         story->flags |= INK_F_GC_ENABLE;
     }
 
@@ -902,7 +903,8 @@ int ink_story_load(struct ink_story *story, const char *source, int flags)
 {
     const struct ink_load_opts opts = {
         .flags = flags,
-        .source_text = (uint8_t *)source,
+        .source_bytes = (uint8_t *)source,
+        .source_length = strlen(source),
         .filename = (uint8_t *)"<STDIN>",
     };
 
