@@ -90,12 +90,6 @@ struct ink_parser_node_context {
  * intermediate parsing results are stored within a scratch buffer before a
  * node sequence is properly allocated. The size of this buffer grows and
  * shrinks dynamically as nodes are added to and removed from it.
- *
- * TODO(Brett): Describe the error recovery strategy.
- *
- * TODO(Brett): Describe expression parsing.
- *
- * TODO(Brett): Add a logger v-table to the parser.
  */
 struct ink_parser {
     struct ink_arena *arena;
