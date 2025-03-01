@@ -145,12 +145,10 @@ int main(int argc, char *argv[])
 
     rc = ink_story_load_opts(&story, &opts);
     if (rc < 0) {
-        ink_source_free(&source);
         /* TODO(Brett): Returning EXIT_FAILURE breaks llvm-lit. Look for a
          * workaround */
-        return EXIT_SUCCESS;
+        goto out;
     }
-
     if (!compile_only) {
         struct ink_string *content = NULL;
 
@@ -183,6 +181,7 @@ int main(int argc, char *argv[])
         }
     }
 
+out:
     ink_story_free(&story);
     ink_source_free(&source);
     return EXIT_SUCCESS;
