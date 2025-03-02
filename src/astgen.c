@@ -1209,15 +1209,17 @@ static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
         choice->option_expr = NULL;
         choice->inner_expr = NULL;
 
-        for (size_t j = 0; j < expr_list->count; j++) {
-            struct ink_ast_node *const expr_node = expr_list->nodes[j];
+        if (expr_list) {
+            for (size_t j = 0; j < expr_list->count; j++) {
+                struct ink_ast_node *const expr_node = expr_list->nodes[j];
 
-            if (expr_node->type == INK_AST_CHOICE_START_EXPR) {
-                choice->start_expr = expr_node;
-            } else if (expr_node->type == INK_AST_CHOICE_OPTION_EXPR) {
-                choice->option_expr = expr_node;
-            } else if (expr_node->type == INK_AST_CHOICE_INNER_EXPR) {
-                choice->inner_expr = expr_node;
+                if (expr_node->type == INK_AST_CHOICE_START_EXPR) {
+                    choice->start_expr = expr_node;
+                } else if (expr_node->type == INK_AST_CHOICE_OPTION_EXPR) {
+                    choice->option_expr = expr_node;
+                } else if (expr_node->type == INK_AST_CHOICE_INNER_EXPR) {
+                    choice->inner_expr = expr_node;
+                }
             }
         }
         if (choice->start_expr) {

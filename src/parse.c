@@ -973,6 +973,10 @@ ink_parse_string(struct ink_parser *parser,
     while (!ink_parser_check_many(parser, token_set)) {
         ink_parser_advance(parser);
     }
+    if (source_start == parser->source_offset) {
+        return ink_ast_node_leaf(INK_AST_EMPTY_CONTENT, source_start,
+                                 source_start, parser->arena);
+    }
     return ink_ast_node_leaf(INK_AST_STRING, source_start,
                              parser->source_offset, parser->arena);
 }
@@ -1650,8 +1654,10 @@ static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
 
     INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
     if (node) {
-        node->type = INK_AST_CHOICE_START_EXPR;
-        ink_parser_scratch_push(scratch, node);
+        if (node->type != INK_AST_EMPTY_CONTENT) {
+            node->type = INK_AST_CHOICE_START_EXPR;
+            ink_parser_scratch_push(scratch, node);
+        }
     }
     if (ink_parser_check(parser, INK_TT_LEFT_BRACKET)) {
         ink_parser_advance(parser);
@@ -1660,8 +1666,10 @@ static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
         if (!ink_parser_check(parser, INK_TT_RIGHT_BRACKET)) {
             INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
             if (node) {
-                node->type = INK_AST_CHOICE_OPTION_EXPR;
-                ink_parser_scratch_push(scratch, node);
+                if (node->type != INK_AST_EMPTY_CONTENT) {
+                    node->type = INK_AST_CHOICE_OPTION_EXPR;
+                    ink_parser_scratch_push(scratch, node);
+                }
             }
         }
 
@@ -1670,8 +1678,10 @@ static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
         if (!ink_parser_check_many(parser, token_set)) {
             INK_PARSER_RULE(node, ink_parse_string, parser, token_set);
             if (node) {
-                node->type = INK_AST_CHOICE_INNER_EXPR;
-                ink_parser_scratch_push(scratch, node);
+                if (node->type != INK_AST_EMPTY_CONTENT) {
+                    node->type = INK_AST_CHOICE_INNER_EXPR;
+                    ink_parser_scratch_push(scratch, node);
+                }
             }
         }
     }
