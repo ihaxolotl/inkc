@@ -485,7 +485,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             switch (c) {
             case '\0': {
                 state = INK_LEX_START;
-                break;
+                continue;
             }
             case '\n': {
                 state = INK_LEX_START;
