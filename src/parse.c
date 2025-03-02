@@ -97,6 +97,7 @@ struct ink_parser {
     struct ink_parser_scratch scratch;
     struct ink_parser_cache cache;
     struct ink_token token;
+    struct ink_ast *tree;
     bool panic_mode;
     int flags;
     size_t source_offset;
@@ -368,17 +369,19 @@ static bool ink_parser_check_many(struct ink_parser *parser,
 /**
  * Raise an error in the parser.
  */
-static void *ink_parser_error(struct ink_parser *parser, const char *format,
-                              ...)
-{
-    va_list vargs;
+static void *ink_parser_error(struct ink_parser *parser,
+                              enum ink_ast_error_type type,
+                              const struct ink_token *token)
 
-    va_start(vargs, format);
-    ink_log(INK_LOG_LEVEL_ERROR, format, vargs);
-    va_end(vargs);
+{
+    const struct ink_ast_error err = {
+        .type = type,
+        .source_start = token->start_offset,
+        .source_end = token->end_offset,
+    };
 
     parser->panic_mode = true;
-    ink_token_print(parser->scanner.source_bytes, &parser->token);
+    ink_ast_error_vec_push(&parser->tree->errors, err);
     return NULL;
 }
 
@@ -474,8 +477,7 @@ static size_t ink_parser_expect(struct ink_parser *parser,
         }
     }
     if (!ink_parser_check(parser, type)) {
-        ink_parser_error(parser, "Unexpected token! %s",
-                         ink_token_type_strz(parser->token.type));
+        ink_parser_error(parser, INK_AST_E_UNEXPECTED_TOKEN, &parser->token);
 
         do {
             source_offset = ink_parser_advance(parser);
@@ -493,7 +495,7 @@ static void ink_parser_expect_stmt_end(struct ink_parser *parser)
 {
     if (!ink_parser_check(parser, INK_TT_EOF) &&
         !ink_parser_check(parser, INK_TT_NL)) {
-        ink_parser_error(parser, "Expected new line!");
+        ink_parser_error(parser, INK_AST_E_EXPECTED_NEWLINE, &parser->token);
     }
 
     ink_parser_advance(parser);
@@ -906,6 +908,7 @@ static int ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
     parser->token.end_offset = 0;
     parser->panic_mode = false;
     parser->flags = flags;
+    parser->tree = tree;
     parser->source_offset = 0;
 
     ink_parser_scratch_init(&parser->scratch);
@@ -993,7 +996,8 @@ static struct ink_ast_node *ink_parse_arglist(struct ink_parser *parser)
         for (;;) {
             node = ink_parse_expr(parser);
             if (arg_count == INK_PARSER_ARGS_MAX) {
-                ink_parser_error(parser, "Too many arguments");
+                ink_parser_error(parser, INK_AST_E_PARAMS_TOO_MANY,
+                                 &parser->token);
                 break;
             }
 
@@ -1733,60 +1737,65 @@ ink_parse_gather(struct ink_parser *parser,
                               NULL, parser->arena);
 }
 
+/*
 static struct ink_ast_node *
 ink_parse_list_element_def(struct ink_parser *parser)
 {
-    struct ink_ast_node *lhs = NULL;
-    struct ink_ast_node *rhs = NULL;
-    const size_t source_start = parser->source_offset;
+struct ink_ast_node *lhs = NULL;
+struct ink_ast_node *rhs = NULL;
+const size_t source_start = parser->source_offset;
 
-    if (ink_parser_check(parser, INK_TT_LEFT_PAREN)) {
-        ink_parser_advance(parser);
-        INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
-        return ink_ast_node_unary(INK_AST_SELECTED_LIST_ELEMENT, source_start,
-                                  parser->source_offset, lhs, parser->arena);
-    }
-
-    INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
-
-    if (ink_parser_check(parser, INK_TT_EQUAL)) {
-        ink_parser_advance(parser);
-        INK_PARSER_RULE(rhs, ink_parse_expr, parser);
-        return ink_ast_node_binary(INK_AST_ASSIGN_STMT, source_start,
-                                   parser->source_offset, lhs, rhs,
-                                   parser->arena);
-    }
-    return lhs;
+if (ink_parser_check(parser, INK_TT_LEFT_PAREN)) {
+ink_parser_advance(parser);
+INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
+return ink_ast_node_unary(INK_AST_SELECTED_LIST_ELEMENT, source_start,
+                        parser->source_offset, lhs, parser->arena);
 }
 
+INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
+
+if (ink_parser_check(parser, INK_TT_EQUAL)) {
+ink_parser_advance(parser);
+INK_PARSER_RULE(rhs, ink_parse_expr, parser);
+return ink_ast_node_binary(INK_AST_ASSIGN_STMT, source_start,
+                         parser->source_offset, lhs, rhs,
+                         parser->arena);
+}
+return lhs;
+}
+*/
+
+/*
 static struct ink_ast_node *ink_parse_list(struct ink_parser *parser)
 {
-    int arg_count = 0;
-    struct ink_ast_node *node = NULL;
-    struct ink_parser_scratch *scratch = &parser->scratch;
-    const size_t scratch_offset = scratch->count;
-    const size_t source_start = parser->source_offset;
+int arg_count = 0;
+struct ink_ast_node *node = NULL;
+struct ink_parser_scratch *scratch = &parser->scratch;
+const size_t scratch_offset = scratch->count;
+const size_t source_start = parser->source_offset;
 
-    for (;;) {
-        INK_PARSER_RULE(node, ink_parse_list_element_def, parser);
-        if (arg_count == INK_PARSER_ARGS_MAX) {
-            ink_parser_error(parser, "Too many arguments");
-            break;
-        }
-
-        arg_count++;
-        ink_parser_scratch_push(scratch, node);
-
-        if (!ink_parser_check(parser, INK_TT_COMMA)) {
-            break;
-        }
-        ink_parser_advance(parser);
-    }
-    return ink_ast_node_sequence(INK_AST_ARG_LIST, source_start,
-                                 parser->source_offset, scratch_offset, scratch,
-                                 parser->arena);
+for (;;) {
+INK_PARSER_RULE(node, ink_parse_list_element_def, parser);
+if (arg_count == INK_PARSER_ARGS_MAX) {
+  ink_parser_error(parser, "Too many arguments");
+  break;
 }
 
+arg_count++;
+ink_parser_scratch_push(scratch, node);
+
+if (!ink_parser_check(parser, INK_TT_COMMA)) {
+  break;
+}
+ink_parser_advance(parser);
+}
+return ink_ast_node_sequence(INK_AST_ARG_LIST, source_start,
+                       parser->source_offset, scratch_offset, scratch,
+                       parser->arena);
+}
+*/
+
+/*
 static struct ink_ast_node *ink_parse_list_decl(struct ink_parser *parser)
 {
     struct ink_ast_node *lhs = NULL;
@@ -1805,6 +1814,7 @@ static struct ink_ast_node *ink_parse_list_decl(struct ink_parser *parser)
     return ink_ast_node_binary(INK_AST_LIST_DECL, source_start, source_end, lhs,
                                rhs, parser->arena);
 }
+*/
 
 static struct ink_ast_node *ink_parse_var(struct ink_parser *parser,
                                           enum ink_ast_node_type node_type)
@@ -1862,7 +1872,8 @@ static struct ink_ast_node *ink_parse_parameter_list(struct ink_parser *parser)
     if (!ink_parser_check(parser, INK_TT_RIGHT_PAREN)) {
         for (;;) {
             if (arg_count == INK_PARSER_ARGS_MAX) {
-                ink_parser_error(parser, "Too many parameters");
+                ink_parser_error(parser, INK_AST_E_PARAMS_TOO_MANY,
+                                 &parser->token);
                 break;
             } else {
                 arg_count++;
@@ -1997,9 +2008,11 @@ ink_parse_stmt(struct ink_parser *parser,
         } else if (ink_scanner_try_keyword(&parser->scanner, &parser->token,
                                            INK_TT_KEYWORD_VAR)) {
             INK_PARSER_RULE(node, ink_parse_var_decl, parser);
-        } else if (ink_scanner_try_keyword(&parser->scanner, &parser->token,
-                                           INK_TT_KEYWORD_LIST)) {
-            INK_PARSER_RULE(node, ink_parse_list_decl, parser);
+            /*
+          } else if (ink_scanner_try_keyword(&parser->scanner, &parser->token,
+                                             INK_TT_KEYWORD_LIST)) {
+              INK_PARSER_RULE(node, ink_parse_list_decl, parser);
+  */
         } else {
             INK_PARSER_RULE(node, ink_parse_content_stmt, parser);
         }

@@ -149,6 +149,12 @@ static void ink_ast_error_render(const struct ink_ast *tree,
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
+    case INK_AST_E_UNEXPECTED_TOKEN:
+        ink_ast_error_renderf(tree, error, arena, "expected token");
+        break;
+    case INK_AST_E_EXPECTED_NEWLINE:
+        ink_ast_error_renderf(tree, error, arena, "expected newline");
+        break;
     case INK_AST_E_IDENT_UNKNOWN:
         ink_ast_error_renderf(tree, error, arena,
                               "use of undeclared identifier '%.*s'",
