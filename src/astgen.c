@@ -19,6 +19,11 @@
 #define INK_STRINGSET_LOAD_MAX (80u)
 #define INK_E_FAIL (-1)
 
+#define INK_ASTGEN_TODO(msg)                                                   \
+    do {                                                                       \
+        fprintf(stderr, "TODO(astgen): %s\n", (msg));                          \
+    } while (0)
+
 INK_VEC_T(ink_astgen_scratch, size_t)
 
 struct ink_stringset_kv {
@@ -1306,8 +1311,15 @@ static void ink_astgen_stmt(struct ink_astgen *astgen,
     case INK_AST_CHOICE_STMT:
         ink_astgen_choice_stmt(astgen, node);
         break;
+    case INK_AST_GATHERED_CHOICE_STMT:
+        INK_ASTGEN_TODO("GatheredChoiceStmt");
+        break;
+    case INK_AST_GATHER_STMT:
+        INK_ASTGEN_TODO("GatherStmt");
+        break;
     default:
-        assert(false);
+        fprintf(stderr, "BUG(astgen): %s in %s\n", __func__,
+                ink_ast_node_type_strz(node->type));
         break;
     }
 }
@@ -1694,6 +1706,7 @@ int ink_astgen(struct ink_ast *tree, struct ink_story *story, int flags)
     struct ink_astgen_global global_store;
 
     if (!ink_ast_error_vec_is_empty(&tree->errors)) {
+        ink_ast_render_errors(tree);
         return INK_E_FAIL;
     }
 

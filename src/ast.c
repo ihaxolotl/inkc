@@ -150,10 +150,16 @@ static void ink_ast_error_render(const struct ink_ast *tree,
 
     switch (error->type) {
     case INK_AST_E_UNEXPECTED_TOKEN:
-        ink_ast_error_renderf(tree, error, arena, "expected token");
+        ink_ast_error_renderf(tree, error, arena, "unexpected token");
+        break;
+    case INK_AST_E_EXPECTED_IDENT:
+        ink_ast_error_renderf(tree, error, arena, "expected identifier");
         break;
     case INK_AST_E_EXPECTED_NEWLINE:
         ink_ast_error_renderf(tree, error, arena, "expected newline");
+        break;
+    case INK_AST_E_INVALID_EXPR:
+        ink_ast_error_renderf(tree, error, arena, "invalid expression");
         break;
     case INK_AST_E_IDENT_UNKNOWN:
         ink_ast_error_renderf(tree, error, arena,
@@ -192,8 +198,8 @@ static void ink_ast_error_render(const struct ink_ast *tree,
                               (int)length, bytes);
         break;
     default:
-        assert(false);
-        return;
+        ink_ast_error_renderf(tree, error, arena, "unknown error");
+        break;
     }
 }
 
