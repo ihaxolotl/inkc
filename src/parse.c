@@ -8,10 +8,8 @@
 #include "ast.h"
 #include "common.h"
 #include "hashmap.h"
-#include "logging.h"
 #include "parse.h"
 #include "scanner.h"
-#include "story.h"
 #include "token.h"
 #include "vec.h"
 
@@ -575,11 +573,11 @@ static void ink_parser_collect_choices(struct ink_parser *parser,
                                        size_t choice_level)
 {
     struct ink_parser_state block, choice, prev_choice;
-    struct ink_ast_node *tmp = NULL;
     struct ink_arena *const arena = parser->arena;
     struct ink_parser_scratch *const scratch = &parser->scratch;
     struct ink_parser_stack *const open_choices = &context->open_choices;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
+    struct ink_ast_node *tmp = NULL;
 
     while (!ink_parser_stack_is_empty(open_choices)) {
         assert(!ink_parser_stack_is_empty(open_blocks));
@@ -772,19 +770,32 @@ static void ink_parser_handle_gather(struct ink_parser *parser,
                                      struct ink_ast_node **node)
 {
     int rc;
-    struct ink_parser_state block;
+    struct ink_parser_state block, choice;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
     struct ink_parser_stack *const open_choices = &context->open_choices;
     struct ink_parser_scratch *const scratch = &parser->scratch;
-    struct ink_ast_node *tmp = NULL;
     const size_t choice_level = context->choice_level;
     const size_t source_start = parser->source_offset;
+    struct ink_ast_node *tmp = NULL;
 
     if (ink_parser_stack_is_empty(open_blocks)) {
-        rc = ink_parser_stack_emplace(open_blocks, 0, scratch->count,
-                                      (*node)->start_offset);
+        rc = ink_parser_stack_emplace(open_blocks, choice_level - 1,
+                                      scratch->count, (*node)->start_offset);
         if (rc < 0) {
             return;
+        }
+    } else if (!ink_parser_stack_is_empty(open_choices)) {
+        ink_parser_stack_last(open_choices, &choice);
+        ink_parser_stack_last(open_blocks, &block);
+
+        if (choice_level > choice.choice_level &&
+            block.choice_level < choice_level) {
+            rc =
+                ink_parser_stack_emplace(open_blocks, choice_level - 1,
+                                         scratch->count, (*node)->start_offset);
+            if (rc < 0) {
+                return;
+            }
         }
     }
     if (!ink_parser_stack_is_empty(open_choices) &&
