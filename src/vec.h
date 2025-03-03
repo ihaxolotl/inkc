@@ -92,31 +92,18 @@ extern "C" {
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int __T##_pop(struct __T *self,      \
-                                                        __V *entry)            \
+    __attribute__((unused)) static inline __V __T##_pop(struct __T *self)      \
     {                                                                          \
-        if (self->count == 0) {                                                \
-            return -INK_E_OOM;                                                 \
-        }                                                                      \
-        if (entry) {                                                           \
-            *entry = self->entries[self->count - 1];                           \
-        }                                                                      \
-                                                                               \
-        self->count--;                                                         \
-        return INK_E_OK;                                                       \
+        assert(self->count > 0);                                               \
+        return self->entries[--self->count];                                   \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline int __T##_last(struct __T *self,     \
-                                                         __V *entry)           \
+    __attribute__((unused)) static inline __V __T##_last(struct __T *self)     \
     {                                                                          \
-        if (self->count == 0) {                                                \
-            return -INK_E_OOM;                                                 \
-        }                                                                      \
-                                                                               \
-        *entry = self->entries[self->count - 1];                               \
-        return INK_E_OK;                                                       \
-    }                                                                          \
-    /**/
+        assert(self->count > 0);                                               \
+        return self->entries[self->count - 1];                                 \
+    }
+/**/
 
 #ifdef __cplusplus
 }
