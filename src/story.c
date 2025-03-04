@@ -183,8 +183,11 @@ static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
     }
 
     obj->is_marked = true;
-    ink_trace("Marked object %p, type=%s", (void *)obj,
-              INK_OBJ_TYPE_STR[obj->type]);
+
+    if (story->flags & INK_F_TRACING) {
+        ink_trace("Marked object %p, type=%s", (void *)obj,
+                  INK_OBJ_TYPE_STR[obj->type]);
+    }
 
     if (story->gc_gray_capacity < story->gc_gray_count + 1) {
         if (story->gc_gray_capacity == 0) {
@@ -260,8 +263,10 @@ static void ink_gc_blacken_object(struct ink_story *story,
 
     story->gc_allocated += obj_size;
 
-    ink_trace("Blackened object %p, type=%s, size=%zu", (void *)obj,
-              INK_OBJ_TYPE_STR[obj->type], obj_size);
+    if (story->flags & INK_F_TRACING) {
+        ink_trace("Blackened object %p, type=%s, size=%zu", (void *)obj,
+                  INK_OBJ_TYPE_STR[obj->type], obj_size);
+    }
 }
 
 static void ink_gc_collect(struct ink_story *story)

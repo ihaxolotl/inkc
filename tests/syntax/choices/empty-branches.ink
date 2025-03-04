@@ -1,4 +1,4 @@
-// RUN: %ink-compiler < %s --dump-ast | FileCheck %s
+// RUN: %ink-compiler < %s --compile-only --dump-ast | FileCheck %s
 
 // CHECK: File "<STDIN>"
 // CHECK-NEXT: `--BlockStmt <line:28, line:33>
@@ -17,7 +17,7 @@
 // CHECK-NEXT:       |        `--ChoiceStarStmt <line:31, col:1:6>
 // CHECK-NEXT:       |           |--ChoiceContentExpr <col:4, col:6>
 // CHECK-NEXT:       |           |  `--ChoiceStartContentExpr `A2` <col:4, col:6>
-// CHECK-NEXT:       |           `--BlockStmt <line:32, line:32>
+// CHECK-NEXT:       |           `--BlockStmt <line:32, line:33>
 // CHECK-NEXT:       |              `--ContentStmt <line:32, col:1:18>
 // CHECK-NEXT:       |                 `--Content <col:1, col:18>
 // CHECK-NEXT:       |                    `--StringLiteral `Content under A2!` <col:1, col:18>

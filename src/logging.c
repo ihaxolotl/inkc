@@ -18,9 +18,9 @@ void ink_log(enum ink_log_level log_level, const char *fmt, va_list args)
 {
     const char *level_str = INK_LOG_LEVEL_STR[log_level];
 
-    fprintf(stdout, "[%s] ", level_str);
-    vfprintf(stdout, fmt, args);
-    fprintf(stdout, "\n");
+    fprintf(stderr, "[%s] ", level_str);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
 }
 
 void ink_error(const char *fmt, ...)
