@@ -75,66 +75,17 @@ struct ink_content_path {
 #define INK_OBJ_IS_CONTENT_PATH(__x) ((__x)->type == INK_OBJ_CONTENT_PATH)
 #define INK_OBJ_AS_CONTENT_PATH(__x) ((struct ink_content_path *)(__x))
 
-extern struct ink_object *
-ink_object_new(struct ink_story *story, enum ink_object_type type, size_t size);
-extern void ink_object_free(struct ink_story *story, struct ink_object *obj);
-extern struct ink_object *ink_object_eq(struct ink_story *story,
-                                        const struct ink_object *lhs,
-                                        const struct ink_object *rhs);
-
 extern struct ink_object *ink_bool_new(struct ink_story *story, bool value);
-extern bool ink_bool_eq(struct ink_story *story, const struct ink_object *lhs,
-                        const struct ink_object *rhs);
-
 extern struct ink_object *ink_number_new(struct ink_story *story, double value);
-extern struct ink_object *ink_number_add(struct ink_story *story,
-                                         const struct ink_object *lhs,
-                                         const struct ink_object *rhs);
-extern struct ink_object *ink_number_sub(struct ink_story *story,
-                                         const struct ink_object *lhs,
-                                         const struct ink_object *rhs);
-extern struct ink_object *ink_number_mul(struct ink_story *story,
-                                         const struct ink_object *lhs,
-                                         const struct ink_object *rhs);
-extern struct ink_object *ink_number_div(struct ink_story *story,
-                                         const struct ink_object *lhs,
-                                         const struct ink_object *rhs);
-extern struct ink_object *ink_number_mod(struct ink_story *story,
-                                         const struct ink_object *lhs,
-                                         const struct ink_object *rhs);
-extern struct ink_object *ink_number_neg(struct ink_story *story,
-                                         const struct ink_object *lhs);
-extern bool ink_number_eq(struct ink_story *story, const struct ink_object *lhs,
-                          const struct ink_object *rhs);
-extern bool ink_number_lt(struct ink_story *story, const struct ink_object *lhs,
-                          const struct ink_object *rhs);
-extern bool ink_number_lte(struct ink_story *story,
-                           const struct ink_object *lhs,
-                           const struct ink_object *rhs);
-extern bool ink_number_gt(struct ink_story *story, const struct ink_object *lhs,
-                          const struct ink_object *rhs);
-extern bool ink_number_gte(struct ink_story *story,
-                           const struct ink_object *lhs,
-                           const struct ink_object *rhs);
-
 extern struct ink_object *ink_string_new(struct ink_story *story,
                                          const uint8_t *chars, size_t length);
-extern bool ink_string_eq(struct ink_story *story, const struct ink_object *lhs,
-                          const struct ink_object *rhs);
-
 extern struct ink_object *ink_table_new(struct ink_story *story);
 extern int ink_table_lookup(struct ink_story *story, struct ink_object *table,
                             struct ink_object *key, struct ink_object **value);
 extern int ink_table_insert(struct ink_story *story, struct ink_object *table,
                             struct ink_object *key, struct ink_object *value);
-
 extern struct ink_object *ink_content_path_new(struct ink_story *story,
                                                struct ink_object *name);
-
-extern void ink_object_print(const struct ink_object *obj);
-extern void ink_number_print(const struct ink_object *obj);
-extern void ink_string_print(const struct ink_object *obj);
-extern void ink_table_print(const struct ink_object *obj);
 
 #ifdef __cplusplus
 }

@@ -47,7 +47,6 @@ lib_srcs := src/logging.c                  \
             src/memory.c                   \
             src/arena.c                    \
             src/symtab.c                   \
-            src/object.c                   \
             src/story.c                    \
             src/source.c                   \
             src/token.c                    \

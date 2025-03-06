@@ -734,7 +734,19 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
         return;
     }
 
-    ink_astgen_emit_const(astgen, INK_OP_LOAD, (uint8_t)sym.as.var.stack_slot);
+    switch (sym.type) {
+    case INK_SYMBOL_VAR_GLOBAL:
+        ink_astgen_emit_const(astgen, INK_OP_LOAD_GLOBAL,
+                              (uint8_t)sym.as.var.const_slot);
+        break;
+    case INK_SYMBOL_VAR_LOCAL:
+        ink_astgen_emit_const(astgen, INK_OP_LOAD,
+                              (uint8_t)sym.as.var.stack_slot);
+        break;
+    default:
+        assert(false);
+        break;
+    }
 }
 
 static int ink_astgen_check_args_count(struct ink_astgen *astgen,
@@ -866,7 +878,7 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
         ink_astgen_unary_op(astgen, node, INK_OP_NEG);
         break;
     case INK_AST_NOT_EXPR:
-        ink_astgen_emit_byte(astgen, INK_OP_NOT);
+        ink_astgen_unary_op(astgen, node, INK_OP_NOT);
         break;
     case INK_AST_AND_EXPR:
         ink_astgen_logical_op(astgen, node, false);

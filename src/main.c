@@ -52,6 +52,44 @@ static void print_usage(const char *name)
     fprintf(stderr, USAGE_MSG, name);
 }
 
+static void inkc_render_error(const char *filename, int rc)
+{
+    switch (-rc) {
+    case INK_E_OK:
+        break;
+    case INK_E_PANIC:
+        ink_error("Panic!");
+        break;
+    case INK_E_OOM:
+        ink_error("Out of memory!");
+        break;
+    case INK_E_OS:
+        ink_error("Could not open file `%s`. OS Error.", filename);
+        break;
+    case INK_E_FILE:
+        ink_error("Could not open file `%s`. Not an ink script.", filename);
+        break;
+    case INK_E_OVERWRITE:
+        ink_error("Something was overwritten.");
+        break;
+    case INK_E_INVALID_OPTION:
+        ink_error("Invalid option.");
+        break;
+    case INK_E_INVALID_INST:
+        ink_error("Invalid instruction.");
+        break;
+    case INK_E_INVALID_ARG:
+        ink_error("Invalid argument.");
+        break;
+    case INK_E_STACK_OVERFLOW:
+        ink_error("Stack overflow.");
+        break;
+    default:
+        ink_error("Unknown error.");
+        break;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     struct ink_source source;
@@ -119,20 +157,7 @@ int main(int argc, char *argv[])
         rc = ink_source_load(filename, &source);
     }
     if (rc < 0) {
-        switch (-rc) {
-        case INK_E_OS: {
-            ink_error("[ERROR] Could not open file `%s`. OS Error.", filename);
-            break;
-        }
-        case INK_E_FILE: {
-            ink_error("[ERROR] Could not open file `%s`. Not an ink script.",
-                      filename);
-            break;
-        }
-        default:
-            ink_error("[ERROR] Unknown error.");
-            break;
-        }
+        inkc_render_error(filename, rc);
         return rc;
     }
 
@@ -180,7 +205,9 @@ int main(int argc, char *argv[])
             }
         }
     }
-
+    if (rc < 0) {
+        inkc_render_error(filename, rc);
+    }
 out:
     ink_story_free(&story);
     ink_source_free(&source);

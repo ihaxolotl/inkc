@@ -78,9 +78,6 @@ extern int ink_story_load_opts(struct ink_story *story,
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
 extern void ink_story_free(struct ink_story *story);
 extern void ink_story_dump(struct ink_story *story);
-extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
-                                 size_t size_old, size_t size_new);
-extern void ink_story_mem_free(struct ink_story *story, void *ptr);
 extern int ink_story_stack_push(struct ink_story *story,
                                 struct ink_object *object);
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
