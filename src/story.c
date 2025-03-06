@@ -188,7 +188,6 @@ static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
         ink_trace("Marked object %p, type=%s", (void *)obj,
                   INK_OBJ_TYPE_STR[obj->type]);
     }
-
     if (story->gc_gray_capacity < story->gc_gray_count + 1) {
         if (story->gc_gray_capacity == 0) {
             story->gc_gray_capacity = INK_GC_GRAY_CAPACITY_MIN;

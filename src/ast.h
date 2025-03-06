@@ -18,17 +18,20 @@ enum ink_ast_error_type {
     INK_AST_OK = 0,
     INK_AST_E_UNEXPECTED_TOKEN,
     INK_AST_E_EXPECTED_NEWLINE,
-    INK_AST_E_EXPECTED_IDENT,
+    INK_AST_E_EXPECTED_DQUOTE,
+    INK_AST_E_EXPECTED_IDENTIFIER,
+    INK_AST_E_EXPECTED_EXPR,
     INK_AST_E_INVALID_EXPR,
-    INK_AST_E_PARAMS_TOO_MANY,
-    INK_AST_E_IDENT_UNKNOWN,
-    INK_AST_E_IDENT_REDEFINED,
+    INK_AST_E_INVALID_LVALUE,
+    INK_AST_E_UNKNOWN_IDENTIFIER,
+    INK_AST_E_REDEFINED_IDENTIFIER,
+    INK_AST_E_TOO_FEW_ARGS,
+    INK_AST_E_TOO_MANY_ARGS,
+    INK_AST_E_TOO_MANY_PARAMS,
     INK_AST_E_CONDITIONAL_EMPTY,
     INK_AST_E_ELSE_EXPECTED,
     INK_AST_E_ELSE_MULTIPLE,
     INK_AST_E_ELSE_FINAL,
-    INK_AST_E_ARGS_TOO_FEW,
-    INK_AST_E_ARGS_TOO_MANY,
 };
 
 struct ink_ast_error {
@@ -69,7 +72,7 @@ INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
     T(AST_DIVERT, "Divert")                                                    \
     T(AST_DIVERT_EXPR, "DivertExpr")                                           \
     T(AST_DIVERT_STMT, "DivertStmt")                                           \
-    T(AST_EMPTY_CONTENT, "EmptyContent")                                       \
+    T(AST_EMPTY_STRING, "EmptyString")                                         \
     T(AST_EQUAL_EXPR, "LogicalEqualityExpr")                                   \
     T(AST_EXPR_STMT, "ExprStmt")                                               \
     T(AST_FALSE, "False")                                                      \

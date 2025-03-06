@@ -65,6 +65,7 @@ const char *ink_ast_node_type_strz(enum ink_ast_node_type type)
     return INK_AST_TYPE_STR[type];
 }
 
+/* FIXME: Deal with positions for not-printable characters. */
 static void ink_render_error_info(const uint8_t *source_bytes,
                                   const struct ink_error_info *info)
 {
@@ -78,9 +79,9 @@ static void ink_render_error_info(const uint8_t *source_bytes,
     printf("     | %*s^\n\n", (int)info->column, "");
 }
 
-static void ink_ast_error_renderf(const struct ink_ast *tree,
-                                  const struct ink_ast_error *error,
-                                  struct ink_arena *arena, const char *fmt, ...)
+static int ink_ast_error_renderf(const struct ink_ast *tree,
+                                 const struct ink_ast_error *error,
+                                 struct ink_arena *arena, const char *fmt, ...)
 {
     va_list ap;
     long msglen;
@@ -93,12 +94,12 @@ static void ink_ast_error_renderf(const struct ink_ast *tree,
     va_end(ap);
 
     if (msglen < 0) {
-        return;
+        return -INK_E_OOM;
     }
 
     info.message = (char *)ink_arena_allocate(arena, (size_t)msglen + 1);
     if (!info.message) {
-        return;
+        return -INK_E_OOM;
     }
 
     va_start(ap, fmt);
@@ -139,67 +140,69 @@ static void ink_ast_error_renderf(const struct ink_ast *tree,
     }
 
     ink_render_error_info(tree->source_bytes, &info);
+    return INK_E_OK;
 }
 
-static void ink_ast_error_render(const struct ink_ast *tree,
-                                 const struct ink_ast_error *error,
-                                 struct ink_arena *arena)
+static int ink_ast_error_render(const struct ink_ast *tree,
+                                const struct ink_ast_error *error,
+                                struct ink_arena *arena)
 {
     const size_t length = error->source_end - error->source_start;
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
     case INK_AST_E_UNEXPECTED_TOKEN:
-        ink_ast_error_renderf(tree, error, arena, "unexpected token");
-        break;
-    case INK_AST_E_EXPECTED_IDENT:
-        ink_ast_error_renderf(tree, error, arena, "expected identifier");
-        break;
+        return ink_ast_error_renderf(tree, error, arena, "unexpected token");
     case INK_AST_E_EXPECTED_NEWLINE:
-        ink_ast_error_renderf(tree, error, arena, "expected newline");
-        break;
+        return ink_ast_error_renderf(tree, error, arena, "expected newline");
+    case INK_AST_E_EXPECTED_DQUOTE:
+        return ink_ast_error_renderf(
+            tree, error, arena, "unterminated string, expected closing quote");
+    case INK_AST_E_EXPECTED_IDENTIFIER:
+        return ink_ast_error_renderf(tree, error, arena, "expected identifier");
+    case INK_AST_E_EXPECTED_EXPR:
+        return ink_ast_error_renderf(tree, error, arena, "expected expression");
     case INK_AST_E_INVALID_EXPR:
-        ink_ast_error_renderf(tree, error, arena, "invalid expression");
-        break;
-    case INK_AST_E_IDENT_UNKNOWN:
-        ink_ast_error_renderf(tree, error, arena,
-                              "use of undeclared identifier '%.*s'",
-                              (int)length, bytes);
-        break;
-    case INK_AST_E_IDENT_REDEFINED:
-        ink_ast_error_renderf(tree, error, arena, "redefinition of '%.*s'",
-                              (int)length, bytes);
-        break;
+        return ink_ast_error_renderf(tree, error, arena, "invalid expression");
+    case INK_AST_E_INVALID_LVALUE:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "invalid lvalue for assignment");
+    case INK_AST_E_UNKNOWN_IDENTIFIER:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "use of undeclared identifier '%.*s'",
+                                     (int)length, bytes);
+    case INK_AST_E_REDEFINED_IDENTIFIER:
+        return ink_ast_error_renderf(
+            tree, error, arena, "redefinition of '%.*s'", (int)length, bytes);
+    case INK_AST_E_TOO_FEW_ARGS:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "too few arguments to '%.*s'", (int)length,
+                                     bytes);
+    case INK_AST_E_TOO_MANY_ARGS:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "too many arguments to '%.*s'",
+                                     (int)length, bytes);
+    case INK_AST_E_TOO_MANY_PARAMS:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "too many parameters defined for '%.*s'",
+                                     (int)length, bytes);
     case INK_AST_E_CONDITIONAL_EMPTY:
-        ink_ast_error_renderf(tree, error, arena,
-                              "condition block with no conditions");
-        break;
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "condition block with no conditions");
     case INK_AST_E_ELSE_EXPECTED:
-        ink_ast_error_renderf(
+        return ink_ast_error_renderf(
             tree, error, arena,
             "expected '- else:' clause rather than extra condition");
-        break;
     case INK_AST_E_ELSE_MULTIPLE:
-        ink_ast_error_renderf(tree, error, arena,
-                              "multiple 'else' cases in conditional");
-        break;
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "multiple 'else' cases in conditional");
     case INK_AST_E_ELSE_FINAL:
-        ink_ast_error_renderf(
+        return ink_ast_error_renderf(
             tree, error, arena,
             "'else' case should always be the final case in conditional");
         break;
-    case INK_AST_E_ARGS_TOO_MANY:
-        ink_ast_error_renderf(tree, error, arena,
-                              "too many arguments to '%.*s'", (int)length,
-                              bytes);
-        break;
-    case INK_AST_E_ARGS_TOO_FEW:
-        ink_ast_error_renderf(tree, error, arena, "too few arguments to '%.*s'",
-                              (int)length, bytes);
-        break;
     default:
-        ink_ast_error_renderf(tree, error, arena, "unknown error");
-        break;
+        return ink_ast_error_renderf(tree, error, arena, "unknown error");
     }
 }
 
@@ -273,13 +276,15 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
         break;
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
+    case INK_AST_FUNC_DECL:
+    case INK_AST_GATHERED_CHOICE_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT:
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
+    case INK_AST_ASSIGN_STMT:
     case INK_AST_CHOICE_PLUS_STMT:
     case INK_AST_CHOICE_STAR_STMT:
     case INK_AST_CONST_DECL:
@@ -291,19 +296,19 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:
     case INK_AST_VAR_DECL:
-    case INK_AST_STRING_EXPR:
         snprintf(buffer, length, "%s <line:%zu, col:%zu:%zu>",
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
-    case INK_AST_STRING:
-    case INK_AST_NUMBER:
-    case INK_AST_IDENTIFIER:
     case INK_AST_CHOICE_START_EXPR:
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
+    case INK_AST_IDENTIFIER:
+    case INK_AST_NUMBER:
     case INK_AST_PARAM_DECL:
     case INK_AST_REF_PARAM_DECL:
+    case INK_AST_STRING:
+    case INK_AST_STRING_EXPR:
         snprintf(buffer, length, "%s `%.*s` <col:%zu, col:%zu>",
                  context->node_type_strz, (int)context->lexeme_length,
                  context->lexeme, context->column_start, context->column_end);
@@ -329,9 +334,10 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
         break;
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
+    case INK_AST_FUNC_DECL:
+    case INK_AST_GATHERED_CHOICE_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -339,6 +345,7 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->node_type_strz, context->line_start,
                  context->line_end);
         break;
+    case INK_AST_ASSIGN_STMT:
     case INK_AST_CHOICE_PLUS_STMT:
     case INK_AST_CHOICE_STAR_STMT:
     case INK_AST_CONST_DECL:
@@ -350,7 +357,6 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:
     case INK_AST_VAR_DECL:
-    case INK_AST_STRING_EXPR:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "<" ANSI_COLOR_YELLOW
@@ -358,14 +364,15 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
                  context->node_type_strz, context->line_start,
                  context->column_start, context->column_end);
         break;
-    case INK_AST_STRING:
-    case INK_AST_NUMBER:
-    case INK_AST_IDENTIFIER:
     case INK_AST_CHOICE_START_EXPR:
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
+    case INK_AST_IDENTIFIER:
+    case INK_AST_NUMBER:
     case INK_AST_PARAM_DECL:
     case INK_AST_REF_PARAM_DECL:
+    case INK_AST_STRING_EXPR:
+    case INK_AST_STRING:
         snprintf(buffer, length,
                  ANSI_COLOR_BLUE ANSI_BOLD_ON
                  "%s " ANSI_BOLD_OFF ANSI_COLOR_RESET "`" ANSI_COLOR_GREEN

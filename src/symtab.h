@@ -18,7 +18,8 @@ struct ink_symtab_pool {
 };
 
 enum ink_symbol_type {
-    INK_SYMBOL_VAR,
+    INK_SYMBOL_VAR_LOCAL,
+    INK_SYMBOL_VAR_GLOBAL,
     INK_SYMBOL_PARAM,
     INK_SYMBOL_KNOT,
     INK_SYMBOL_FUNC,
