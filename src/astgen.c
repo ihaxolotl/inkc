@@ -740,6 +740,7 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
                               (uint8_t)sym.as.var.const_slot);
         break;
     case INK_SYMBOL_VAR_LOCAL:
+    case INK_SYMBOL_PARAM:
         ink_astgen_emit_const(astgen, INK_OP_LOAD,
                               (uint8_t)sym.as.var.stack_slot);
         break;

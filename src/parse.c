@@ -695,6 +695,14 @@ ink_parser_collect_stitch(struct ink_parser *parser,
             return ink_ast_node_binary(INK_AST_STITCH_DECL,
                                        proto_node->start_offset, end_offset,
                                        proto_node, body_node, parser->arena);
+        } else if (proto_node->type == INK_AST_FUNC_PROTO) {
+            const size_t end_offset =
+                body_node ? body_node->end_offset : proto_node->end_offset;
+
+            ink_parser_scratch_pop(scratch);
+            return ink_ast_node_binary(INK_AST_FUNC_DECL,
+                                       proto_node->start_offset, end_offset,
+                                       proto_node, body_node, parser->arena);
         }
     }
     return body_node;
@@ -721,8 +729,7 @@ ink_parser_collect_knot(struct ink_parser *parser,
         struct ink_ast_node *const proto_node =
             scratch->entries[context->knot_offset];
 
-        if (proto_node->type == INK_AST_KNOT_PROTO ||
-            proto_node->type == INK_AST_FUNC_PROTO) {
+        if (proto_node->type == INK_AST_KNOT_PROTO) {
             const size_t source_start = proto_node->start_offset;
             const size_t source_end =
                 child_node ? child_node->end_offset : proto_node->end_offset;
@@ -731,11 +738,8 @@ ink_parser_collect_knot(struct ink_parser *parser,
                                          scratch->count, parser->arena);
 
             ink_parser_scratch_pop(scratch);
-
-            node = ink_ast_node_unary(
-                proto_node->type == INK_AST_KNOT_PROTO ? INK_AST_KNOT_DECL
-                                                       : INK_AST_FUNC_DECL,
-                source_start, source_end, proto_node, parser->arena);
+            node = ink_ast_node_unary(INK_AST_KNOT_DECL, source_start,
+                                      source_end, proto_node, parser->arena);
             node->seq = seq;
         }
     }
@@ -938,7 +942,7 @@ static void ink_parser_handle_stitch(struct ink_parser *parser,
 static void ink_parser_handle_func(struct ink_parser *parser,
                                    struct ink_parser_node_context *context)
 {
-    ink_parser_handle_knot(parser, context);
+    ink_parser_handle_stitch(parser, context);
 }
 
 static struct ink_ast_node *ink_parse_content(struct ink_parser *,

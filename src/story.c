@@ -1084,8 +1084,14 @@ static int ink_story_exec(struct ink_story *story)
     struct ink_byte_vec pending_content;
     struct ink_object *const globals_pool = story->globals;
     struct ink_object *const paths_pool = story->paths;
-    struct ink_call_frame *frame =
-        &story->call_stack[story->call_stack_top - 1];
+    struct ink_call_frame *frame = NULL;
+
+    if (story->call_stack_top > 0) {
+        frame = &story->call_stack[story->call_stack_top - 1];
+    } else {
+        story->can_continue = false;
+        return INK_E_OK;
+    }
 
     ink_byte_vec_init(&pending_content);
     ink_choice_vec_shrink(&story->current_choices, 0);
@@ -1121,6 +1127,7 @@ static int ink_story_exec(struct ink_story *story)
 
             story->stack_top = (size_t)(frame->sp - story->stack);
             ink_story_stack_push(story, value);
+            frame = &story->call_stack[story->call_stack_top - 1];
             break;
         }
         case INK_OP_POP:
