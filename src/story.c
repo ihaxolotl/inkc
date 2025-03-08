@@ -6,19 +6,27 @@
 #include <time.h>
 
 #include "compile.h"
+#include "hashmap.h"
 #include "logging.h"
 #include "object.h"
 #include "opcode.h"
 #include "story.h"
 
-#define INK_STORY_STACK_MAX 128
+#define INK_STORY_STACK_MAX (128ul)
 #define INK_GC_GRAY_CAPACITY_MIN (16ul)
 #define INK_GC_GRAY_GROWTH_FACTOR (2ul)
 #define INK_GC_HEAP_SIZE_MIN (1024ul * 1024ul)
 #define INK_GC_HEAP_GROWTH_PERCENT (50ul)
 #define INK_TABLE_CAPACITY_MIN (8ul)
-#define INK_TABLE_LOAD_MAX (80ul)
 #define INK_TABLE_SCALE_FACTOR (2ul)
+#define INK_TABLE_LOAD_MAX (80ul)
+#define INK_OBJECT_SET_LOAD_MAX (80ul)
+
+struct ink_object_set_key {
+    struct ink_object *obj;
+};
+
+INK_HASHMAP_T(ink_object_set, struct ink_object_set_key, void *)
 
 struct ink_call_frame {
     struct ink_content_path *callee;
@@ -37,15 +45,14 @@ struct ink_story {
     size_t call_stack_top;
     size_t gc_allocated;
     size_t gc_threshold;
-    size_t gc_gray_count;
-    size_t gc_gray_capacity;
-    struct ink_object **gc_gray;
+    struct ink_object_vec gc_gray;
+    struct ink_object_set gc_owned;
     struct ink_object *gc_objects;
     struct ink_object *globals;
     struct ink_object *paths;
     struct ink_object *current_path;
     struct ink_object *current_content;
-    struct ink_object *choice_id;
+    struct ink_object *current_choice_id;
     struct ink_choice_vec current_choices;
     struct ink_object *stack[INK_STORY_STACK_MAX];
     struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
@@ -75,6 +82,21 @@ static struct ink_object *ink_object_to_string(struct ink_story *,
 static struct ink_number *ink_object_to_number(struct ink_story *,
                                                struct ink_object *);
 static bool ink_string_eq(const struct ink_object *, const struct ink_object *);
+static void ink_gc_own(struct ink_story *, struct ink_object *);
+static void ink_gc_disown(struct ink_story *, struct ink_object *);
+
+static uint32_t ink_object_set_key_hash(const void *key, size_t length)
+{
+    return ink_fnv32a((uint8_t *)key, length);
+}
+
+static bool ink_object_set_key_cmp(const void *lhs, const void *rhs)
+{
+    const struct ink_object_set_key *const key_lhs = lhs;
+    const struct ink_object_set_key *const key_rhs = rhs;
+
+    return (key_lhs->obj == key_rhs->obj);
+}
 
 /**
  * Return a printable string for an object type.
@@ -119,24 +141,8 @@ static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
         ink_trace("Marked object %p, type=%s", (void *)obj,
                   INK_OBJ_TYPE_STR[obj->type]);
     }
-    if (story->gc_gray_capacity < story->gc_gray_count + 1) {
-        if (story->gc_gray_capacity == 0) {
-            story->gc_gray_capacity = INK_GC_GRAY_CAPACITY_MIN;
-        } else {
-            story->gc_gray_capacity =
-                story->gc_gray_capacity * INK_GC_GRAY_GROWTH_FACTOR;
-        }
 
-        story->gc_gray = (struct ink_object **)ink_realloc(
-            story->gc_gray,
-            sizeof(struct ink_object *) * story->gc_gray_capacity);
-
-        if (!story->gc_gray) {
-            ink_runtime_error(story, "Out of memory!");
-        }
-    }
-
-    story->gc_gray[story->gc_gray_count++] = obj;
+    ink_object_vec_push(&story->gc_gray, obj);
 }
 
 /**
@@ -227,12 +233,19 @@ static void ink_gc_collect(struct ink_story *story)
             ink_gc_mark_object(story, obj);
         }
     }
+    for (size_t i = 0; i < story->gc_owned.capacity; i++) {
+        struct ink_object_set_kv *const entry = &story->gc_owned.entries[i];
+
+        if (entry->key.obj) {
+            ink_gc_mark_object(story, INK_OBJ(entry->key.obj));
+        }
+    }
 
     ink_gc_mark_object(story, story->globals);
     ink_gc_mark_object(story, story->paths);
     ink_gc_mark_object(story, story->current_path);
     ink_gc_mark_object(story, story->current_content);
-    ink_gc_mark_object(story, story->choice_id);
+    ink_gc_mark_object(story, story->current_choice_id);
 
     for (size_t i = 0; i < story->current_choices.count; i++) {
         struct ink_choice *const choice = &story->current_choices.entries[i];
@@ -240,8 +253,8 @@ static void ink_gc_collect(struct ink_story *story)
         ink_gc_mark_object(story, choice->id);
         ink_gc_mark_object(story, INK_OBJ(choice->text));
     }
-    while (story->gc_gray_count > 0) {
-        struct ink_object *const obj = story->gc_gray[--story->gc_gray_count];
+    while (story->gc_gray.count > 0) {
+        struct ink_object *const obj = ink_object_vec_pop(&story->gc_gray);
 
         ink_gc_blacken_object(story, obj);
     }
@@ -368,6 +381,10 @@ static void ink_object_free(struct ink_story *story, struct ink_object *obj)
         break;
     }
     }
+    if (story->flags & INK_F_TRACING) {
+        ink_trace("Free object %p, type=%s", (void *)obj,
+                  INK_OBJ_TYPE_STR[obj->type]);
+    }
 
     ink_story_mem_free(story, obj);
 }
@@ -447,7 +464,10 @@ static struct ink_object *ink_object_to_string(struct ink_story *story,
     default:
         break;
     }
-    return ink_string_new(story, buf, buflen);
+
+    obj = ink_string_new(story, buf, buflen);
+    ink_gc_own(story, obj);
+    return obj;
 #undef INK_NUMBER_BUFLEN
 }
 
@@ -471,7 +491,10 @@ static struct ink_number *ink_object_to_number(struct ink_story *story,
         value = 1;
         break;
     }
-    return INK_OBJ_AS_NUMBER(ink_number_new(story, value));
+
+    obj = ink_number_new(story, value);
+    ink_gc_own(story, obj);
+    return INK_OBJ_AS_NUMBER(obj);
 }
 
 /**
@@ -598,6 +621,9 @@ static struct ink_object *ink_number_bin_op(struct ink_story *story,
         assert(false);
         break;
     }
+
+    ink_gc_disown(story, INK_OBJ(lhs));
+    ink_gc_disown(story, INK_OBJ(rhs));
     return ink_number_new(story, value);
 }
 
@@ -692,6 +718,8 @@ static struct ink_object *ink_string_concat(struct ink_story *story,
 
     memcpy(bytes, str_lhs->bytes, str_lhs->length);
     memcpy(bytes + str_lhs->length, str_rhs->bytes, str_rhs->length);
+    ink_gc_disown(story, INK_OBJ(lhs));
+    ink_gc_disown(story, INK_OBJ(rhs));
     value = ink_string_new(story, bytes, length);
     ink_free(bytes);
     return value;
@@ -853,6 +881,24 @@ int ink_table_insert(struct ink_story *story, struct ink_object *obj,
     entry->key = key_str;
     entry->value = value;
     return 1;
+}
+
+static void ink_gc_own(struct ink_story *story, struct ink_object *obj)
+{
+    const struct ink_object_set_key key = {
+        .obj = obj,
+    };
+
+    ink_object_set_insert(&story->gc_owned, key, NULL);
+}
+
+static void ink_gc_disown(struct ink_story *story, struct ink_object *obj)
+{
+    const struct ink_object_set_key key = {
+        .obj = obj,
+    };
+
+    ink_object_set_remove(&story->gc_owned, key);
 }
 
 #undef INK_TABLE_CAPACITY_MIN
@@ -1162,12 +1208,13 @@ static int ink_story_exec(struct ink_story *story)
             frame = &story->call_stack[story->call_stack_top - 1];
             break;
         }
-        case INK_OP_POP:
+        case INK_OP_POP: {
             if (!ink_story_stack_pop(story)) {
                 rc = -INK_E_INVALID_ARG;
                 goto exit_loop;
             }
             break;
+        }
         case INK_OP_TRUE: {
             struct ink_object *const value = ink_bool_new(story, true);
 
@@ -1443,7 +1490,7 @@ static int ink_story_exec(struct ink_story *story)
             break;
         }
         case INK_OP_LOAD_CHOICE_ID: {
-            rc = ink_story_stack_push(story, story->choice_id);
+            rc = ink_story_stack_push(story, story->current_choice_id);
             if (rc < 0) {
                 goto exit_loop;
             }
@@ -1547,7 +1594,7 @@ int ink_story_choose(struct ink_story *story, size_t index)
         struct ink_choice *const choice =
             &story->current_choices.entries[index];
 
-        story->choice_id = choice->id;
+        story->current_choice_id = choice->id;
         return INK_E_OK;
     }
     return -INK_E_INVALID_ARG;
@@ -1682,19 +1729,19 @@ struct ink_story *ink_open(void)
     story->call_stack_top = 0;
     story->gc_allocated = 0;
     story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
-    story->gc_gray_count = 0;
-    story->gc_gray_capacity = 0;
-    story->gc_gray = NULL;
     story->gc_objects = NULL;
     story->globals = NULL;
     story->paths = NULL;
     story->current_path = NULL;
     story->current_content = NULL;
-    story->choice_id = NULL;
+    story->current_choice_id = NULL;
 
     memset(story->stack, 0, sizeof(*story->stack) * INK_STORY_STACK_MAX);
     memset(story->call_stack, 0,
            sizeof(*story->call_stack) * INK_STORY_STACK_MAX);
+    ink_object_vec_init(&story->gc_gray);
+    ink_object_set_init(&story->gc_owned, INK_OBJECT_SET_LOAD_MAX,
+                        ink_object_set_key_hash, ink_object_set_key_cmp);
     ink_choice_vec_init(&story->current_choices);
     return story;
 }
@@ -1705,6 +1752,8 @@ struct ink_story *ink_open(void)
 void ink_close(struct ink_story *story)
 {
     ink_choice_vec_deinit(&story->current_choices);
+    ink_object_vec_deinit(&story->gc_gray);
+    ink_object_set_deinit(&story->gc_owned);
 
     while (story->gc_objects) {
         struct ink_object *const obj = story->gc_objects;
@@ -1713,7 +1762,6 @@ void ink_close(struct ink_story *story)
         ink_object_free(story, obj);
     }
 
-    ink_free(story->gc_gray);
     memset(story, 0, sizeof(*story));
     ink_free(story);
 }
