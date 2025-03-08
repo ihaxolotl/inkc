@@ -19,16 +19,15 @@ static uint32_t ink_symtab_hash(const void *bytes, size_t length)
 }
 
 /**
- * Comparison function for symbol table maps.
+ * Key comparison function for symbol table maps.
  */
-static bool ink_symtab_cmp(const void *a, size_t alen, const void *b,
-                           size_t blen)
+static bool ink_symtab_cmp(const void *lhs, const void *rhs)
 {
-    const struct ink_string_ref *const key_1 = a;
-    const struct ink_string_ref *const key_2 = b;
+    const struct ink_string_ref *const key_lhs = lhs;
+    const struct ink_string_ref *const key_rhs = rhs;
 
-    return (key_1->length == key_2->length) &&
-           memcmp(key_1->bytes, key_2->bytes, key_1->length) == 0;
+    return key_lhs->length == key_rhs->length &&
+           memcmp(key_lhs->bytes, key_rhs->bytes, key_lhs->length) == 0;
 }
 
 struct ink_symtab *ink_symtab_make(struct ink_symtab_pool *st_pool)

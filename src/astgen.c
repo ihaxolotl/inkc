@@ -14,10 +14,7 @@
 #include "symtab.h"
 #include "vec.h"
 
-#define INK_STRINGSET_CAPACITY_MIN (16u)
-#define INK_STRINGSET_GROWTH_FACTOR (2u)
 #define INK_STRINGSET_LOAD_MAX (80u)
-#define INK_E_FAIL (-1)
 
 #define INK_ASTGEN_TODO(msg)                                                   \
     do {                                                                       \
@@ -31,196 +28,28 @@
     } while (0)
 
 INK_VEC_T(ink_astgen_scratch, size_t)
-
-struct ink_stringset_kv {
-    const uint8_t *key_bytes;
-    size_t key_length;
-    size_t str_index;
-};
+INK_HASHMAP_T(ink_stringset, struct ink_string_ref, size_t)
 
 /**
- * Hashset for interning strings.
- *
- * No backing store is provided for keys. Keys always point to within the
- * IR's string bytes region.
+ * Key comparison operation for string set entries.
  */
-struct ink_stringset {
-    size_t max_load_percentage;
-    size_t count;
-    size_t capacity;
-    struct ink_stringset_kv *entries;
-    uint32_t (*hasher)(const uint8_t *bytes, size_t length);
-};
-
-/**
- * Determine if a KV bucket has a value set.
- *
- * Returns true if set, false otherwise.
- */
-static bool ink_stringset_kv_is_set(const struct ink_stringset_kv *self)
+static bool ink_stringset_cmp(const void *lhs, const void *rhs)
 {
-    return self->key_length != 0;
+    const struct ink_string_ref *const key_lhs = lhs;
+    const struct ink_string_ref *const key_rhs = rhs;
+
+    return key_lhs->length == key_rhs->length &&
+           memcmp(key_lhs->bytes, key_rhs->bytes, key_lhs->length) == 0;
 }
 
 /**
- * Calculate the next size of a stringset.
+ * Hasher for string set entries.
  */
-static size_t ink_stringset_next_size(const struct ink_stringset *self)
+static uint32_t ink_stringset_hasher(const void *bytes, size_t length)
 {
-    if (self->capacity < INK_STRINGSET_CAPACITY_MIN) {
-        return INK_STRINGSET_CAPACITY_MIN;
-    }
-    return self->capacity * INK_STRINGSET_GROWTH_FACTOR;
-}
+    const struct ink_string_ref *const key = bytes;
 
-/**
- * Determine if the set needs to be resized.
- *
- * Returns true if a resize is needed, false otherwise.
- */
-static bool ink_stringset_needs_resize(struct ink_stringset *self)
-{
-    if (self->capacity == 0) {
-        return true;
-    }
-    return ((self->count * 100ul) / self->capacity) > self->max_load_percentage;
-}
-
-/**
- * Comparison function for string set keys.
- */
-static bool ink_stringset_cmp(const uint8_t *a, size_t a_length,
-                              const uint8_t *b, size_t b_length)
-{
-    return a_length == b_length && memcmp(a, b, a_length) == 0;
-}
-
-/**
- * Hash function for string set keys.
- */
-static uint32_t ink_stringset_hasher(const uint8_t *bytes, size_t length)
-{
-    return ink_fnv32a(bytes, length);
-}
-
-static struct ink_stringset_kv *
-ink_stringset_find_slot(struct ink_stringset_kv *entries, size_t capacity,
-                        const uint8_t *key, size_t key_length,
-                        uint32_t (*hasher)(const uint8_t *bytes, size_t length))
-{
-    size_t i = hasher(key, key_length) & (capacity - 1);
-
-    for (;;) {
-        struct ink_stringset_kv *const slot = &entries[i];
-
-        if (!ink_stringset_kv_is_set(slot) ||
-            ink_stringset_cmp(key, key_length, slot->key_bytes,
-                              slot->key_length)) {
-            return slot;
-        }
-
-        i = (i + 1) & (capacity - 1);
-    }
-}
-
-static int ink_stringset_resize(struct ink_stringset *self)
-{
-    struct ink_stringset_kv *entries, *src, *dst;
-    size_t count = 0;
-    const size_t capacity = ink_stringset_next_size(self);
-    const size_t size = sizeof(*self->entries) * capacity;
-
-    entries = ink_malloc(size);
-    if (!entries) {
-        return -INK_E_OOM;
-    }
-
-    memset(entries, 0, size);
-
-    for (size_t i = 0; i < self->capacity; i++) {
-        src = &self->entries[i];
-        if (ink_stringset_kv_is_set(src)) {
-            dst = ink_stringset_find_slot(entries, capacity, src->key_bytes,
-                                          src->key_length, self->hasher);
-            dst->key_bytes = src->key_bytes;
-            dst->key_length = src->key_length;
-            count++;
-        }
-    }
-
-    ink_free(self->entries);
-    self->count = count;
-    self->capacity = capacity;
-    self->entries = entries;
-    return INK_E_OK;
-}
-
-/**
- * Lookup a string within the set.
- */
-static int ink_stringset_lookup(struct ink_stringset *self,
-                                const uint8_t *key_bytes, size_t key_length,
-                                size_t *str_index)
-{
-    struct ink_stringset_kv *entry;
-
-    if (self->count == 0) {
-        return -INK_E_OOM;
-    }
-
-    entry = ink_stringset_find_slot(self->entries, self->capacity, key_bytes,
-                                    key_length, self->hasher);
-    if (!ink_stringset_kv_is_set(entry)) {
-        return -INK_E_OOM;
-    }
-
-    *str_index = entry->str_index;
-    return INK_E_OK;
-}
-
-/**
- * Insert a string into the set.
- */
-static int ink_stringset_insert(struct ink_stringset *self,
-                                const uint8_t *key_bytes, size_t key_length,
-                                size_t str_index)
-{
-    struct ink_stringset_kv *entry;
-
-    if (ink_stringset_needs_resize(self)) {
-        int rc = ink_stringset_resize(self);
-        if (rc < 0) {
-            return rc;
-        }
-    }
-
-    entry = ink_stringset_find_slot(self->entries, self->capacity, key_bytes,
-                                    key_length, self->hasher);
-    if (!ink_stringset_kv_is_set(entry)) {
-        entry->key_bytes = key_bytes;
-        entry->key_length = key_length;
-        entry->str_index = str_index;
-        self->count++;
-        return INK_E_OK;
-    }
-    return -INK_E_OOM;
-}
-
-static void
-ink_stringset_init(struct ink_stringset *self, size_t max_load_percentage,
-                   uint32_t (*hasher)(const uint8_t *bytes, size_t length))
-{
-    assert(max_load_percentage > 0ul && max_load_percentage < 100ul);
-    self->count = 0;
-    self->capacity = 0;
-    self->entries = 0;
-    self->max_load_percentage = max_load_percentage;
-    self->hasher = hasher;
-}
-
-static void ink_stringset_deinit(struct ink_stringset *self)
-{
-    ink_free(self->entries);
+    return ink_fnv32a(key->bytes, key->length);
 }
 
 struct ink_astgen_global {
@@ -242,7 +71,7 @@ static void ink_astgen_global_init(struct ink_astgen_global *global,
 
     ink_byte_vec_init(&global->string_bytes);
     ink_stringset_init(&global->string_table, INK_STRINGSET_LOAD_MAX,
-                       ink_stringset_hasher);
+                       ink_stringset_hasher, ink_stringset_cmp);
     ink_symtab_pool_init(&global->symtab_pool);
 }
 
@@ -528,16 +357,20 @@ static size_t ink_astgen_add_str(struct ink_astgen *astgen,
     struct ink_astgen_global *const global = astgen->global;
     struct ink_stringset *const string_table = &global->string_table;
     struct ink_byte_vec *const strings = &global->string_bytes;
+    const struct ink_string_ref key = {
+        .bytes = chars,
+        .length = length,
+    };
     size_t str_index = strings->count;
 
-    rc = ink_stringset_lookup(string_table, chars, length, &str_index);
+    rc = ink_stringset_lookup(string_table, key, &str_index);
     if (rc < 0) {
         for (size_t i = 0; i < length; i++) {
             ink_byte_vec_push(strings, chars[i]);
         }
 
         ink_byte_vec_push(strings, '\0');
-        ink_stringset_insert(string_table, chars, length, str_index);
+        ink_stringset_insert(string_table, key, str_index);
     }
     return str_index;
 }

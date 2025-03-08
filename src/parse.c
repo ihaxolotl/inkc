@@ -38,14 +38,13 @@ static uint32_t ink_parser_cache_key_hash(const void *key, size_t length)
     return ink_fnv32a((uint8_t *)key, length);
 }
 
-static bool ink_parser_cache_key_compare(const void *a, size_t a_length,
-                                         const void *b, size_t b_length)
+static bool ink_parser_cache_key_cmp(const void *lhs, const void *rhs)
 {
-    struct ink_parser_cache_key *const key_a = (struct ink_parser_cache_key *)a;
-    struct ink_parser_cache_key *const key_b = (struct ink_parser_cache_key *)b;
+    const struct ink_parser_cache_key *const key_lhs = lhs;
+    const struct ink_parser_cache_key *const key_rhs = rhs;
 
-    return (key_a->source_offset == key_b->source_offset) &&
-           (key_a->rule_address == key_b->rule_address);
+    return (key_lhs->source_offset == key_rhs->source_offset) &&
+           (key_lhs->rule_address == key_rhs->rule_address);
 }
 
 static int ink_parser_stack_emplace(struct ink_parser_stack *stack,
@@ -383,8 +382,7 @@ static void ink_parser_init(struct ink_parser *parser, struct ink_ast *tree,
 
     ink_parser_scratch_init(&parser->scratch);
     ink_parser_cache_init(&parser->cache, INK_PARSER_CACHE_LOAD_MAX,
-                          ink_parser_cache_key_hash,
-                          ink_parser_cache_key_compare);
+                          ink_parser_cache_key_hash, ink_parser_cache_key_cmp);
 }
 
 /**

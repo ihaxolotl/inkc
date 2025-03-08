@@ -10,6 +10,7 @@ extern "C" {
 
 enum ink_status {
     INK_E_OK,
+    INK_E_FAIL,
     INK_E_PANIC,
     INK_E_OOM,
     INK_E_OS,

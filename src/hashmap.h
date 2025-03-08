@@ -13,12 +13,21 @@
 extern "C" {
 #endif
 
-#define INK_HASHMAP_CAPACITY_MIN 16
-#define INK_HASHMAP_GROWTH_FACTOR 2
+#define INK_HASHMAP_CAPACITY_MIN (16)
+#define INK_HASHMAP_GROWTH_FACTOR (2)
+
+enum ink_hashmap_entry_state {
+    INK_HASHMAP_IS_EMPTY = 0,
+    INK_HASHMAP_IS_OCCUPIED,
+    INK_HASHMAP_IS_DELETED,
+};
 
 #define INK_HASHMAP_T(__T, __K, __V)                                           \
+    /**                                                                        \
+     * Hashmap bucket.                                                         \
+     */                                                                        \
     struct __T##_kv {                                                          \
-        size_t key_length;                                                     \
+        enum ink_hashmap_entry_state state;                                    \
         __K key;                                                               \
         __V value;                                                             \
     };                                                                         \
@@ -29,15 +38,21 @@ extern "C" {
         size_t capacity;                                                       \
         struct __T##_kv *entries;                                              \
         uint32_t (*hasher)(const void *bytes, size_t length);                  \
-        bool (*compare)(const void *a, size_t a_length, const void *b,         \
-                        size_t b_length);                                      \
+        bool (*compare)(const void *lhs, const void *rhs);                     \
     };                                                                         \
                                                                                \
+    /**                                                                        \
+     * Perform initialization on the hashmap.                                  \
+     *                                                                         \
+     * Functions for key comparison and hashing, as well as a maximum load     \
+     * factor, must be provided for correct operation.                         \
+     *                                                                         \
+     * Heap memory for the buckets store is allocated lazily upon insertion.   \
+     */                                                                        \
     __attribute__((unused)) static inline void __T##_init(                     \
         struct __T *self, size_t max_load_percentage,                          \
         uint32_t (*hasher)(const void *bytes, size_t length),                  \
-        bool (*compare)(const void *a, size_t a_length, const void *b,         \
-                        size_t b_length))                                      \
+        bool (*compare)(const void *lhs, const void *rhs))                     \
     {                                                                          \
         assert(max_load_percentage > 0ul && max_load_percentage < 100ul);      \
         self->count = 0;                                                       \
@@ -48,17 +63,25 @@ extern "C" {
         self->max_load_percentage = max_load_percentage;                       \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Perform de-initialization on the hashmap.                               \
+     *                                                                         \
+     * The buckets store will be freed and all members shall be cleared.       \
+     */                                                                        \
     __attribute__((unused)) static inline void __T##_deinit(struct __T *self)  \
     {                                                                          \
         ink_free(self->entries);                                               \
+        self->count = 0;                                                       \
+        self->capacity = 0;                                                    \
+        self->entries = (void *)0;                                             \
+        self->hasher = (void *)0;                                              \
+        self->compare = (void *)0;                                             \
+        self->max_load_percentage = 0;                                         \
     }                                                                          \
                                                                                \
-    __attribute__((unused)) static inline bool __T##_kv_is_set(                \
-        const struct __T##_kv *self)                                           \
-    {                                                                          \
-        return self->key_length != 0;                                          \
-    }                                                                          \
-                                                                               \
+    /**                                                                        \
+     * Calculate the next total capacity of the buckets store.                 \
+     */                                                                        \
     __attribute__((unused)) static inline size_t __T##_next_size(              \
         const struct __T *self)                                                \
     {                                                                          \
@@ -68,6 +91,11 @@ extern "C" {
         return self->capacity * INK_HASHMAP_GROWTH_FACTOR;                     \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Determine if the buckets store requires resizing.                       \
+     *                                                                         \
+     * This is calculated based on the the load factor supplied by the user.   \
+     */                                                                        \
     __attribute__((unused)) static inline bool __T##_needs_resize(             \
         struct __T *self)                                                      \
     {                                                                          \
@@ -78,28 +106,40 @@ extern "C" {
                self->max_load_percentage;                                      \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Perform linear probing on the buckets store.                            \
+     *                                                                         \
+     * An entry pointer shall be returned if the entry's key matches or if the \
+     * key has not yet been set.                                               \
+     */                                                                        \
     __attribute__((unused)) static inline struct __T##_kv *__T##_find_slot(    \
         struct __T##_kv *entries, size_t capacity, const void *key,            \
-        size_t key_length,                                                     \
         uint32_t (*hasher)(const void *bytes, size_t length),                  \
-        bool (*compare)(const void *a, size_t a_length, const void *b,         \
-                        size_t b_length))                                      \
+        bool (*compare)(const void *lhs, const void *rhs))                     \
     {                                                                          \
-        size_t i = hasher(key, key_length) & (capacity - 1);                   \
+        struct __T##_kv *tombstone = (void *)0;                                \
+        size_t index = hasher(key, sizeof(__K)) & (capacity - 1);              \
                                                                                \
         for (;;) {                                                             \
-            struct __T##_kv *const slot = &entries[i];                         \
+            struct __T##_kv *const slot = &entries[index];                     \
                                                                                \
-            if (!__T##_kv_is_set(slot) ||                                      \
-                compare(key, key_length, (void *)&slot->key,                   \
-                        slot->key_length)) {                                   \
+            if (slot->state == INK_HASHMAP_IS_EMPTY) {                         \
+                return tombstone ? tombstone : slot;                           \
+            } else if (slot->state == INK_HASHMAP_IS_DELETED) {                \
+                if (!tombstone) {                                              \
+                    tombstone = slot;                                          \
+                }                                                              \
+            } else if (compare(key, (void *)&slot->key)) {                     \
                 return slot;                                                   \
             }                                                                  \
                                                                                \
-            i = (i + 1) & (capacity - 1);                                      \
+            index = (index + 1) & (capacity - 1);                              \
         }                                                                      \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * The buckets store shall be resized quadratically.                       \
+     */                                                                        \
     __attribute__((unused)) static inline int __T##_resize(struct __T *self)   \
     {                                                                          \
         struct __T##_kv *entries, *src, *dst;                                  \
@@ -116,12 +156,10 @@ extern "C" {
                                                                                \
         for (size_t i = 0; i < self->capacity; i++) {                          \
             src = &self->entries[i];                                           \
-            if (__T##_kv_is_set(src)) {                                        \
+            if (src->state == INK_HASHMAP_IS_OCCUPIED) {                       \
                 dst = __T##_find_slot(entries, capacity, &src->key,            \
-                                      src->key_length, self->hasher,           \
-                                      self->compare);                          \
+                                      self->hasher, self->compare);            \
                 dst->key = src->key;                                           \
-                dst->key_length = src->key_length;                             \
                 dst->value = src->value;                                       \
                 count++;                                                       \
             }                                                                  \
@@ -134,25 +172,31 @@ extern "C" {
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Lookup and retrieve an element within the hashmap.                      \
+     */                                                                        \
     __attribute__((unused)) static inline int __T##_lookup(                    \
         struct __T *self, __K key, __V *value)                                 \
     {                                                                          \
         struct __T##_kv *entry;                                                \
                                                                                \
         if (self->count == 0) {                                                \
-            return -INK_E_OOM;                                                 \
+            return -INK_E_FAIL;                                                \
         }                                                                      \
                                                                                \
         entry = __T##_find_slot(self->entries, self->capacity, (void *)&key,   \
-                                sizeof(key), self->hasher, self->compare);     \
-        if (!__T##_kv_is_set(entry)) {                                         \
-            return -INK_E_OOM;                                                 \
+                                self->hasher, self->compare);                  \
+        if (entry->state != INK_HASHMAP_IS_OCCUPIED) {                         \
+            return -INK_E_FAIL;                                                \
         }                                                                      \
                                                                                \
         *value = entry->value;                                                 \
         return INK_E_OK;                                                       \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Insert an element into the hashmap.                                     \
+     */                                                                        \
     __attribute__((unused)) static inline int __T##_insert(struct __T *self,   \
                                                            __K key, __V value) \
     {                                                                          \
@@ -167,27 +211,44 @@ extern "C" {
         }                                                                      \
                                                                                \
         entry = __T##_find_slot(self->entries, self->capacity, (void *)&key,   \
-                                sizeof(key), self->hasher, self->compare);     \
-        if (!__T##_kv_is_set(entry)) {                                         \
+                                self->hasher, self->compare);                  \
+        if (entry->state != INK_HASHMAP_IS_OCCUPIED) {                         \
+            entry->state = INK_HASHMAP_IS_OCCUPIED;                            \
             entry->key = key;                                                  \
-            entry->key_length = sizeof(key);                                   \
             entry->value = value;                                              \
             self->count++;                                                     \
             return INK_E_OK;                                                   \
         }                                                                      \
                                                                                \
         entry->key = key;                                                      \
-        entry->key_length = sizeof(key);                                       \
         entry->value = value;                                                  \
         return -INK_E_OVERWRITE;                                               \
     }                                                                          \
                                                                                \
+    /**                                                                        \
+     * Remove an entry from the map.                                           \
+     *                                                                         \
+     * If a bucket for the supplied key is found, the bucket shall be marked   \
+     * witha  tombstone value and return zero. Otherwise the operation shall   \
+     * fail and return a non-zero failure code.                                \
+     */                                                                        \
     __attribute__((unused)) static inline int __T##_remove(struct __T *self,   \
                                                            __K key)            \
     {                                                                          \
-        (void)self;                                                            \
-        (void)key;                                                             \
-        return -1;                                                             \
+        struct __T##_kv *entry;                                                \
+                                                                               \
+        if (self->count == 0) {                                                \
+            return -INK_E_FAIL;                                                \
+        }                                                                      \
+                                                                               \
+        entry = __T##_find_slot(self->entries, self->capacity, (void *)&key,   \
+                                self->hasher, self->compare);                  \
+        if (entry->state != INK_HASHMAP_IS_OCCUPIED) {                         \
+            return -INK_E_FAIL;                                                \
+        }                                                                      \
+                                                                               \
+        entry->state = INK_HASHMAP_IS_DELETED;                                 \
+        return INK_E_OK;                                                       \
     }                                                                          \
     /**/
 
