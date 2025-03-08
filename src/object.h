@@ -7,9 +7,15 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#include "story.h"
 #include "vec.h"
+
+struct ink_story;
+struct ink_object;
+
+INK_VEC_T(ink_byte_vec, uint8_t)
+INK_VEC_T(ink_object_vec, struct ink_object *)
 
 enum ink_object_type {
     INK_OBJ_BOOL,

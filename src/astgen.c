@@ -14,6 +14,8 @@
 #include "symtab.h"
 #include "vec.h"
 
+struct ink_object *ink_story_get_paths(struct ink_story *);
+
 #define INK_STRINGSET_LOAD_MAX (80u)
 
 #define INK_ASTGEN_TODO(msg)                                                   \
@@ -419,7 +421,7 @@ static void ink_astgen_add_knot(struct ink_astgen *astgen, size_t str_index)
     struct ink_byte_vec *const string_bytes = &global->string_bytes;
     struct ink_story *const story = global->story;
     uint8_t *const str = &string_bytes->entries[str_index];
-    struct ink_object *const paths_table = story->paths;
+    struct ink_object *const paths_table = ink_story_get_paths(story);
     struct ink_object *const path_name =
         ink_string_new(story, str, strlen((char *)str));
 

@@ -11,9 +11,9 @@ extern "C" {
 #include "common.h"
 #include "vec.h"
 
+struct ink_story;
 struct ink_object;
-
-#define INK_STORY_STACK_MAX 128
+struct ink_string;
 
 enum ink_flags {
     INK_F_TRACING = (1 << 0),
@@ -31,40 +31,7 @@ struct ink_choice {
     struct ink_string *text;
 };
 
-struct ink_call_frame {
-    struct ink_content_path *callee;
-    struct ink_content_path *caller;
-    uint8_t *ip;
-    struct ink_object **sp;
-};
-
-INK_VEC_T(ink_object_vec, struct ink_object *)
 INK_VEC_T(ink_choice_vec, struct ink_choice)
-INK_VEC_T(ink_byte_vec, uint8_t)
-
-/**
- * Ink Story Context
- */
-struct ink_story {
-    bool can_continue;
-    int flags;
-    size_t stack_top;
-    size_t call_stack_top;
-    size_t gc_allocated;
-    size_t gc_threshold;
-    size_t gc_gray_count;
-    size_t gc_gray_capacity;
-    struct ink_object **gc_gray;
-    struct ink_object *gc_objects;
-    struct ink_object *globals;
-    struct ink_object *paths;
-    struct ink_object *current_path;
-    struct ink_object *current_content;
-    struct ink_object *choice_id;
-    struct ink_choice_vec current_choices;
-    struct ink_object *stack[INK_STORY_STACK_MAX];
-    struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
-};
 
 struct ink_load_opts {
     const uint8_t *filename;
@@ -73,18 +40,22 @@ struct ink_load_opts {
     int flags;
 };
 
+extern struct ink_story *ink_open(void);
+extern void ink_close(struct ink_story *story);
 extern int ink_story_load_opts(struct ink_story *story,
                                const struct ink_load_opts *opts);
 extern int ink_story_load(struct ink_story *story, const char *text, int flags);
-extern void ink_story_free(struct ink_story *story);
 extern void ink_story_dump(struct ink_story *story);
 extern int ink_story_stack_push(struct ink_story *story,
                                 struct ink_object *object);
 extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
 extern struct ink_object *ink_story_stack_peek(struct ink_story *story,
                                                size_t offset);
+extern bool ink_story_can_continue(struct ink_story *story);
 extern int ink_story_continue(struct ink_story *story,
                               struct ink_string **content);
+extern void ink_story_get_choices(struct ink_story *story,
+                                  struct ink_choice_vec *choices);
 extern int ink_story_choose(struct ink_story *story, size_t index);
 
 #ifdef __cplusplus

@@ -11,6 +11,7 @@
 #include "opcode.h"
 #include "story.h"
 
+#define INK_STORY_STACK_MAX 128
 #define INK_GC_GRAY_CAPACITY_MIN (16ul)
 #define INK_GC_GRAY_GROWTH_FACTOR (2ul)
 #define INK_GC_HEAP_SIZE_MIN (1024ul * 1024ul)
@@ -18,6 +19,37 @@
 #define INK_TABLE_CAPACITY_MIN (8ul)
 #define INK_TABLE_LOAD_MAX (80ul)
 #define INK_TABLE_SCALE_FACTOR (2ul)
+
+struct ink_call_frame {
+    struct ink_content_path *callee;
+    struct ink_content_path *caller;
+    uint8_t *ip;
+    struct ink_object **sp;
+};
+
+/**
+ * Ink Story Context
+ */
+struct ink_story {
+    bool can_continue;
+    int flags;
+    size_t stack_top;
+    size_t call_stack_top;
+    size_t gc_allocated;
+    size_t gc_threshold;
+    size_t gc_gray_count;
+    size_t gc_gray_capacity;
+    struct ink_object **gc_gray;
+    struct ink_object *gc_objects;
+    struct ink_object *globals;
+    struct ink_object *paths;
+    struct ink_object *current_path;
+    struct ink_object *current_content;
+    struct ink_object *choice_id;
+    struct ink_choice_vec current_choices;
+    struct ink_object *stack[INK_STORY_STACK_MAX];
+    struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
+};
 
 const char *INK_DEFAULT_PATH = "@main";
 
@@ -1476,6 +1508,11 @@ struct ink_object *ink_story_stack_peek(struct ink_story *story, size_t offset)
     return story->stack[story->stack_top - offset - 1];
 }
 
+bool ink_story_can_continue(struct ink_story *story)
+{
+    return story->can_continue;
+}
+
 /**
  * Advance the story and output content, if available.
  *
@@ -1514,6 +1551,21 @@ int ink_story_choose(struct ink_story *story, size_t index)
         return INK_E_OK;
     }
     return -INK_E_INVALID_ARG;
+}
+
+void ink_story_get_choices(struct ink_story *story,
+                           struct ink_choice_vec *choices)
+{
+    ink_choice_vec_shrink(choices, 0);
+
+    for (size_t i = 0; i < story->current_choices.count; i++) {
+        ink_choice_vec_push(choices, story->current_choices.entries[i]);
+    }
+}
+
+struct ink_object *ink_story_get_paths(struct ink_story *story)
+{
+    return story->paths;
 }
 
 /**
@@ -1560,34 +1612,13 @@ int ink_story_load_opts(struct ink_story *story,
         return -INK_E_PANIC;
     }
 
-    story->can_continue = true;
     story->flags = opts->flags & ~INK_F_GC_ENABLE;
-    story->stack_top = 0;
-    story->call_stack_top = 0;
-    story->gc_allocated = 0;
-    story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
-    story->gc_gray_count = 0;
-    story->gc_gray_capacity = 0;
-    story->gc_gray = NULL;
-    story->gc_objects = NULL;
     story->globals = ink_table_new(story);
     story->paths = ink_table_new(story);
-    story->current_path = NULL;
-    story->current_content = NULL;
-    story->choice_id = NULL;
-
-    memset(story->stack, 0, sizeof(struct ink_object *) * INK_STORY_STACK_MAX);
-    memset(story->call_stack, 0,
-           sizeof(struct ink_call_frame *) * INK_STORY_STACK_MAX);
-
-    ink_choice_vec_init(&story->current_choices);
 
     rc = ink_compile(story, opts);
     if (rc < 0) {
         goto err;
-    }
-    if (opts->flags & INK_F_GC_ENABLE) {
-        story->flags |= INK_F_GC_ENABLE;
     }
 
     struct ink_table *const paths_table = INK_OBJ_AS_TABLE(story->paths);
@@ -1606,6 +1637,12 @@ int ink_story_load_opts(struct ink_story *story,
                 break;
             }
         }
+    }
+
+    story->can_continue = true;
+
+    if (opts->flags & INK_F_GC_ENABLE) {
+        story->flags |= INK_F_GC_ENABLE;
     }
 err:
     return rc;
@@ -1629,9 +1666,43 @@ int ink_story_load(struct ink_story *story, const char *source, int flags)
 }
 
 /**
- * Free and deinitialize an Ink story.
+ * Open a new Ink story context.
  */
-void ink_story_free(struct ink_story *story)
+struct ink_story *ink_open(void)
+{
+    struct ink_story *const story = ink_malloc(sizeof(*story));
+
+    if (!story) {
+        return NULL;
+    }
+
+    story->can_continue = false;
+    story->flags = 0;
+    story->stack_top = 0;
+    story->call_stack_top = 0;
+    story->gc_allocated = 0;
+    story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
+    story->gc_gray_count = 0;
+    story->gc_gray_capacity = 0;
+    story->gc_gray = NULL;
+    story->gc_objects = NULL;
+    story->globals = NULL;
+    story->paths = NULL;
+    story->current_path = NULL;
+    story->current_content = NULL;
+    story->choice_id = NULL;
+
+    memset(story->stack, 0, sizeof(*story->stack) * INK_STORY_STACK_MAX);
+    memset(story->call_stack, 0,
+           sizeof(*story->call_stack) * INK_STORY_STACK_MAX);
+    ink_choice_vec_init(&story->current_choices);
+    return story;
+}
+
+/**
+ * Free and deinitialize an Ink story context.
+ */
+void ink_close(struct ink_story *story)
 {
     ink_choice_vec_deinit(&story->current_choices);
 
@@ -1644,4 +1715,5 @@ void ink_story_free(struct ink_story *story)
 
     ink_free(story->gc_gray);
     memset(story, 0, sizeof(*story));
+    ink_free(story);
 }

@@ -93,7 +93,6 @@ static void inkc_render_error(const char *filename, int rc)
 int main(int argc, char *argv[])
 {
     struct ink_source source;
-    struct ink_story story;
     bool compile_only = false;
     int flags = INK_F_GC_ENABLE | INK_F_GC_STRESS;
     int opt = 0;
@@ -161,6 +160,12 @@ int main(int argc, char *argv[])
         return rc;
     }
 
+    struct ink_story *const story = ink_open();
+
+    if (!story) {
+        goto out;
+    }
+
     const struct ink_load_opts opts = {
         .source_bytes = source.bytes,
         .source_length = source.length,
@@ -168,7 +173,7 @@ int main(int argc, char *argv[])
         .flags = flags,
     };
 
-    rc = ink_story_load_opts(&story, &opts);
+    rc = ink_story_load_opts(story, &opts);
     if (rc < 0) {
         /* TODO(Brett): Returning EXIT_FAILURE breaks llvm-lit. Look for a
          * workaround */
@@ -176,21 +181,26 @@ int main(int argc, char *argv[])
     }
     if (!compile_only) {
         struct ink_string *content = NULL;
+        struct ink_choice_vec choices;
 
-        while (story.can_continue) {
-            rc = ink_story_continue(&story, &content);
+        ink_choice_vec_init(&choices);
+
+        while (ink_story_can_continue(story)) {
+            rc = ink_story_continue(story, &content);
             if (rc < 0) {
                 break;
             }
             if (content) {
                 printf("%s\n", content->bytes);
             }
-            if (story.current_choices.count > 0) {
+
+            ink_story_get_choices(story, &choices);
+
+            if (choices.count > 0) {
                 size_t choice_index = 0;
 
-                for (size_t i = 0; i < story.current_choices.count; i++) {
-                    struct ink_choice *const choice =
-                        &story.current_choices.entries[i];
+                for (size_t i = 0; i < choices.count; i++) {
+                    struct ink_choice *const choice = &choices.entries[i];
 
                     printf("[%zu] %s\n", i + 1, choice->text->bytes);
                 }
@@ -198,18 +208,20 @@ int main(int argc, char *argv[])
                 printf("> ");
                 scanf("%zu", &choice_index);
 
-                rc = ink_story_choose(&story, choice_index);
+                rc = ink_story_choose(story, choice_index);
                 if (rc < 0) {
                     break;
                 }
             }
         }
+
+        ink_choice_vec_deinit(&choices);
     }
     if (rc < 0) {
         inkc_render_error(filename, rc);
     }
 out:
-    ink_story_free(&story);
+    ink_close(story);
     ink_source_free(&source);
     return EXIT_SUCCESS;
 }
