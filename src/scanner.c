@@ -347,14 +347,12 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_SLASH: {
             switch (c) {
-            case '/': {
+            case '/':
                 state = INK_LEX_COMMENT_LINE;
                 break;
-            }
-            case '*': {
+            case '*':
                 state = INK_LEX_COMMENT_BLOCK;
                 break;
-            }
             default:
                 token->type = INK_TT_SLASH;
                 goto exit_loop;
@@ -385,21 +383,18 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_LESS_THAN: {
             switch (c) {
-            case '=': {
+            case '=':
                 token->type = INK_TT_LESS_EQUAL;
                 scanner->cursor_offset++;
                 goto exit_loop;
-            }
-            case '-': {
+            case '-':
                 token->type = INK_TT_LEFT_ARROW;
                 scanner->cursor_offset++;
                 goto exit_loop;
-            }
-            case '>': {
+            case '>':
                 token->type = INK_TT_GLUE;
                 scanner->cursor_offset++;
                 goto exit_loop;
-            }
             default:
                 token->type = INK_TT_LESS_THAN;
                 goto exit_loop;
@@ -483,15 +478,13 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_COMMENT_LINE: {
             switch (c) {
-            case '\0': {
+            case '\0':
                 state = INK_LEX_START;
                 continue;
-            }
-            case '\n': {
+            case '\n':
                 state = INK_LEX_START;
                 scanner->is_line_start = true;
                 break;
-            }
             default:
                 break;
             }
