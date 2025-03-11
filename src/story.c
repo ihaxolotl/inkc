@@ -994,8 +994,8 @@ static size_t ink_disassemble_jump_inst(const struct ink_story *story,
 
     jump |= bytes[offset + 2];
 
-    printf("%-16s 0x%lx -> 0x%lx\n", ink_opcode_strz(opcode), offset,
-           offset + 3 + jump);
+    printf("%-16s 0x%04x (0x%04lx -> 0x%04lx)\n", ink_opcode_strz(opcode), jump,
+           offset, offset + 3 + jump);
     return offset + 3;
 }
 

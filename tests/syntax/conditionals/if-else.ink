@@ -1,5 +1,0 @@
-{false:
-    Unreachable!
-- else:
-    Else!
-}

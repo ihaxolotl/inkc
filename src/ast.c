@@ -200,7 +200,10 @@ static int ink_ast_error_render(const struct ink_ast *tree,
         return ink_ast_error_renderf(
             tree, error, arena,
             "'else' case should always be the final case in conditional");
-        break;
+    case INK_AST_E_SWITCH_EXPR:
+        return ink_ast_error_renderf(
+            tree, error, arena,
+            "expected switch case expression to be constant value");
     default:
         return ink_ast_error_renderf(tree, error, arena, "unknown error");
     }
@@ -277,7 +280,7 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
     case INK_AST_FUNC_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT:
+    case INK_AST_GATHERED_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
         snprintf(buffer, length, "%s <line:%zu, line:%zu>",
@@ -291,7 +294,7 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_CONTENT_STMT:
     case INK_AST_DIVERT_STMT:
     case INK_AST_EXPR_STMT:
-    case INK_AST_GATHER_STMT:
+    case INK_AST_GATHER_POINT_STMT:
     case INK_AST_LIST_DECL:
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:
@@ -335,7 +338,7 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_BLOCK:
     case INK_AST_CHOICE_STMT:
     case INK_AST_FUNC_DECL:
-    case INK_AST_GATHERED_CHOICE_STMT:
+    case INK_AST_GATHERED_STMT:
     case INK_AST_KNOT_DECL:
     case INK_AST_STITCH_DECL:
         snprintf(buffer, length,
@@ -352,7 +355,7 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_CONTENT_STMT:
     case INK_AST_DIVERT_STMT:
     case INK_AST_EXPR_STMT:
-    case INK_AST_GATHER_STMT:
+    case INK_AST_GATHER_POINT_STMT:
     case INK_AST_LIST_DECL:
     case INK_AST_RETURN_STMT:
     case INK_AST_TEMP_DECL:

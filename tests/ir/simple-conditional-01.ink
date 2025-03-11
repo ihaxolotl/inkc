@@ -1,3 +1,0 @@
-{true:
-    Hello, world!
-}
