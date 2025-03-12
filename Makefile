@@ -5,8 +5,8 @@ PROFILE := debug
 
 DIST_ROOT         := build
 DIST              := $(DIST_ROOT)/$(PROFILE)
-INK_BIN           := $(DIST)/inkc
-INK_LIB           := $(DIST)/libink.a
+BIN               := $(DIST)/inkc
+LIB               := $(DIST)/libink.a
 TEST_BIN          := $(DIST_ROOT)/libink-tests
 FUZZ_BIN          := $(DIST_ROOT)/libink-fuzzer
 FUZZ_COVERAGE_BIN := $(DIST_ROOT)/libink-coverage
@@ -24,12 +24,12 @@ CFLAGS.debug   := -O0 -g3                 \
                   -fsanitize=undefined    \
                   -fno-omit-frame-pointer
 
-CFLAGS.fuzzing := -O2 -g                    \
-                  -fprofile-instr-generate  \
-                  -fcoverage-mapping        \
-                  -fsanitize=address        \
-                  -fsanitize=undefined      \
-                  -fsanitize=fuzzer-no-link
+CFLAGS.coverage := -O2 -g                    \
+                   -fprofile-instr-generate  \
+                   -fcoverage-mapping        \
+                   -fsanitize=address        \
+                   -fsanitize=undefined      \
+                   -fsanitize=fuzzer-no-link
 
 CFLAGS  := -Wall                            \
            -Wextra                          \
@@ -47,11 +47,11 @@ LDFLAGS.debug := -fsanitize=address      \
 
 LDFLAGS.release :=
 
-LDFLAGS.fuzzing := -fprofile-instr-generate  \
-                   -fcoverage-mapping        \
-                   -fsanitize=address        \
-                   -fsanitize=undefined      \
-                   -fsanitize=fuzzer-no-link
+LDFLAGS.coverage := -fprofile-instr-generate  \
+                    -fcoverage-mapping        \
+                    -fsanitize=address        \
+                    -fsanitize=undefined      \
+                    -fsanitize=fuzzer-no-link
 
 LDFLAGS := -lm -L/usr/local/lib \
 		   ${LDFLAGS.${PROFILE}}
@@ -97,19 +97,19 @@ $(DIST)/%.o: %.c | $(DIST)
 	$(Q)$(MKDIR) $(dir $@)
 	$(Q)$(CC) $(CFLAGS) -c -o $@ $<
 
-$(INK_LIB): $(call source-to-object,$(lib_srcs))
+$(LIB): $(call source-to-object,$(lib_srcs))
 	$(call msg,AR,$@)
 	$(Q)$(AR) $(ARFLAGS) $@ $^
 
-$(INK_BIN): $(call source-to-object,$(bin_srcs)) $(INK_LIB)
+$(BIN): $(call source-to-object,$(bin_srcs)) $(LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(TEST_BIN): $(call source-to-object,$(test_bin_srcs)) $(INK_LIB)
+$(TEST_BIN): $(call source-to-object,$(test_bin_srcs)) $(LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcmocka
 
-$(FUZZ_BIN): $(call source-to-object,$(fuzz_bin_srcs)) $(INK_LIB)
+$(FUZZ_BIN): $(call source-to-object,$(fuzz_bin_srcs)) $(LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) -Isrc -O2 -g -o $@ $^ \
         -fprofile-instr-generate \
@@ -118,21 +118,23 @@ $(FUZZ_BIN): $(call source-to-object,$(fuzz_bin_srcs)) $(INK_LIB)
         -fsanitize=undefined \
         -fsanitize=fuzzer
 
-$(FUZZ_COVERAGE_BIN): $(call source-to-object,$(fuzz_coverage_bin_srcs)) $(INK_LIB)
+$(FUZZ_COVERAGE_BIN): $(call source-to-object,$(fuzz_coverage_bin_srcs)) $(LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) -Isrc -O2 -g -o $@ $^ $(LDFLAGS)
 
-driver: $(INK_BIN)
+driver: $(BIN)
 
-library: $(INK_LIB)
+library: $(LIB)
 
 test: $(TEST_BIN)
 
 fuzzer:
-	$(Q)$(MAKE) --no-print-directory $(FUZZ_BIN) PROFILE=fuzzing
+	$(Q)$(MAKE) --no-print-directory $(FUZZ_BIN) PROFILE=coverage
 
 coverage:
-	$(Q)$(MAKE) --no-print-directory $(FUZZ_COVERAGE_BIN) PROFILE=fuzzing
+	$(Q)$(MAKE) --no-print-directory library PROFILE=coverage
+	$(Q)$(MAKE) --no-print-directory driver PROFILE=coverage
+	$(Q)$(MAKE) --no-print-directory $(FUZZ_COVERAGE_BIN) PROFILE=coverage
 
 clean:
 	$(Q)$(RM) $(DIST_ROOT)

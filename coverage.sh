@@ -3,16 +3,14 @@
 
 # Directories
 BUILD_ROOT=build
-CRASH_ROOT=${CRASH_ROOT:-"$BUILD_ROOT/crashes"}
-CORPUS_ROOT=${CORPUS_ROOT:-"$BUILD_ROOT/corpus"}
-
-# Artifacts
-profraw_file="$BUILD_ROOT/coverage.profraw"
-profdata_file="$BUILD_ROOT/coverage.profdata"
+PROFILE_ROOT=$BUILD_ROOT/coverage
+CRASH_ROOT=${CRASH_ROOT:-"$PROFILE_ROOT/crashes"}
+CORPUS_ROOT=${CORPUS_ROOT:-"$PROFILE_ROOT/corpus"}
+TEST_ROOT=${TEST_ROOT:-"testing"}
 exe="$BUILD_ROOT/libink-coverage"
 
-if [ ! -d $BUILD_ROOT ]; then
-    echo "Could not collect coverage information. A build has not yet been created."
+if [ ! -d $PROFILE_ROOT ]; then
+    echo "Could not collect coverage information. Coverage build has not yet been created."
     exit 1
 fi
 
@@ -22,10 +20,16 @@ if [ ! -f $exe ]; then
 fi
 
 mkdir -p $CRASH_ROOT $CORPUS_ROOT
-LLVM_PROFILE_FILE="$profraw_file" $exe $CORPUS_ROOT/*
-llvm-profdata merge -sparse $profraw_file -o $profdata_file
+LLVM_PROFILE_FILE="$PROFILE_ROOT/fuzzer-coverage.profraw" $exe $CORPUS_ROOT/*
+python3 ./lit.site.py --per-test-coverage $TEST_ROOT
+find $PROFILE_ROOT -name "*.profraw" > $PROFILE_ROOT/profraw-files.txt
+
+llvm-profdata merge -sparse \
+    --input-files=$PROFILE_ROOT/profraw-files.txt \
+    -o $PROFILE_ROOT/coverage.profdata
+
 llvm-cov show $exe \
-    -instr-profile=$profdata_file \
+    -instr-profile=$PROFILE_ROOT/coverage.profdata \
     --ignore-filename-regex='(fuzzing|testing)[/\\].*' \
     --format=html \
-    --output-dir=$BUILD_ROOT/html
+    --output-dir=$PROFILE_ROOT/html
