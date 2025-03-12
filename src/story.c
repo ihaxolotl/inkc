@@ -606,7 +606,7 @@ static struct ink_object *ink_number_bin_op(struct ink_story *story,
         value = lhs->value + rhs->value;
         break;
     case INK_OP_SUB:
-        value = lhs->value + rhs->value;
+        value = lhs->value - rhs->value;
         break;
     case INK_OP_MUL:
         value = lhs->value * rhs->value;

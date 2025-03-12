@@ -1050,6 +1050,7 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
             ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
             break;
         case INK_AST_GLUE:
+            INK_ASTGEN_TODO("GlueExpr");
             break;
         default:
             INK_ASTGEN_BUG(expr_node);
