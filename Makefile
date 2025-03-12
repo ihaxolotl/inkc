@@ -16,28 +16,43 @@ RM    := rm -rf
 MKDIR := mkdir -p
 
 CFLAGS.release := -O2 -DNDEBUG
-CFLAGS.debug   := -O0 -g3                      \
-                  -fsanitize=address,undefined \
-                  -fno-omit-frame-pointer      \
-                  -fprofile-instr-generate     \
+
+CFLAGS.debug   := -O0 -g3                 \
+                  -fsanitize=address      \
+                  -fsanitize=undefined    \
+                  -fno-omit-frame-pointer
+
+CFLAGS.fuzzing := -O2 -g                    \
+                  -fsanitize=address        \
+                  -fsanitize=undefined      \
+                  -fsanitize=fuzzer-no-link \
+                  -fprofile-instr-generate  \
                   -fcoverage-mapping
 
-CFLAGS  := -Wall                               \
-           -Wextra                             \
-           -Werror                             \
-           -Wpedantic                          \
-           -Wno-unused-parameter               \
-           -Wconversion                        \
-           -std=c99                            \
-           -Isrc                               \
+CFLAGS  := -Wall                            \
+           -Wextra                          \
+           -Werror                          \
+           -Wpedantic                       \
+           -Wno-unused-parameter            \
+           -Wconversion                     \
+           -std=c99                         \
+           -Isrc                            \
            ${CFLAGS.${PROFILE}}
 
-LDFLAGS.debug := -fsanitize=address,undefined  \
-	             -fno-omit-frame-pointer       \
+LDFLAGS.debug := -fsanitize=address      \
+                 -fsanitize=undefined    \
+	             -fno-omit-frame-pointer
 
 LDFLAGS.release :=
 
-LDFLAGS := -lm -L/usr/local/lib                \
+LDFLAGS.fuzzing := -fno-omit-frame-pointer   \
+                   -fsanitize=address        \
+                   -fsanitize=undefined      \
+                   -fsanitize=fuzzer-no-link \
+                   -fprofile-instr-generate  \
+                   -fcoverage-mapping
+
+LDFLAGS := -lm -L/usr/local/lib \
 		   ${LDFLAGS.${PROFILE}}
 
 ARFLAGS  := -crs
@@ -61,7 +76,8 @@ bin_srcs := src/option.c                   \
 
 test_srcs := tests/test_main.c
 
-fuzz_srcs := tests/fuzz_main.cc
+fuzz_srcs := tests/fuzz_main.c             \
+             tests/fuzz.c
 
 build-prefix = $(addprefix $(DIST)/,$1)
 source-to-object = $(call build-prefix, $(subst .c,.o,$(filter %.c,$1)))
@@ -94,14 +110,9 @@ $(TEST_BIN): $(call source-to-object,$(test_srcs)) $(INK_LIB)
 
 fuzz: $(FUZZ_BIN)
 
-$(FUZZ_BIN): $(INK_LIB)
+$(FUZZ_BIN): $(call source-to-object,$(fuzz_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
-	$(Q)$(CC) -Isrc -g3 -O0                                \
-        -fno-omit-frame-pointer                            \
-		-fsanitize=address,undefined,fuzzer                \
-		-fprofile-instr-generate                           \
-		-fcoverage-mapping                                 \
-	   	-o $(FUZZ_BIN) $(fuzz_srcs) $(INK_LIB) $(LDFLAGS)
+	$(Q)$(CC) -Isrc -o $@ $^ $(LDFLAGS)
 
 clean:
 	$(Q)$(RM) $(DIST_ROOT)

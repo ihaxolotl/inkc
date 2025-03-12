@@ -2,7 +2,7 @@
 
 // CHECK: File "<STDIN>"
 // CHECK-NEXT: `--BlockStmt <line:34, line:40>
-// CHECK-NEXT:    |--GatherPoint <line:34, col:1:3>
+// CHECK-NEXT:    |--GatherPoint <line:34, col:1:2>
 // CHECK-NEXT:    |--GatheredStmt <line:35, line:40>
 // CHECK-NEXT:    |  |--ChoiceStmt <line:35, line:40>
 // CHECK-NEXT:    |  |  |--ChoiceStarStmt <line:35, col:2:7>

@@ -16,7 +16,7 @@
 // CHECK-NEXT:             |  |        `--ContentStmt <line:26, col:1:10>
 // CHECK-NEXT:             |  |           `--Content <col:1, col:10>
 // CHECK-NEXT:             |  |              `--StringLiteral `A1 Nested` <col:1, col:10>
-// CHECK-NEXT:             |  `--GatherPoint <line:27, col:1:4>
+// CHECK-NEXT:             |  `--GatherPoint <line:27, col:1:3>
 // CHECK-NEXT:             `--ContentStmt <line:28, col:1:9>
 // CHECK-NEXT:                `--Content <col:1, col:9>
 // CHECK-NEXT:                   `--StringLiteral `A Nested` <col:1, col:9>

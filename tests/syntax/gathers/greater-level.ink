@@ -6,7 +6,7 @@
 // CHECK-NEXT:       `--ChoicePlusStmt <line:11, col:1:2>
 // CHECK-NEXT:          |--ChoiceContentExpr <col:2, col:2>
 // CHECK-NEXT:          `--BlockStmt <line:12, line:12>
-// CHECK-NEXT:             `--GatherPoint <line:12, col:1:4>
+// CHECK-NEXT:             `--GatherPoint <line:12, col:1:3>
 
 +
 --

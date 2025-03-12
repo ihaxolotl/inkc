@@ -17,7 +17,7 @@
 // CHECK-NEXT:    |  |        |  |        `--ContentStmt <line:36, col:1:10>
 // CHECK-NEXT:    |  |        |  |           `--Content <col:1, col:10>
 // CHECK-NEXT:    |  |        |  |              `--StringLiteral `A1 Nested` <col:1, col:10>
-// CHECK-NEXT:    |  |        |  `--GatherPoint <line:37, col:1:4>
+// CHECK-NEXT:    |  |        |  `--GatherPoint <line:37, col:1:3>
 // CHECK-NEXT:    |  |        `--ChoiceStmt <line:38, line:41>
 // CHECK-NEXT:    |  |           `--ChoiceStarStmt <line:38, col:1:6>
 // CHECK-NEXT:    |  |              |--ChoiceContentExpr <col:4, col:6>
@@ -26,7 +26,7 @@
 // CHECK-NEXT:    |  |                 `--ContentStmt <line:39, col:1:10>
 // CHECK-NEXT:    |  |                    `--Content <col:1, col:10>
 // CHECK-NEXT:    |  |                       `--StringLiteral `A2 Nested` <col:1, col:10>
-// CHECK-NEXT:    |  `--GatherPoint <line:40, col:1:3>
+// CHECK-NEXT:    |  `--GatherPoint <line:40, col:1:2>
 // CHECK-NEXT:    `--ContentStmt <line:41, col:1:12>
 // CHECK-NEXT:       `--Content <col:1, col:12>
 // CHECK-NEXT:          `--StringLiteral `Base Nested` <col:1, col:12>

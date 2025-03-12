@@ -10,7 +10,7 @@
 // CHECK-NEXT:       |  `--ChoiceStarStmt <line:16, col:1:4>
 // CHECK-NEXT:       |     `--ChoiceContentExpr <col:3, col:4>
 // CHECK-NEXT:       |        `--ChoiceStartContentExpr `B` <col:3, col:4>
-// CHECK-NEXT:       `--GatherPoint <line:17, col:1:3>
+// CHECK-NEXT:       `--GatherPoint <line:17, col:1:2>
 
 * A
 * B
