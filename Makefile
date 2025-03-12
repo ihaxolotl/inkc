@@ -75,7 +75,7 @@ lib_srcs := src/logging.c                  \
 bin_srcs := src/option.c                   \
             src/main.c
 
-test_bin_srcs := tests/test_main.c
+test_bin_srcs := testing/test_main.c
 
 fuzz_bin_srcs := fuzzing/fuzz_harness.c
 
@@ -105,13 +105,18 @@ $(INK_BIN): $(call source-to-object,$(bin_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(TEST_BIN): $(call source-to-object,$(test_srcs)) $(INK_LIB)
+$(TEST_BIN): $(call source-to-object,$(test_bin_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcmocka
 
 $(FUZZ_BIN): $(call source-to-object,$(fuzz_bin_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
-	$(Q)$(CC) -Isrc -O2 -g -o $@ $^ -fprofile-instr-generate -fcoverage-mapping -fsanitize=address -fsanitize=undefined -fsanitize=fuzzer
+	$(Q)$(CC) -Isrc -O2 -g -o $@ $^ \
+        -fprofile-instr-generate \
+        -fcoverage-mapping \
+        -fsanitize=address \
+        -fsanitize=undefined \
+        -fsanitize=fuzzer
 
 $(FUZZ_COVERAGE_BIN): $(call source-to-object,$(fuzz_coverage_bin_srcs)) $(INK_LIB)
 	$(call msg,LD,$@)
