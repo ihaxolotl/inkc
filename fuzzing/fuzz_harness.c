@@ -18,12 +18,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         .flags = 0,
     };
 
-    const int rc = ink_story_load_opts(story, &opts);
-    if (rc < 0) {
-        ink_close(story);
-        return -1;
-    }
-
+    ink_story_load_opts(story, &opts);
     ink_close(story);
     return 0;
 }
