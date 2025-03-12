@@ -841,8 +841,6 @@ static void ink_parser_handle_gather(struct ink_parser *parser,
 
     if (ink_parser_stack_is_empty(open_blocks)) {
         assert(ink_parser_stack_is_empty(open_choices));
-        assert(ink_parser_scratch_is_empty(scratch));
-
         ink_parser_stack_emplace(open_blocks, 0, scratch->count,
                                  (*node)->start_offset);
     } else if (!ink_parser_stack_is_empty(open_choices)) {
