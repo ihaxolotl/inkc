@@ -1825,14 +1825,17 @@ static struct ink_ast_node *ink_parse_parameter_decl(struct ink_parser *parser)
 {
     struct ink_ast_node *node = NULL;
 
-    /* FIXME: This may cause a crash. */
     if (ink_parser_check(parser, INK_TT_KEYWORD_REF)) {
         ink_parser_advance(parser);
         node = ink_parse_expect_identifier(parser);
-        node->type = INK_AST_REF_PARAM_DECL;
+        if (node) {
+            node->type = INK_AST_REF_PARAM_DECL;
+        }
     } else {
         node = ink_parse_expect_identifier(parser);
-        node->type = INK_AST_PARAM_DECL;
+        if (node) {
+            node->type = INK_AST_PARAM_DECL;
+        }
     }
     return node;
 }
