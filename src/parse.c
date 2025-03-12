@@ -1075,6 +1075,9 @@ static struct ink_ast_node *ink_parse_identifier_expr(struct ink_parser *parser)
 {
     struct ink_ast_node *lhs = ink_parse_expect_identifier(parser);
 
+    if (!lhs) {
+        return NULL;
+    }
     for (;;) {
         struct ink_ast_node *rhs = NULL;
 
