@@ -16,14 +16,18 @@ struct ink_object;
 struct ink_string;
 
 enum ink_flags {
-    INK_F_TRACING = (1 << 0),
-    INK_F_CACHING = (1 << 1),
-    INK_F_COLOR = (1 << 2),
-    INK_F_DUMP_AST = (1 << 3),
-    INK_F_DUMP_IR = (1 << 4),
-    INK_F_DUMP_CODE = (1 << 5),
-    INK_F_GC_ENABLE = (1 << 6),
-    INK_F_GC_STRESS = (1 << 7),
+    INK_F_RESERVED_1 = (1 << 0),
+    INK_F_RESERVED_2 = (1 << 1),
+    INK_F_RESERVED_3 = (1 << 2),
+    INK_F_CACHING = (1 << 3),
+    INK_F_COLOR = (1 << 4),
+    INK_F_DUMP_AST = (1 << 5),
+    INK_F_DUMP_IR = (1 << 6),
+    INK_F_DUMP_CODE = (1 << 7),
+    INK_F_GC_ENABLE = (1 << 8),
+    INK_F_GC_STRESS = (1 << 9),
+    INK_F_GC_TRACING = (1 << 10),
+    INK_F_VM_TRACING = (1 << 11),
 };
 
 struct ink_choice {

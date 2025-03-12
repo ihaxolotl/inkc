@@ -137,7 +137,7 @@ static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
 
     obj->is_marked = true;
 
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Marked object %p, type=%s", (void *)obj,
                   INK_OBJ_TYPE_STR[obj->type]);
     }
@@ -202,7 +202,7 @@ static void ink_gc_blacken_object(struct ink_story *story,
 
     story->gc_allocated += obj_size;
 
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Blackened object %p, type=%s, size=%zu", (void *)obj,
                   INK_OBJ_TYPE_STR[obj->type], obj_size);
     }
@@ -218,7 +218,7 @@ static void ink_gc_collect(struct ink_story *story)
     double time_start, time_elapsed;
     size_t bytes_before, bytes_after;
 
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         time_start = (double)clock() / CLOCKS_PER_SEC;
         bytes_before = story->gc_allocated;
         ink_trace("Beginning collection");
@@ -280,7 +280,7 @@ static void ink_gc_collect(struct ink_story *story)
     if (story->gc_threshold < INK_GC_HEAP_SIZE_MIN) {
         story->gc_threshold = INK_GC_HEAP_SIZE_MIN;
     }
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         time_elapsed = ((double)clock() / CLOCKS_PER_SEC) - time_start;
         bytes_after = story->gc_allocated;
 
@@ -297,7 +297,7 @@ static void ink_gc_collect(struct ink_story *story)
 static void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
                                  size_t size_old, size_t size_new)
 {
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         if (size_new > size_old) {
             ink_trace("Allocating memory for %p, before=%zu, after=%zu", ptr,
                       size_old, size_new);
@@ -328,7 +328,7 @@ static void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
  */
 static void ink_story_mem_free(struct ink_story *story, void *ptr)
 {
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Free memory %p", ptr);
     }
 
@@ -381,7 +381,7 @@ static void ink_object_free(struct ink_story *story, struct ink_object *obj)
         break;
     }
     }
-    if (story->flags & INK_F_TRACING) {
+    if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Free object %p, type=%s", (void *)obj,
                   INK_OBJ_TYPE_STR[obj->type]);
     }
@@ -1180,7 +1180,7 @@ static int ink_story_exec(struct ink_story *story)
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 
     for (;;) {
-        if (story->flags & INK_F_TRACING) {
+        if (story->flags & INK_F_VM_TRACING) {
             ink_trace_exec(story, frame);
         }
 
