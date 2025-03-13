@@ -658,7 +658,7 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
                               (uint8_t)sym.as.var.stack_slot);
         break;
     default:
-        assert(false);
+        ink_astgen_error(astgen, INK_AST_E_INVALID_EXPR, node);
         break;
     }
 }
@@ -1218,7 +1218,8 @@ static void ink_astgen_assign_stmt(struct ink_astgen *astgen,
         ink_astgen_emit_byte(astgen, INK_OP_POP);
         break;
     default:
-        ink_astgen_error(astgen, INK_AST_E_INVALID_LVALUE, name_node);
+        /* TODO: Give a more informative error message here. */
+        ink_astgen_error(astgen, INK_AST_E_INVALID_EXPR, name_node);
         break;
     }
 }
