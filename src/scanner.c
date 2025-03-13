@@ -23,6 +23,7 @@ enum ink_lex_state {
     INK_LEX_COMMENT_BLOCK,
     INK_LEX_COMMENT_BLOCK_STAR,
     INK_LEX_NEWLINE,
+    INK_LEX_INVALID_ASCII,
 };
 
 static const char *INK_GRAMMAR_TYPE_STR[] = {
@@ -30,24 +31,54 @@ static const char *INK_GRAMMAR_TYPE_STR[] = {
     [INK_GRAMMAR_EXPRESSION] = "Expression",
 };
 
+static const uint8_t INK_ASCII_CHARS[256] = {
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', ' ',  '!',  '"',  '#',
+    '$',  '%',  '&',  '\'', '(',  ')',  '*',  '+',  ',',  '-',  '.',  '/',
+    '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  ':',  ';',
+    '<',  '=',  '>',  '?',  '@',  'A',  'B',  'C',  'D',  'E',  'F',  'G',
+    'H',  'I',  'J',  'K',  'L',  'M',  'N',  'O',  'P',  'Q',  'R',  'S',
+    'T',  'U',  'V',  'W',  'X',  'Y',  'Z',  '[',  '\\', ']',  '^',  '_',
+    '`',  'a',  'b',  'c',  'd',  'e',  'f',  'g',  'h',  'i',  'j',  'k',
+    'l',  'm',  'n',  'o',  'p',  'q',  'r',  's',  't',  'u',  'v',  'w',
+    'x',  'y',  'z',  '{',  '|',  '}',  '~',  '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    '\0', '\0', '\0', '\0',
+};
+
 const char *ink_grammar_type_strz(enum ink_grammar_type type)
 {
     return INK_GRAMMAR_TYPE_STR[type];
 }
 
-static inline bool ink_is_alpha(uint8_t c)
+static inline bool ink_is_printable(uint8_t ch)
 {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    return INK_ASCII_CHARS[ch];
 }
 
-static inline bool ink_is_digit(uint8_t c)
+static inline bool ink_is_alpha(uint8_t ch)
 {
-    return (c >= '0' && c <= '9');
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
 }
 
-static inline bool ink_is_identifier(uint8_t c)
+static inline bool ink_is_digit(uint8_t ch)
 {
-    return ink_is_alpha(c) || ink_is_digit(c) || c == '_';
+    return (ch >= '0' && ch <= '9');
+}
+
+static inline bool ink_is_identifier(uint8_t ch)
+{
+    return ink_is_alpha(ch) || ink_is_digit(ch) || ch == '_';
 }
 
 struct ink_scanner_mode *ink_scanner_current(struct ink_scanner *scanner)
@@ -193,13 +224,13 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
     struct ink_scanner_mode *const mode = ink_scanner_current(scanner);
 
     for (;;) {
-        const uint8_t c = scanner->source_bytes[scanner->cursor_offset];
+        const uint8_t ch = scanner->source_bytes[scanner->cursor_offset];
 
         switch (state) {
         case INK_LEX_START: {
             scanner->start_offset = scanner->cursor_offset;
 
-            switch (c) {
+            switch (ch) {
             case '\0': {
                 token->type = INK_TT_EOF;
                 goto exit_loop;
@@ -319,9 +350,9 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             }
             default:
                 if (mode->type == INK_GRAMMAR_EXPRESSION) {
-                    if (ink_is_alpha(c)) {
+                    if (ink_is_alpha(ch)) {
                         state = INK_LEX_IDENTIFIER;
-                    } else if (ink_is_digit(c)) {
+                    } else if (ink_is_digit(ch)) {
                         state = INK_LEX_NUMBER;
                     } else {
                         token->type = INK_TT_ERROR;
@@ -329,14 +360,18 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
                         goto exit_loop;
                     }
                 } else {
-                    state = INK_LEX_WORD;
+                    if (ink_is_printable(ch)) {
+                        state = INK_LEX_WORD;
+                    } else {
+                        state = INK_LEX_INVALID_ASCII;
+                    }
                 }
                 break;
             }
             break;
         }
         case INK_LEX_MINUS: {
-            if (c == '>') {
+            if (ch == '>') {
                 token->type = INK_TT_RIGHT_ARROW;
                 scanner->cursor_offset++;
                 goto exit_loop;
@@ -346,7 +381,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             goto exit_loop;
         }
         case INK_LEX_SLASH: {
-            switch (c) {
+            switch (ch) {
             case '/':
                 state = INK_LEX_COMMENT_LINE;
                 break;
@@ -361,7 +396,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_EQUAL: {
             if (mode->type == INK_GRAMMAR_EXPRESSION) {
-                if (c == '=') {
+                if (ch == '=') {
                     token->type = INK_TT_EQUAL_EQUAL;
                     scanner->cursor_offset++;
                     goto exit_loop;
@@ -372,7 +407,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             goto exit_loop;
         }
         case INK_LEX_BANG: {
-            if (c == '=') {
+            if (ch == '=') {
                 token->type = INK_TT_BANG_EQUAL;
                 scanner->cursor_offset++;
                 goto exit_loop;
@@ -382,7 +417,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             goto exit_loop;
         }
         case INK_LEX_LESS_THAN: {
-            switch (c) {
+            switch (ch) {
             case '=':
                 token->type = INK_TT_LESS_EQUAL;
                 scanner->cursor_offset++;
@@ -401,7 +436,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             }
         }
         case INK_LEX_GREATER_THAN: {
-            if (c == '=') {
+            if (ch == '=') {
                 token->type = INK_TT_GREATER_EQUAL;
                 scanner->cursor_offset++;
                 goto exit_loop;
@@ -411,19 +446,19 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             goto exit_loop;
         }
         case INK_LEX_WORD: {
-            if (!ink_is_identifier(c)) {
+            if (!ink_is_identifier(ch)) {
                 token->type = INK_TT_STRING;
                 goto exit_loop;
             }
             break;
         }
         case INK_LEX_NUMBER: {
-            if (c == '.') {
+            if (ch == '.') {
                 state = INK_LEX_NUMBER_DOT;
             } else {
-                if (ink_is_alpha(c) || c == '_') {
+                if (ink_is_alpha(ch) || ch == '_') {
                     state = INK_LEX_IDENTIFIER;
-                } else if (!ink_is_digit(c)) {
+                } else if (!ink_is_digit(ch)) {
                     token->type = INK_TT_NUMBER;
                     goto exit_loop;
                 }
@@ -431,7 +466,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_NUMBER_DOT: {
-            if (!ink_is_digit(c)) {
+            if (!ink_is_digit(ch)) {
                 token->type = INK_TT_ERROR;
                 goto exit_loop;
             } else {
@@ -440,14 +475,14 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_NUMBER_DECIMAL: {
-            if (!ink_is_digit(c)) {
+            if (!ink_is_digit(ch)) {
                 token->type = INK_TT_NUMBER;
                 goto exit_loop;
             }
             break;
         }
         case INK_LEX_IDENTIFIER: {
-            if (!ink_is_identifier(c)) {
+            if (!ink_is_identifier(ch)) {
                 if (mode->type == INK_GRAMMAR_EXPRESSION) {
                     token->type = ink_scanner_keyword(
                         scanner, INK_TT_IDENTIFIER, scanner->start_offset,
@@ -460,7 +495,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_WHITESPACE: {
-            switch (c) {
+            switch (ch) {
             case ' ':
             case '\t':
                 break;
@@ -477,7 +512,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_COMMENT_LINE: {
-            switch (c) {
+            switch (ch) {
             case '\0':
                 state = INK_LEX_START;
                 continue;
@@ -491,7 +526,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_COMMENT_BLOCK: {
-            switch (c) {
+            switch (ch) {
             case '\0':
                 token->type = INK_TT_ERROR;
                 goto exit_loop;
@@ -504,7 +539,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_COMMENT_BLOCK_STAR: {
-            switch (c) {
+            switch (ch) {
             case '\0':
                 token->type = INK_TT_ERROR;
                 goto exit_loop;
@@ -518,7 +553,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             break;
         }
         case INK_LEX_NEWLINE: {
-            if (c != '\n') {
+            if (ch != '\n') {
                 if (scanner->is_line_start) {
                     scanner->is_line_start = false;
                     state = INK_LEX_START;
@@ -530,8 +565,16 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
             }
             break;
         }
+        case INK_LEX_INVALID_ASCII: {
+            if (ch == '\0' || ink_is_printable(ch)) {
+                token->type = INK_TT_ERROR;
+                goto exit_loop;
+            }
+            break;
+        }
         default:
             /* Unreachable */
+            token->type = INK_TT_ERROR;
             break;
         }
 
