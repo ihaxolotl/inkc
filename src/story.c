@@ -1194,7 +1194,7 @@ static int ink_story_exec(struct ink_story *story)
             goto exit_loop;
         }
         case INK_OP_RET: {
-            struct ink_object *const value = ink_story_stack_pop(story);
+            struct ink_object *value = ink_story_stack_pop(story);
 
             story->call_stack_top--;
             if (story->call_stack_top == 0) {
@@ -1204,6 +1204,12 @@ static int ink_story_exec(struct ink_story *story)
             }
 
             story->stack_top = (size_t)(frame->sp - story->stack);
+
+            /* FIXME: This probably isn't a good way to handle this case. */
+            if (!value) {
+                value = ink_bool_new(story, false);
+            }
+
             ink_story_stack_push(story, value);
             frame = &story->call_stack[story->call_stack_top - 1];
             break;
