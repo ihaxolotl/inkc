@@ -680,17 +680,29 @@ static int ink_astgen_check_args_count(struct ink_astgen *astgen,
                                        struct ink_ast_seq *args_list,
                                        struct ink_symbol *symbol)
 {
+    int rc = -1;
     const size_t knot_arity = symbol->as.knot.arity;
 
-    if (args_list->count != knot_arity) {
-        if (args_list->count > knot_arity) {
-            ink_astgen_error(astgen, INK_AST_E_TOO_MANY_ARGS, node);
-        } else {
+    if (!args_list) {
+        if (knot_arity != 0) {
             ink_astgen_error(astgen, INK_AST_E_TOO_FEW_ARGS, node);
+            rc = -1;
+        } else {
+            rc = 0;
         }
-        return -1;
+    } else {
+        if (args_list->count != knot_arity) {
+            if (args_list->count > knot_arity) {
+                ink_astgen_error(astgen, INK_AST_E_TOO_MANY_ARGS, node);
+            } else {
+                ink_astgen_error(astgen, INK_AST_E_TOO_FEW_ARGS, node);
+            }
+            rc = -1;
+        } else {
+            rc = 0;
+        }
     }
-    return 0;
+    return rc;
 }
 
 /*
@@ -724,11 +736,12 @@ static void ink_astgen_call_expr(struct ink_astgen *astgen,
         if (rc < 0) {
             return;
         }
+        if (args_list) {
+            for (size_t i = 0; i < args_list->count; i++) {
+                struct ink_ast_node *const arg_node = args_list->nodes[i];
 
-        for (size_t i = 0; i < args_list->count; i++) {
-            struct ink_ast_node *const arg_node = args_list->nodes[i];
-
-            ink_astgen_expr(astgen, arg_node);
+                ink_astgen_expr(astgen, arg_node);
+            }
         }
     }
 
