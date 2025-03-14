@@ -3,6 +3,26 @@ InkC is a port of Inkle's Ink narrative scripting engine to the C programming la
 
 The project is written in pure C99 with no non-standard extensions, as God intended.
 
+## Features
+InkC is very early in development. As such, a small subset of features are currently supported:
+ * Simple content statements
+ * Choice statements
+ * Gathered choice statements
+ * Global variables (`VAR`, `CONST`)
+ * Temporary variables (`temp`)
+ * Functions / calls
+ * Knots / stitches / diverts
+ * Arithmetic / logical expressions
+ * Inline logic
+ * Inline conditionals
+ * Switch statements
+ * String interpolation
+ * Type coersion
+
+A significant deviation from the reference implementation is the inclusion of lexical scoping.
+
+Source files also currently only support the US-ASCII character set.
+
 ## Installation
 ```bash
 # Debug
