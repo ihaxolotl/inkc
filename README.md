@@ -1,9 +1,11 @@
 # Ink C
+
 InkC is a port of Inkle's Ink narrative scripting engine to the C programming language.
 
 The project is written in pure C99 with no non-standard extensions, as God intended.
 
 ## Features
+
 InkC is very early in development. As such, a small subset of features are currently supported:
  * Simple content statements
  * Choice statements
@@ -24,6 +26,7 @@ A significant deviation from the reference implementation is the inclusion of le
 Source files also currently only support the US-ASCII character set.
 
 ## Installation
+
 ```bash
 # Debug
 make
@@ -37,6 +40,7 @@ InkC does not yet provide a Windows-compatible build, though this need will soon
 By default, the build process uses the LLVM toolchain, with [Clang](https://clang.llvm.org/) as the compiler. Support for other compilers can be achieved by overriding variables within the Makefile.
 
 ## Usage
+
 ```
 inkc [OPTION]... [FILE]
 Load and execute an Ink story.
@@ -51,6 +55,7 @@ Load and execute an Ink story.
 ```
 
 ## Contributing
+
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
 The development toolchain requires the following:
@@ -70,4 +75,5 @@ pip install pre-commit
 All commit messages should follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standard.
 
 ## License
-TBD
+
+[MIT](https://choosealicense.com/licenses/mit/)
