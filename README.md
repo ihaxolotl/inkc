@@ -36,6 +36,20 @@ InkC does not yet provide a Windows-compatible build, though this need will soon
 
 By default, the build process uses the LLVM toolchain, with [Clang](https://clang.llvm.org/) as the compiler. Support for other compilers can be achieved by overriding variables within the Makefile.
 
+## Usage
+```
+inkc [OPTION]... [FILE]
+Load and execute an Ink story.
+
+  -h, --help       Print this message
+  --colors         Enable color output
+  --compile-only   Compile the story without executing
+  --dump-ast       Dump a source file's AST
+  --dump-story     Dump a story's bytecode
+  --trace          Enable execution tracing
+  --trace-gc       Enable garbage collector tracing
+```
+
 ## Contributing
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
