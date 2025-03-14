@@ -86,24 +86,29 @@ struct ink_scanner_mode *ink_scanner_current(struct ink_scanner *scanner)
     return &scanner->mode_stack[scanner->mode_depth];
 }
 
-void ink_scanner_push(struct ink_scanner *scanner, enum ink_grammar_type type,
-                      size_t source_offset)
+int ink_scanner_push(struct ink_scanner *scanner, enum ink_grammar_type type,
+                     size_t source_offset)
 {
     struct ink_scanner_mode *mode;
 
-    assert(scanner->mode_depth < INK_SCANNER_DEPTH_MAX);
+    if (scanner->mode_depth < INK_SCANNER_DEPTH_MAX) {
+        scanner->mode_depth++;
 
-    scanner->mode_depth++;
-
-    mode = &scanner->mode_stack[scanner->mode_depth];
-    mode->type = type;
-    mode->source_offset = source_offset;
+        mode = &scanner->mode_stack[scanner->mode_depth];
+        mode->type = type;
+        mode->source_offset = source_offset;
+        return 0;
+    }
+    return -1;
 }
 
-void ink_scanner_pop(struct ink_scanner *scanner)
+int ink_scanner_pop(struct ink_scanner *scanner)
 {
-    assert(scanner->mode_depth != 0);
-    scanner->mode_depth--;
+    if (scanner->mode_depth != 0) {
+        scanner->mode_depth--;
+        return 0;
+    }
+    return -1;
 }
 
 /**

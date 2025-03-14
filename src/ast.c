@@ -151,6 +151,8 @@ static int ink_ast_error_render(const struct ink_ast *tree,
     const uint8_t *const bytes = &tree->source_bytes[error->source_start];
 
     switch (error->type) {
+    case INK_AST_E_PANIC:
+        return ink_ast_error_renderf(tree, error, arena, "parser panicked");
     case INK_AST_E_UNEXPECTED_TOKEN:
         return ink_ast_error_renderf(tree, error, arena, "unexpected token");
     case INK_AST_E_EXPECTED_NEWLINE:

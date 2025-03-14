@@ -37,9 +37,9 @@ extern bool ink_scanner_try_keyword(struct ink_scanner *scanner,
                                     enum ink_token_type type);
 extern struct ink_scanner_mode *
 ink_scanner_current(struct ink_scanner *scanner);
-extern void ink_scanner_push(struct ink_scanner *scanner,
-                             enum ink_grammar_type type, size_t source_offset);
-extern void ink_scanner_pop(struct ink_scanner *scanner);
+extern int ink_scanner_push(struct ink_scanner *scanner,
+                            enum ink_grammar_type type, size_t source_offset);
+extern int ink_scanner_pop(struct ink_scanner *scanner);
 extern void ink_scanner_rewind(struct ink_scanner *scanner,
                                size_t source_offset);
 extern void ink_scanner_next(struct ink_scanner *scanner,

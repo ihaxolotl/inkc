@@ -16,6 +16,7 @@ struct ink_ast_node;
 
 enum ink_ast_error_type {
     INK_AST_OK = 0,
+    INK_AST_E_PANIC,
     INK_AST_E_UNEXPECTED_TOKEN,
     INK_AST_E_EXPECTED_NEWLINE,
     INK_AST_E_EXPECTED_DQUOTE,
