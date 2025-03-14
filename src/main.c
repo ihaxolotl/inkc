@@ -18,8 +18,7 @@ enum {
     OPT_GC_TRACING,
     OPT_CACHING,
     OPT_DUMP_AST,
-    OPT_DUMP_IR,
-    OPT_DUMP_CODE,
+    OPT_DUMP_STORY,
     OPT_HELP,
 };
 
@@ -27,8 +26,7 @@ static const struct option opts[] = {
     {"--colors", OPT_COLORS, false},
     {"--compile-only", OPT_COMPILE_ONLY, false},
     {"--dump-ast", OPT_DUMP_AST, false},
-    {"--dump-ir", OPT_DUMP_IR, false},
-    {"--dump-code", OPT_DUMP_CODE, false},
+    {"--dump-story", OPT_DUMP_STORY, false},
     {"--trace", OPT_VM_TRACING, false},
     {"--trace-gc", OPT_GC_TRACING, false},
     {"--help", OPT_HELP, false},
@@ -43,7 +41,6 @@ static const char *USAGE_MSG =
     "  --colors         Enable color output\n"
     "  --compile-only   Compile the story without executing\n"
     "  --dump-ast       Dump a source file's AST\n"
-    "  --dump-ir        Dump a source file's IR\n"
     "  --dump-story     Dump a story's bytecode\n"
     "  --trace          Enable execution tracing\n"
     "  --trace-gc       Enable garbage collector tracing\n"
@@ -120,10 +117,7 @@ int main(int argc, char *argv[])
         case OPT_DUMP_AST:
             flags |= INK_F_DUMP_AST;
             break;
-        case OPT_DUMP_IR:
-            flags |= INK_F_DUMP_IR;
-            break;
-        case OPT_DUMP_CODE:
+        case OPT_DUMP_STORY:
             flags |= INK_F_DUMP_CODE;
             break;
         case OPT_COMPILE_ONLY:
