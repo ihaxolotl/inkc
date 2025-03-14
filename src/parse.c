@@ -18,7 +18,7 @@
 #define INK_PARSER_CACHE_LOAD_MAX (80ul)
 
 struct ink_parser_state {
-    size_t choice_level;
+    size_t level;
     size_t scratch_offset;
     size_t source_offset;
 };
@@ -48,11 +48,11 @@ static bool ink_parser_cache_key_cmp(const void *lhs, const void *rhs)
 }
 
 static int ink_parser_stack_emplace(struct ink_parser_stack *stack,
-                                    size_t choice_level, size_t scratch_offset,
+                                    size_t level, size_t scratch_offset,
                                     size_t source_offset)
 {
-    struct ink_parser_state entry = {
-        .choice_level = choice_level,
+    const struct ink_parser_state entry = {
+        .level = level,
         .scratch_offset = scratch_offset,
         .source_offset = source_offset,
     };
@@ -563,115 +563,154 @@ static size_t ink_parser_match_many(struct ink_parser *parser,
     return count;
 }
 
+static struct ink_ast_node *
+ink_parser_fixup_block(struct ink_parser *parser,
+                       struct ink_parser_node_context *context,
+                       struct ink_ast_node *block_node)
+{
+    struct ink_parser_scratch *const scratch = &parser->scratch;
+
+    if (!ink_parser_scratch_is_empty(scratch) &&
+        scratch->count > context->scratch_start) {
+        struct ink_ast_node *const stmt = ink_parser_scratch_last(scratch);
+
+        switch (stmt->type) {
+        case INK_AST_CHOICE_STAR_STMT:
+        case INK_AST_CHOICE_PLUS_STMT:
+        case INK_AST_SWITCH_CASE:
+        case INK_AST_IF_BRANCH:
+        case INK_AST_ELSE_BRANCH:
+            stmt->rhs = block_node;
+            return ink_parser_scratch_pop(scratch);
+        default:
+            break;
+        }
+    }
+
+    context->is_block_created = true;
+    return block_node;
+}
+
 /**
  * Close the current block, if present.
  */
 static struct ink_ast_node *
 ink_parser_collect_block(struct ink_parser *parser,
-                         struct ink_parser_node_context *context)
+                         struct ink_parser_node_context *context, size_t level)
 {
     struct ink_parser_scratch *const scratch = &parser->scratch;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
     struct ink_ast_node *node = NULL;
 
     if (!ink_parser_stack_is_empty(open_blocks)) {
-        const struct ink_parser_state block = ink_parser_stack_pop(open_blocks);
-        struct ink_ast_node *const tmp = ink_parser_scratch_last(scratch);
+        const struct ink_parser_state block =
+            ink_parser_stack_last(open_blocks);
 
-        /** FIXME: Bounds checking for scratch. */
-        node = ink_ast_node_sequence(INK_AST_BLOCK, block.source_offset,
-                                     tmp->end_offset, block.scratch_offset,
-                                     scratch, parser->arena);
+        if (block.level >= level) {
+            size_t source_start = block.source_offset;
+            size_t source_end = 0;
 
-        if (!ink_parser_scratch_is_empty(scratch) &&
-            scratch->count > context->scratch_start) {
-            struct ink_ast_node *const tmp = ink_parser_scratch_last(scratch);
+            if (!ink_parser_scratch_is_empty(scratch)) {
+                struct ink_ast_node *const last_node =
+                    ink_parser_scratch_last(scratch);
 
-            switch (tmp->type) {
-            case INK_AST_CHOICE_STAR_STMT:
-            case INK_AST_CHOICE_PLUS_STMT:
-            case INK_AST_SWITCH_CASE:
-            case INK_AST_IF_BRANCH:
-            case INK_AST_ELSE_BRANCH: {
-                tmp->rhs = node;
-                node = tmp;
-
-                ink_parser_scratch_pop(scratch);
-                break;
+                source_end = last_node->end_offset;
+            } else {
+                source_end = source_start;
             }
-            default:
-                context->is_block_created = true;
-                break;
-            }
-        } else {
-            context->is_block_created = true;
+
+            node = ink_ast_node_sequence(INK_AST_BLOCK, source_start,
+                                         source_end, block.scratch_offset,
+                                         scratch, parser->arena);
+            node = ink_parser_fixup_block(parser, context, node);
+            ink_parser_stack_pop(open_blocks);
         }
     }
     return node;
 }
 
 /**
- * Close an open choice statement for a given level, if present.
+ * Collect open choice statements upto a given level.
  */
-static void ink_parser_collect_choices(struct ink_parser *parser,
-                                       struct ink_parser_node_context *context,
-                                       size_t choice_level, bool gather)
+static struct ink_ast_node *
+ink_parser_collect_context(struct ink_parser *parser,
+                           struct ink_parser_node_context *context,
+                           size_t level, bool should_gather)
 {
     struct ink_parser_scratch *const scratch = &parser->scratch;
     struct ink_parser_stack *const open_choices = &context->open_choices;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
 
+    /**
+     * The level of the current choice should always be greater then the
+     * level for the current block. Choice statements must have non-zero
+     * levels, while blocks can levels greater than or equal to zero.
+     *
+     * Choice statement levels need not follow a sequentially increasing order.
+     * When collecting choice branches, statements with levels less than the
+     * previous statement will be included in the same enclosing choice if no
+     * previous levels exist.
+     */
     while (!ink_parser_stack_is_empty(open_choices)) {
         const struct ink_parser_state choice =
             ink_parser_stack_last(open_choices);
-        struct ink_ast_node *tmp = NULL;
+        struct ink_ast_node *node = NULL;
 
         assert(!ink_parser_stack_is_empty(open_blocks));
 
-        if (choice.choice_level > choice_level) {
+        if (choice.level > level) {
             ink_parser_stack_pop(open_choices);
 
             if (!ink_parser_stack_is_empty(open_blocks)) {
                 const struct ink_parser_state block =
                     ink_parser_stack_last(open_blocks);
 
-                if (choice.choice_level <= block.choice_level) {
-                    tmp = ink_parser_collect_block(parser, context);
-                    if (tmp != NULL) {
-                        ink_parser_scratch_push(scratch, tmp);
+                if (choice.level <= block.level) {
+                    node =
+                        ink_parser_collect_block(parser, context, block.level);
+                    if (node) {
+                        ink_parser_scratch_push(scratch, node);
                     }
                 }
             }
-            if (!ink_parser_stack_is_empty(open_choices)) {
-                const struct ink_parser_state prev_choice =
-                    ink_parser_stack_last(open_choices);
+            if (!should_gather) {
+                if (!ink_parser_stack_is_empty(open_choices)) {
+                    const struct ink_parser_state prev_choice =
+                        ink_parser_stack_last(open_choices);
 
-                if (choice_level > prev_choice.choice_level) {
-                    /* Handle non-sequentially increasing levels */
-                    ink_parser_stack_emplace(open_choices, choice_level,
-                                             choice.scratch_offset,
-                                             choice.source_offset);
-                    break;
-                }
-            } else {
-                if (!gather && choice_level > 0) {
-                    ink_parser_stack_emplace(open_choices, choice_level,
+                    if (level > prev_choice.level) {
+                        ink_parser_stack_emplace(open_choices, level,
+                                                 choice.scratch_offset,
+                                                 choice.source_offset);
+                        break;
+                    }
+                } else if (level > 0) {
+                    ink_parser_stack_emplace(open_choices, level,
                                              choice.scratch_offset,
                                              choice.source_offset);
                     break;
                 }
             }
 
-            tmp = ink_ast_node_sequence(
+            node = ink_ast_node_sequence(
                 INK_AST_CHOICE_STMT, choice.source_offset,
                 parser->token.start_offset, choice.scratch_offset, scratch,
                 parser->arena);
 
-            ink_parser_scratch_push(scratch, tmp);
+            if (node) {
+                ink_parser_scratch_push(scratch, node);
+            }
         } else {
             break;
         }
     }
+    if (!should_gather) {
+        return ink_parser_collect_block(parser, context, level);
+    }
+    if (!ink_parser_scratch_is_empty(scratch)) {
+        return ink_parser_scratch_pop(scratch);
+    }
+    return NULL;
 }
 
 /**
@@ -681,11 +720,9 @@ static struct ink_ast_node *
 ink_parser_collect_stitch(struct ink_parser *parser,
                           struct ink_parser_node_context *context)
 {
-    ink_parser_collect_choices(parser, context, 0, false);
-
     struct ink_parser_scratch *const scratch = &parser->scratch;
     struct ink_ast_node *const body_node =
-        ink_parser_collect_block(parser, context);
+        ink_parser_collect_context(parser, context, 0, false);
 
     if (!ink_parser_scratch_is_empty(scratch)) {
         struct ink_ast_node *const proto_node =
@@ -752,19 +789,15 @@ ink_parser_collect_knot(struct ink_parser *parser,
 
 static void
 ink_parser_handle_conditional_branch(struct ink_parser *parser,
-                                     struct ink_parser_node_context *context,
-                                     struct ink_ast_node *node)
+                                     struct ink_parser_node_context *context)
 {
-    ink_parser_collect_choices(parser, context, 0, false);
-
     struct ink_parser_scratch *const scratch = &parser->scratch;
-    struct ink_ast_node *const tmp = ink_parser_collect_block(parser, context);
+    struct ink_ast_node *const node =
+        ink_parser_collect_context(parser, context, 0, false);
 
-    if (!tmp) {
-        return;
+    if (node) {
+        ink_parser_scratch_push(scratch, node);
     }
-
-    ink_parser_scratch_push(scratch, tmp);
 }
 
 static void
@@ -772,58 +805,42 @@ ink_parser_handle_choice_branch(struct ink_parser *parser,
                                 struct ink_parser_node_context *context,
                                 struct ink_ast_node *node)
 {
-    int rc = -1;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
     struct ink_parser_stack *const open_choices = &context->open_choices;
     struct ink_parser_scratch *const scratch = &parser->scratch;
-    const size_t choice_level = context->choice_level;
+    const size_t level = context->choice_level;
 
     if (ink_parser_stack_is_empty(open_blocks)) {
-        rc = ink_parser_stack_emplace(open_blocks, 0, scratch->count,
-                                      node->start_offset);
-        if (rc < 0) {
-            return;
-        }
+        ink_parser_stack_emplace(open_blocks, 0, scratch->count,
+                                 node->start_offset);
     }
     if (ink_parser_stack_is_empty(open_choices)) {
-        ink_parser_stack_emplace(open_choices, choice_level, scratch->count,
+        ink_parser_stack_emplace(open_choices, level, scratch->count,
                                  node->start_offset);
     } else {
         const struct ink_parser_state choice =
             ink_parser_stack_last(open_choices);
         const struct ink_parser_state block =
             ink_parser_stack_last(open_blocks);
-        struct ink_ast_node *tmp = NULL;
 
-        if (choice_level > choice.choice_level) {
-            if (block.choice_level < choice.choice_level) {
-                ink_parser_stack_emplace(open_blocks, choice.choice_level,
+        if (level > choice.level) {
+            if (block.level < choice.level) {
+                ink_parser_stack_emplace(open_blocks, choice.level,
                                          scratch->count,
                                          parser->token.start_offset);
             }
 
-            ink_parser_stack_emplace(open_choices, choice_level, scratch->count,
+            ink_parser_stack_emplace(open_choices, level, scratch->count,
                                      node->start_offset);
-        } else if (choice_level == choice.choice_level) {
-            if (choice_level == block.choice_level) {
-                tmp = ink_parser_collect_block(parser, context);
-                if (tmp != NULL) {
-                    ink_parser_scratch_push(scratch, tmp);
-                }
+        } else if (level == choice.level) {
+            node = ink_parser_collect_block(parser, context, level);
+            if (node) {
+                ink_parser_scratch_push(scratch, node);
             }
         } else {
-            ink_parser_collect_choices(parser, context, choice_level, false);
-
-            if (!ink_parser_stack_is_empty(open_blocks)) {
-                const struct ink_parser_state prev_block =
-                    ink_parser_stack_last(open_blocks);
-
-                if (prev_block.choice_level == choice_level) {
-                    tmp = ink_parser_collect_block(parser, context);
-                    if (tmp != NULL) {
-                        ink_parser_scratch_push(scratch, tmp);
-                    }
-                }
+            node = ink_parser_collect_context(parser, context, level, false);
+            if (node) {
+                ink_parser_scratch_push(scratch, node);
             }
         }
     }
@@ -836,47 +853,45 @@ static void ink_parser_handle_gather(struct ink_parser *parser,
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
     struct ink_parser_stack *const open_choices = &context->open_choices;
     struct ink_parser_scratch *const scratch = &parser->scratch;
-    const size_t gather_level = context->choice_level;
     const size_t source_start = parser->token.start_offset;
+    const size_t level = context->choice_level;
 
     if (ink_parser_stack_is_empty(open_blocks)) {
         assert(ink_parser_stack_is_empty(open_choices));
         ink_parser_stack_emplace(open_blocks, 0, scratch->count,
                                  (*node)->start_offset);
-    } else if (!ink_parser_stack_is_empty(open_choices)) {
+    }
+    /**
+     * Gather points terminate compound statements at the appropriate level.
+     */
+    if (!ink_parser_stack_is_empty(open_choices)) {
         const struct ink_parser_state choice =
             ink_parser_stack_last(open_choices);
         const struct ink_parser_state block =
             ink_parser_stack_last(open_blocks);
 
-        if (gather_level > choice.choice_level) {
-            if (block.choice_level != choice.choice_level) {
-                ink_parser_stack_emplace(open_blocks, choice.choice_level,
+        if (level > choice.level) {
+            if (block.level != choice.level) {
+                ink_parser_stack_emplace(open_blocks, choice.level,
                                          scratch->count, (*node)->start_offset);
             }
-        } else {
-            if (!ink_parser_scratch_is_empty(scratch)) {
-                struct ink_ast_node *tmp = NULL;
+        } else if (!ink_parser_scratch_is_empty(scratch)) {
+            struct ink_ast_node *tmp =
+                ink_parser_collect_context(parser, context, level - 1, true);
 
-                ink_parser_collect_choices(parser, context, gather_level - 1,
-                                           true);
+            if (tmp->type == INK_AST_CHOICE_STMT) {
+                *node = ink_ast_node_binary(INK_AST_GATHERED_STMT,
+                                            tmp->start_offset, source_start,
+                                            tmp, *node, parser->arena);
+            }
+            if (!ink_parser_stack_is_empty(open_blocks)) {
+                const struct ink_parser_state block =
+                    ink_parser_stack_last(open_blocks);
 
-                tmp = ink_parser_scratch_last(scratch);
-                if (tmp->type == INK_AST_CHOICE_STMT) {
-                    ink_parser_scratch_pop(scratch);
-                    *node = ink_ast_node_binary(INK_AST_GATHERED_STMT,
-                                                tmp->start_offset, source_start,
-                                                tmp, *node, parser->arena);
-                }
-                if (!ink_parser_stack_is_empty(open_blocks)) {
-                    const struct ink_parser_state block =
-                        ink_parser_stack_last(open_blocks);
-
-                    if (block.choice_level == gather_level) {
-                        tmp = ink_parser_collect_block(parser, context);
-                        if (tmp != NULL) {
-                            ink_parser_scratch_push(scratch, tmp);
-                        }
+                if (block.level == level) {
+                    tmp = ink_parser_collect_block(parser, context, level);
+                    if (tmp != NULL) {
+                        ink_parser_scratch_push(scratch, tmp);
                     }
                 }
             }
@@ -888,17 +903,13 @@ static void ink_parser_handle_content(struct ink_parser *parser,
                                       struct ink_parser_node_context *context,
                                       struct ink_ast_node *node)
 {
-    int rc = -1;
     struct ink_parser_scratch *const scratch = &parser->scratch;
     struct ink_parser_stack *const open_blocks = &context->open_blocks;
     struct ink_parser_stack *const open_choices = &context->open_choices;
 
     if (ink_parser_stack_is_empty(open_blocks)) {
-        rc = ink_parser_stack_emplace(open_blocks, 0, scratch->count,
-                                      node->start_offset);
-        if (rc < 0) {
-            return;
-        }
+        ink_parser_stack_emplace(open_blocks, 0, scratch->count,
+                                 node->start_offset);
     }
     if (!ink_parser_stack_is_empty(open_choices)) {
         const struct ink_parser_state block =
@@ -906,9 +917,9 @@ static void ink_parser_handle_content(struct ink_parser *parser,
         const struct ink_parser_state choice =
             ink_parser_stack_last(open_choices);
 
-        if (block.choice_level != choice.choice_level) {
-            ink_parser_stack_emplace(open_blocks, choice.choice_level,
-                                     scratch->count, node->start_offset);
+        if (block.level != choice.level) {
+            ink_parser_stack_emplace(open_blocks, choice.level, scratch->count,
+                                     node->start_offset);
         }
     }
 }
@@ -1496,6 +1507,7 @@ ink_parse_conditional_branch(struct ink_parser *parser,
 static struct ink_ast_node *ink_parse_conditional(struct ink_parser *parser,
                                                   struct ink_ast_node *expr)
 {
+    enum ink_ast_node_type node_type;
     struct ink_parser_node_context context;
     const size_t scratch_offset = parser->scratch.count;
     const size_t source_start = parser->token.start_offset;
@@ -1515,15 +1527,10 @@ static struct ink_ast_node *ink_parse_conditional(struct ink_parser *parser,
         }
     }
 
-    ink_parser_collect_choices(parser, &context, 0, false);
-
-    node = ink_parser_collect_block(parser, &context);
+    node = ink_parser_collect_context(parser, &context, 0, false);
     if (node) {
         ink_parser_scratch_push(&parser->scratch, node);
     }
-
-    enum ink_ast_node_type node_type;
-
     if (expr && !context.is_block_created) {
         node_type = INK_AST_SWITCH_STMT;
     } else if (!expr) {
@@ -2014,7 +2021,7 @@ ink_parse_stmt(struct ink_parser *parser,
     case INK_AST_IF_BRANCH:
     case INK_AST_ELSE_BRANCH:
     case INK_AST_SWITCH_CASE:
-        ink_parser_handle_conditional_branch(parser, context, node);
+        ink_parser_handle_conditional_branch(parser, context);
         break;
     case INK_AST_CHOICE_STAR_STMT:
     case INK_AST_CHOICE_PLUS_STMT:

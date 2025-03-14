@@ -25,8 +25,8 @@ struct ink_object *ink_story_get_paths(struct ink_story *);
 
 #define INK_ASTGEN_BUG(node)                                                   \
     do {                                                                       \
-        fprintf(stderr, "BUG(astgen): %s in %s\n", __func__,                   \
-                ink_ast_node_type_strz((node)->type));                         \
+        fprintf(stderr, "BUG(astgen): %s in %s\n",                             \
+                ink_ast_node_type_strz((node)->type), __func__);               \
     } while (0)
 
 /**
@@ -1252,6 +1252,10 @@ static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
     for (size_t i = 0; i < node_list->count; i++) {
         struct ink_astgen_choice *const choice = &choice_data[i];
         struct ink_ast_node *const choice_node = node_list->nodes[i];
+
+        assert(choice_node->type == INK_AST_CHOICE_STAR_STMT ||
+               choice_node->type == INK_AST_CHOICE_PLUS_STMT);
+
         struct ink_ast_node *const hdr_node = choice_node->lhs;
         struct ink_ast_seq *const expr_list = hdr_node->seq;
         struct ink_object *const number =
