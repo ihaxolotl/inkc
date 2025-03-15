@@ -114,14 +114,11 @@ struct ink_ast_node_list {
  *
  * Nodes do not directly store tokens, instead opting to reference a range of
  * bytes within the source file.
- *
- * TODO: Rename `start_offset` to `bytes_start`.
- * TODO: Rename `end_offset` to `bytes_end`.
  */
 struct ink_ast_node {
     enum ink_ast_node_type type;
-    size_t start_offset;
-    size_t end_offset;
+    size_t bytes_start;
+    size_t bytes_end;
     union {
         struct {
             struct ink_ast_node *lhs;
@@ -186,8 +183,8 @@ extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
 
 /* FIXME: Deprecated. */
 extern struct ink_ast_node *
-ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
-                 size_t end_offset, struct ink_ast_node *lhs,
+ink_ast_node_new(enum ink_ast_node_type type, size_t bytes_start,
+                 size_t bytes_end, struct ink_ast_node *lhs,
                  struct ink_ast_node *rhs, struct ink_ast_node_list *seq,
                  struct ink_arena *arena);
 
@@ -203,16 +200,16 @@ extern struct ink_ast_node *ink_ast_leaf_new(enum ink_ast_node_type type,
  * Create an AST node for a binary expression.
  */
 extern struct ink_ast_node *
-ink_ast_binary_new(enum ink_ast_node_type type, size_t start_offset,
-                   size_t end_offset, struct ink_ast_node *lhs,
+ink_ast_binary_new(enum ink_ast_node_type type, size_t bytes_start,
+                   size_t bytes_end, struct ink_ast_node *lhs,
                    struct ink_ast_node *rhs, struct ink_arena *arena);
 
 /**
  * Create an AST node for a compound expression / statement.
  */
 extern struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
-                                             size_t start_offset,
-                                             size_t end_offset,
+                                             size_t bytes_start,
+                                             size_t bytes_end,
                                              struct ink_ast_node_list *list,
                                              struct ink_arena *arena);
 
@@ -220,7 +217,7 @@ extern struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
  * Create an AST node for a choice expression.
  */
 extern struct ink_ast_node *ink_ast_choice_expr_new(
-    enum ink_ast_node_type type, size_t start_offset, size_t end_offset,
+    enum ink_ast_node_type type, size_t bytes_start, size_t bytes_end,
     struct ink_ast_node *start_expr, struct ink_ast_node *option_expr,
     struct ink_ast_node *inner_expr, struct ink_arena *arena);
 

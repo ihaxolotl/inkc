@@ -13,8 +13,8 @@ const char *ink_token_type_strz(enum ink_token_type type)
 
 void ink_token_print(const uint8_t *source_bytes, const struct ink_token *token)
 {
-    const size_t start = token->start_offset;
-    const size_t end = token->end_offset;
+    const size_t start = token->bytes_start;
+    const size_t end = token->bytes_end;
 
     switch (token->type) {
     case INK_TT_EOF:

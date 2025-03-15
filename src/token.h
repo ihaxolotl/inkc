@@ -79,8 +79,8 @@ enum ink_token_type {
 
 struct ink_token {
     enum ink_token_type type;
-    size_t start_offset;
-    size_t end_offset;
+    size_t bytes_start;
+    size_t bytes_end;
 };
 
 extern const char *ink_token_type_strz(enum ink_token_type type);

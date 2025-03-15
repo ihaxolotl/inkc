@@ -174,8 +174,8 @@ static void ink_astgen_error(struct ink_astgen *astgen,
     struct ink_astgen_global *const global = astgen->global;
     const struct ink_ast_error err = {
         .type = type,
-        .source_start = node->start_offset,
-        .source_end = node->end_offset,
+        .source_start = node->bytes_start,
+        .source_end = node->bytes_end,
     };
 
     ink_ast_error_vec_push(&global->tree->errors, err);
@@ -198,8 +198,8 @@ ink_string_from_node(const struct ink_astgen *astgen,
     struct ink_astgen_global *const global = astgen->global;
     const struct ink_ast *const tree = global->tree;
     const struct ink_string_ref ref = {
-        .bytes = &tree->source_bytes[node->start_offset],
-        .length = node->end_offset - node->start_offset,
+        .bytes = &tree->source_bytes[node->bytes_start],
+        .length = node->bytes_end - node->bytes_start,
     };
 
     return ref;

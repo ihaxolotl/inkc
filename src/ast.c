@@ -21,8 +21,8 @@
 #define ANSI_BOLD_OFF "\x1b[22m"
 
 struct ink_source_range {
-    size_t start_offset;
-    size_t end_offset;
+    size_t bytes_start;
+    size_t bytes_end;
 };
 
 struct ink_print_context {
@@ -233,22 +233,22 @@ void ink_ast_render_errors(const struct ink_ast *tree)
 static void ink_build_lines(struct ink_line_buffer *lines, const uint8_t *bytes)
 {
     struct ink_source_range range;
-    size_t start_offset = 0;
-    size_t end_offset = 0;
+    size_t bytes_start = 0;
+    size_t bytes_end = 0;
 
-    while (bytes[end_offset] != '\0') {
-        if (bytes[end_offset] == '\n') {
-            range.start_offset = start_offset;
-            range.end_offset = end_offset;
+    while (bytes[bytes_end] != '\0') {
+        if (bytes[bytes_end] == '\n') {
+            range.bytes_start = bytes_start;
+            range.bytes_end = bytes_end;
 
             ink_line_buffer_push(lines, range);
-            start_offset = end_offset + 1;
+            bytes_start = bytes_end + 1;
         }
-        end_offset++;
+        bytes_end++;
     }
-    if (start_offset != end_offset || !end_offset) {
-        range.start_offset = start_offset;
-        range.end_offset = end_offset;
+    if (bytes_start != bytes_end || !bytes_end) {
+        range.bytes_start = bytes_start;
+        range.bytes_end = bytes_end;
 
         ink_line_buffer_push(lines, range);
     }
@@ -262,7 +262,7 @@ static size_t ink_calculate_line(const struct ink_line_buffer *lines,
     for (size_t i = 0; i < lines->count; i++) {
         const struct ink_source_range range = lines->entries[i];
 
-        if (offset >= range.start_offset && offset <= range.end_offset) {
+        if (offset >= range.bytes_start && offset <= range.bytes_end) {
             return line_number;
         }
 
@@ -405,18 +405,18 @@ static void ink_ast_print_node(const struct ink_ast *tree,
                                bool colors)
 {
     char line[1024];
-    const size_t line_start = ink_calculate_line(lines, node->start_offset);
-    const size_t line_end = ink_calculate_line(lines, node->end_offset);
+    const size_t line_start = ink_calculate_line(lines, node->bytes_start);
+    const size_t line_end = ink_calculate_line(lines, node->bytes_end);
     const struct ink_source_range line_range = lines->entries[line_start];
     const struct ink_print_context context = {
         .filename = (char *)tree->filename,
         .node_type_strz = ink_ast_node_type_strz(node->type),
-        .lexeme = tree->source_bytes + node->start_offset,
-        .lexeme_length = node->end_offset - node->start_offset,
+        .lexeme = tree->source_bytes + node->bytes_start,
+        .lexeme_length = node->bytes_end - node->bytes_start,
         .line_start = line_start + 1,
         .line_end = line_end + 1,
-        .column_start = (node->start_offset - line_range.start_offset) + 1,
-        .column_end = (node->end_offset - line_range.start_offset) + 1,
+        .column_start = (node->bytes_start - line_range.bytes_start) + 1,
+        .column_end = (node->bytes_end - line_range.bytes_start) + 1,
     };
 
     if (colors) {
@@ -536,8 +536,8 @@ void ink_ast_print(const struct ink_ast *tree, bool colors)
 }
 
 static struct ink_ast_node *ink_ast_base_new(enum ink_ast_node_type type,
-                                             size_t start_offset,
-                                             size_t end_offset,
+                                             size_t bytes_start,
+                                             size_t bytes_end,
                                              struct ink_arena *arena)
 {
     struct ink_ast_node *const n = ink_arena_allocate(arena, sizeof(*n));
@@ -549,8 +549,8 @@ static struct ink_ast_node *ink_ast_base_new(enum ink_ast_node_type type,
     memset(n, 0, sizeof(*n));
 
     n->type = type;
-    n->start_offset = start_offset;
-    n->end_offset = end_offset;
+    n->bytes_start = bytes_start;
+    n->bytes_end = bytes_end;
     return n;
 }
 

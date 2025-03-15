@@ -124,11 +124,11 @@ void ink_scanner_rewind(struct ink_scanner *scanner, size_t source_offset)
 
 static enum ink_token_type ink_scanner_keyword(struct ink_scanner *scanner,
                                                enum ink_token_type type,
-                                               size_t start_offset,
-                                               size_t end_offset)
+                                               size_t bytes_start,
+                                               size_t bytes_end)
 {
-    const uint8_t *lexeme = &scanner->source_bytes[start_offset];
-    const size_t length = end_offset - start_offset;
+    const uint8_t *lexeme = &scanner->source_bytes[bytes_start];
+    const size_t length = bytes_end - bytes_start;
 
     switch (length) {
     case 2: {
@@ -201,8 +201,8 @@ static enum ink_token_type
 ink_scanner_keyword_from_token(struct ink_scanner *scanner,
                                const struct ink_token *token)
 {
-    return ink_scanner_keyword(scanner, token->type, token->start_offset,
-                               token->end_offset);
+    return ink_scanner_keyword(scanner, token->type, token->bytes_start,
+                               token->bytes_end);
 }
 
 /**
@@ -590,6 +590,6 @@ exit_loop:
         scanner->is_line_start = false;
     }
 
-    token->start_offset = scanner->start_offset;
-    token->end_offset = scanner->cursor_offset;
+    token->bytes_start = scanner->start_offset;
+    token->bytes_end = scanner->cursor_offset;
 }
