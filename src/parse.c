@@ -1653,7 +1653,7 @@ static struct ink_ast_node *ink_parse_content_stmt(struct ink_parser *parser)
                               node, NULL, parser->arena);
 }
 
-static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
+static struct ink_ast_node *ink_parse_choice_expr(struct ink_parser *p)
 {
     /**
  * FIXME: Add back once fully supported.
@@ -1668,83 +1668,78 @@ static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
         INK_TT_RIGHT_BRACKET, INK_TT_RIGHT_ARROW,  INK_TT_NL,
         INK_TT_EOF,
     };
-    const size_t scratch_offset = parser->scratch.count;
-    const size_t source_start = parser->token.start_offset;
-    struct ink_ast_node *node = NULL;
-
-    node = ink_parse_string(parser, token_set);
-    if (node) {
-        if (node->type != INK_AST_EMPTY_STRING) {
-            node->type = INK_AST_CHOICE_START_EXPR;
-            ink_parser_scratch_push(&parser->scratch, node);
-        }
-    }
-    if (ink_parser_check(parser, INK_TT_LEFT_BRACKET)) {
-        ink_parser_advance(parser);
-        ink_parser_match(parser, INK_TT_WHITESPACE);
-
-        if (!ink_parser_check(parser, INK_TT_RIGHT_BRACKET)) {
-            node = ink_parse_string(parser, token_set);
-            if (node) {
-                if (node->type != INK_AST_EMPTY_STRING) {
-                    node->type = INK_AST_CHOICE_OPTION_EXPR;
-                    ink_parser_scratch_push(&parser->scratch, node);
-                }
-            }
-        }
-
-        ink_parser_expect_token(parser, INK_TT_RIGHT_BRACKET);
-
-        if (!ink_parser_check_many(parser, token_set)) {
-            node = ink_parse_string(parser, token_set);
-            if (node) {
-                if (node->type != INK_AST_EMPTY_STRING) {
-                    node->type = INK_AST_CHOICE_INNER_EXPR;
-                    ink_parser_scratch_push(&parser->scratch, node);
-                }
-            }
-        }
-    }
-    return ink_ast_node_sequence(INK_AST_CHOICE_EXPR, source_start,
-                                 parser->token.start_offset, scratch_offset,
-                                 &parser->scratch, parser->arena);
-}
-
-static struct ink_ast_node *
-ink_parse_choice(struct ink_parser *parser,
-                 struct ink_parser_node_context *context)
-{
-    const enum ink_token_type token_type = parser->token.type;
-    const size_t source_start = parser->token.start_offset;
-    size_t source_end = 0;
-    struct ink_ast_node *node = NULL;
-
-    context->choice_level = ink_parser_match_many(parser, token_type, true);
-    node = ink_parse_choice_content(parser);
-    source_end = node ? node->end_offset : parser->token.start_offset;
-
-    if (ink_parser_check(parser, INK_TT_NL)) {
-        ink_parser_advance(parser);
-    }
-    return ink_ast_binary_new(ink_branch_type(token_type), source_start,
-                              source_end, node, NULL, parser->arena);
-}
-
-static struct ink_ast_node *
-ink_parse_gather_point(struct ink_parser *parser,
-                       struct ink_parser_node_context *context)
-{
-    const enum ink_token_type token_type = parser->token.type;
-    const size_t source_start = parser->token.start_offset;
-    size_t source_end = 0;
     struct ink_ast_node *lhs = NULL;
+    struct ink_ast_node *mhs = NULL;
+    struct ink_ast_node *rhs = NULL;
+    struct ink_token t = p->token;
 
-    context->choice_level = ink_parser_match_many(parser, token_type, true);
-    source_end = parser->token.start_offset;
-    ink_parser_match(parser, INK_TT_WHITESPACE);
-    ink_parser_match(parser, INK_TT_NL);
-    return ink_ast_binary_new(INK_AST_GATHER_POINT_STMT, source_start,
-                              source_end, lhs, NULL, parser->arena);
+    lhs = ink_parse_string(p, token_set);
+    if (lhs) {
+        if (lhs->type != INK_AST_EMPTY_STRING) {
+            lhs->type = INK_AST_CHOICE_START_EXPR;
+        }
+    }
+    if (ink_parser_check(p, INK_TT_LEFT_BRACKET)) {
+        ink_parser_advance(p);
+        ink_parser_match(p, INK_TT_WHITESPACE);
+
+        if (!ink_parser_check(p, INK_TT_RIGHT_BRACKET)) {
+            mhs = ink_parse_string(p, token_set);
+            if (mhs) {
+                if (mhs->type != INK_AST_EMPTY_STRING) {
+                    mhs->type = INK_AST_CHOICE_OPTION_EXPR;
+                }
+            }
+        }
+
+        ink_parser_expect_token(p, INK_TT_RIGHT_BRACKET);
+
+        if (!ink_parser_check_many(p, token_set)) {
+            rhs = ink_parse_string(p, token_set);
+            if (rhs) {
+                if (rhs->type != INK_AST_EMPTY_STRING) {
+                    rhs->type = INK_AST_CHOICE_INNER_EXPR;
+                }
+            }
+        }
+    }
+    return ink_ast_choice_expr_new(INK_AST_CHOICE_EXPR, t.start_offset,
+                                   p->token.start_offset, lhs, mhs, rhs,
+                                   p->arena);
+}
+
+static struct ink_ast_node *
+ink_parse_choice_stmt(struct ink_parser *p, struct ink_parser_node_context *ctx)
+{
+    struct ink_ast_node *n = NULL;
+    struct ink_token t = p->token;
+    size_t bytes_end = 0;
+
+    ctx->choice_level = ink_parser_match_many(p, t.type, true);
+    n = ink_parse_choice_expr(p);
+    bytes_end = n ? n->end_offset : p->token.start_offset;
+
+    if (ink_parser_check(p, INK_TT_NL)) {
+        ink_parser_advance(p);
+    }
+    return ink_ast_binary_new(ink_branch_type(t.type), t.start_offset,
+                              bytes_end, n, NULL, p->arena);
+}
+
+static struct ink_ast_node *
+ink_parse_gather_point(struct ink_parser *p,
+                       struct ink_parser_node_context *ctx)
+{
+    struct ink_ast_node *n = NULL;
+    struct ink_token t = p->token;
+    size_t bytes_end = 0;
+
+    ctx->choice_level = ink_parser_match_many(p, t.type, true);
+    bytes_end = p->token.start_offset;
+    ink_parser_match(p, INK_TT_WHITESPACE);
+    ink_parser_match(p, INK_TT_NL);
+    return ink_ast_binary_new(INK_AST_GATHER_POINT_STMT, t.start_offset,
+                              bytes_end, n, NULL, p->arena);
 }
 
 /**
@@ -1982,7 +1977,7 @@ ink_parse_stmt(struct ink_parser *parser,
         break;
     case INK_TT_STAR:
     case INK_TT_PLUS:
-        node = ink_parse_choice(parser, context);
+        node = ink_parse_choice_stmt(parser, context);
         break;
     case INK_TT_MINUS:
         if (context->is_conditional) {

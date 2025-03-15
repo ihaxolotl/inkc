@@ -114,6 +114,9 @@ struct ink_ast_node_list {
  *
  * Nodes do not directly store tokens, instead opting to reference a range of
  * bytes within the source file.
+ *
+ * TODO: Rename `start_offset` to `bytes_start`.
+ * TODO: Rename `end_offset` to `bytes_end`.
  */
 struct ink_ast_node {
     enum ink_ast_node_type type;
@@ -128,6 +131,12 @@ struct ink_ast_node {
         struct {
             struct ink_ast_node_list *list;
         } many;
+
+        struct {
+            struct ink_ast_node *start_expr;
+            struct ink_ast_node *option_expr;
+            struct ink_ast_node *inner_expr;
+        } choice_expr;
     } data;
     struct ink_ast_node_list *seq;
 };
@@ -206,6 +215,14 @@ extern struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
                                              size_t end_offset,
                                              struct ink_ast_node_list *list,
                                              struct ink_arena *arena);
+
+/**
+ * Create an AST node for a choice expression.
+ */
+extern struct ink_ast_node *ink_ast_choice_expr_new(
+    enum ink_ast_node_type type, size_t start_offset, size_t end_offset,
+    struct ink_ast_node *start_expr, struct ink_ast_node *option_expr,
+    struct ink_ast_node *inner_expr, struct ink_arena *arena);
 
 /**
  * Initialize abstract syntax tree.

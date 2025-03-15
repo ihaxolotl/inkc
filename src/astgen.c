@@ -1275,123 +1275,117 @@ static void ink_astgen_return_stmt(struct ink_astgen *astgen,
 struct ink_astgen_choice {
     uint16_t constant;
     uint16_t label;
-    struct ink_ast_node *start_expr;
-    struct ink_ast_node *option_expr;
-    struct ink_ast_node *inner_expr;
+    struct ink_object *id;
 };
 
-static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
-                                   const struct ink_ast_node *node)
+static void ink_astgen_choice_stmt(struct ink_astgen *scope,
+                                   const struct ink_ast_node *stmt)
 {
-    struct ink_ast_node_list *const node_list = node->seq;
-    struct ink_astgen_choice *const choice_data =
-        ink_malloc(node_list->count * sizeof(*choice_data));
+    struct ink_astgen_choice *data = NULL;
+    struct ink_ast_node_list *l = stmt->data.many.list;
 
-    if (!choice_data) {
+    assert(l != NULL);
+
+    data = ink_malloc(l->count * sizeof(*data));
+    if (!data) {
         return;
     }
-    for (size_t i = 0; i < node_list->count; i++) {
-        struct ink_astgen_choice *const choice = &choice_data[i];
-        struct ink_ast_node *const choice_node = node_list->nodes[i];
+    for (size_t i = 0; i < l->count; i++) {
+        struct ink_astgen_choice *choice = &data[i];
+        struct ink_ast_node *br_stmt = l->nodes[i];
 
-        assert(choice_node->type == INK_AST_CHOICE_STAR_STMT ||
-               choice_node->type == INK_AST_CHOICE_PLUS_STMT);
+        assert(br_stmt->type == INK_AST_CHOICE_STAR_STMT ||
+               br_stmt->type == INK_AST_CHOICE_PLUS_STMT);
 
-        struct ink_ast_node *const hdr_node = choice_node->data.bin.lhs;
-        struct ink_ast_node_list *const expr_list = hdr_node->seq;
-        struct ink_object *const number =
-            ink_number_new(astgen->global->story, (double)i);
-
-        choice->start_expr = NULL;
-        choice->option_expr = NULL;
-        choice->inner_expr = NULL;
-
-        if (expr_list) {
-            for (size_t j = 0; j < expr_list->count; j++) {
-                struct ink_ast_node *const expr_node = expr_list->nodes[j];
-
-                if (expr_node->type == INK_AST_CHOICE_START_EXPR) {
-                    choice->start_expr = expr_node;
-                } else if (expr_node->type == INK_AST_CHOICE_OPTION_EXPR) {
-                    choice->option_expr = expr_node;
-                } else if (expr_node->type == INK_AST_CHOICE_INNER_EXPR) {
-                    choice->inner_expr = expr_node;
-                }
-            }
-        }
-        if (choice->start_expr) {
-            ink_astgen_string(astgen, choice->start_expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
-        }
-        if (choice->option_expr) {
-            ink_astgen_string(astgen, choice->option_expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+        choice->id = ink_number_new(scope->global->story, (double)i);
+        if (!choice->id) {
+            /* TODO: Probably panic and report an error here. */
+            return;
         }
 
-        choice->constant = (uint16_t)ink_astgen_add_const(astgen, number);
+        struct ink_ast_node *br_expr = br_stmt->data.bin.lhs;
+        struct ink_ast_node *lhs = br_expr->data.choice_expr.start_expr;
+        struct ink_ast_node *rhs = br_expr->data.choice_expr.option_expr;
 
-        ink_astgen_emit_const(astgen, INK_OP_CONST, choice->constant);
-        ink_astgen_emit_byte(astgen, INK_OP_CHOICE_PUSH);
+        if (lhs) {
+            ink_astgen_string(scope, lhs);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+        }
+        if (rhs) {
+            ink_astgen_string(scope, rhs);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+        }
+
+        choice->constant = (uint16_t)ink_astgen_add_const(scope, choice->id);
+        ink_astgen_emit_const(scope, INK_OP_CONST, choice->constant);
+        ink_astgen_emit_byte(scope, INK_OP_CHOICE_PUSH);
     }
 
-    ink_astgen_emit_byte(astgen, INK_OP_FLUSH);
+    ink_astgen_emit_byte(scope, INK_OP_FLUSH);
 
-    for (size_t i = 0; i < node_list->count; i++) {
-        struct ink_astgen_choice *const choice = &choice_data[i];
+    for (size_t i = 0; i < l->count; i++) {
+        struct ink_astgen_choice *choice = &data[i];
 
-        ink_astgen_emit_byte(astgen, INK_OP_LOAD_CHOICE_ID);
-        ink_astgen_emit_const(astgen, INK_OP_CONST, choice->constant);
-        ink_astgen_emit_byte(astgen, INK_OP_CMP_EQ);
-        choice->label = (uint16_t)ink_astgen_emit_jump(astgen, INK_OP_JMP_T);
-        ink_astgen_emit_byte(astgen, INK_OP_POP);
+        ink_astgen_emit_byte(scope, INK_OP_LOAD_CHOICE_ID);
+        ink_astgen_emit_const(scope, INK_OP_CONST, choice->constant);
+        ink_astgen_emit_byte(scope, INK_OP_CMP_EQ);
+        choice->label = (uint16_t)ink_astgen_emit_jump(scope, INK_OP_JMP_T);
+        ink_astgen_emit_byte(scope, INK_OP_POP);
     }
 
     /* TODO: Could possibly trap here instead. */
-    ink_astgen_emit_byte(astgen, INK_OP_EXIT);
+    ink_astgen_emit_byte(scope, INK_OP_EXIT);
 
-    for (size_t i = 0; i < node_list->count; i++) {
-        struct ink_astgen_choice *const choice = &choice_data[i];
-        struct ink_ast_node *const choice_node = node_list->nodes[i];
-        struct ink_ast_node *const body_node = choice_node->data.bin.rhs;
+    for (size_t i = 0; i < l->count; i++) {
+        struct ink_astgen_choice *choice = &data[i];
+        struct ink_ast_node *br_stmt = l->nodes[i];
+        struct ink_ast_node *br_expr = br_stmt->data.bin.lhs;
+        struct ink_ast_node *br_body = br_stmt->data.bin.rhs;
+        struct ink_ast_node *lhs = br_expr->data.choice_expr.start_expr;
+        struct ink_ast_node *rhs = br_expr->data.choice_expr.inner_expr;
 
-        ink_astgen_patch_jump(astgen, choice->label);
-        ink_astgen_emit_byte(astgen, INK_OP_POP);
+        ink_astgen_patch_jump(scope, choice->label);
+        ink_astgen_emit_byte(scope, INK_OP_POP);
 
-        if (choice->start_expr) {
-            ink_astgen_string(astgen, choice->start_expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+        if (lhs) {
+            ink_astgen_string(scope, lhs);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
         }
-        if (choice->inner_expr) {
-            ink_astgen_string(astgen, choice->inner_expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+        if (rhs) {
+            ink_astgen_string(scope, rhs);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
         }
 
-        ink_astgen_emit_byte(astgen, INK_OP_FLUSH);
-        ink_astgen_block_stmt(astgen, body_node);
+        ink_astgen_emit_byte(scope, INK_OP_FLUSH);
+        ink_astgen_block_stmt(scope, br_body);
     }
 
-    ink_free(choice_data);
+    ink_free(data);
 }
 
 static void ink_astgen_gather_stmt(struct ink_astgen *astgen,
-                                   const struct ink_ast_node *node)
+                                   const struct ink_ast_node *stmt)
 {
-    if (node->data.bin.lhs) {
-        ink_astgen_stmt(astgen, node->data.bin.lhs);
+    struct ink_ast_node *lhs = stmt->data.bin.lhs;
+
+    if (lhs) {
+        ink_astgen_stmt(astgen, lhs);
     }
 }
 
 static void ink_astgen_gathered_stmt(struct ink_astgen *parent_scope,
-                                     const struct ink_ast_node *node)
+                                     const struct ink_ast_node *stmt)
 {
     struct ink_astgen scope;
+    struct ink_ast_node *lhs = stmt->data.bin.lhs;
+    struct ink_ast_node *rhs = stmt->data.bin.rhs;
 
     ink_astgen_make(&scope, parent_scope, NULL);
     scope.exit_label = ink_astgen_add_label(&scope);
 
-    ink_astgen_choice_stmt(&scope, node->data.bin.lhs);
+    ink_astgen_choice_stmt(&scope, lhs);
     ink_astgen_set_label(&scope, scope.exit_label);
-    ink_astgen_gather_stmt(&scope, node->data.bin.rhs);
+    ink_astgen_gather_stmt(&scope, rhs);
 }
 
 static void ink_astgen_stmt(struct ink_astgen *astgen,

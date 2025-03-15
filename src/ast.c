@@ -441,7 +441,7 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
      * TODO: `new_prefix` needs bounds checking.
      */
     char new_prefix[1024];
-    struct ink_ast_node *lhs, *rhs;
+    struct ink_ast_node *lhs, *mhs, *rhs;
     struct ink_ast_node_list *list;
     struct ink_node_buffer nodes;
 
@@ -449,6 +449,30 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
 
     switch (node->type) {
     case INK_AST_BLOCK:
+        list = node->data.many.list;
+
+        if (list) {
+            for (size_t i = 0; i < list->count; i++) {
+                ink_node_buffer_push(&nodes, list->nodes[i]);
+            }
+        }
+        break;
+    case INK_AST_CHOICE_EXPR:
+        lhs = node->data.choice_expr.start_expr;
+        mhs = node->data.choice_expr.option_expr;
+        rhs = node->data.choice_expr.inner_expr;
+
+        if (lhs) {
+            ink_node_buffer_push(&nodes, lhs);
+        }
+        if (mhs) {
+            ink_node_buffer_push(&nodes, mhs);
+        }
+        if (rhs) {
+            ink_node_buffer_push(&nodes, rhs);
+        }
+        break;
+    case INK_AST_CHOICE_STMT:
         list = node->data.many.list;
 
         if (list) {
@@ -531,24 +555,24 @@ static struct ink_ast_node *ink_ast_base_new(enum ink_ast_node_type type,
 }
 
 struct ink_ast_node *ink_ast_leaf_new(enum ink_ast_node_type type,
-                                      size_t source_start, size_t source_end,
+                                      size_t bytes_start, size_t bytes_end,
                                       struct ink_arena *arena)
 {
     struct ink_ast_node *const n =
-        ink_ast_base_new(type, source_start, source_end, arena);
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
 
     assert(n);
     return n;
 }
 
 struct ink_ast_node *ink_ast_binary_new(enum ink_ast_node_type type,
-                                        size_t source_start, size_t source_end,
+                                        size_t bytes_start, size_t bytes_end,
                                         struct ink_ast_node *lhs,
                                         struct ink_ast_node *rhs,
                                         struct ink_arena *arena)
 {
     struct ink_ast_node *const n =
-        ink_ast_base_new(type, source_start, source_end, arena);
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
 
     assert(n);
     n->data.bin.lhs = lhs;
@@ -557,22 +581,38 @@ struct ink_ast_node *ink_ast_binary_new(enum ink_ast_node_type type,
 }
 
 struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
-                                      size_t source_start, size_t source_end,
+                                      size_t bytes_start, size_t bytes_end,
                                       struct ink_ast_node_list *list,
                                       struct ink_arena *arena)
 {
     struct ink_ast_node *const n =
-        ink_ast_base_new(type, source_start, source_end, arena);
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
 
     assert(n);
     switch (type) {
     case INK_AST_BLOCK:
+    case INK_AST_CHOICE_STMT:
         n->data.many.list = list;
         break;
     default:
         n->seq = list;
         break;
     }
+    return n;
+}
+
+struct ink_ast_node *ink_ast_choice_expr_new(
+    enum ink_ast_node_type type, size_t bytes_start, size_t bytes_end,
+    struct ink_ast_node *start_expr, struct ink_ast_node *option_expr,
+    struct ink_ast_node *inner_expr, struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
+
+    assert(n);
+    n->data.choice_expr.start_expr = start_expr;
+    n->data.choice_expr.option_expr = option_expr;
+    n->data.choice_expr.inner_expr = inner_expr;
     return n;
 }
 
