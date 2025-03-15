@@ -284,41 +284,6 @@ static inline enum ink_ast_node_type ink_branch_type(enum ink_token_type type)
 }
 
 /**
- * Create a leaf AST node.
- */
-static inline struct ink_ast_node *
-ink_ast_node_leaf(enum ink_ast_node_type type, size_t source_start,
-                  size_t source_end, struct ink_arena *arena)
-{
-    return ink_ast_node_new(type, source_start, source_end, NULL, NULL, NULL,
-                            arena);
-}
-
-/**
- * Create a unary AST node.
- */
-static inline struct ink_ast_node *
-ink_ast_node_unary(enum ink_ast_node_type type, size_t source_start,
-                   size_t source_end, struct ink_ast_node *lhs,
-                   struct ink_arena *arena)
-{
-    return ink_ast_node_new(type, source_start, source_end, lhs, NULL, NULL,
-                            arena);
-}
-
-/**
- * Create a binary AST node.
- */
-static inline struct ink_ast_node *
-ink_ast_node_binary(enum ink_ast_node_type type, size_t source_start,
-                    size_t source_end, struct ink_ast_node *lhs,
-                    struct ink_ast_node *rhs, struct ink_arena *arena)
-{
-    return ink_ast_node_new(type, source_start, source_end, lhs, rhs, NULL,
-                            arena);
-}
-
-/**
  * Create an AST node with a variable number of children.
  */
 static inline struct ink_ast_node *
@@ -336,8 +301,7 @@ ink_ast_node_sequence(enum ink_ast_node_type type, size_t source_start,
             return NULL;
         }
     }
-    return ink_ast_node_new(type, source_start, source_end, NULL, NULL, seq,
-                            arena);
+    return ink_ast_many_new(type, source_start, source_end, seq, arena);
 }
 
 static void
@@ -602,7 +566,7 @@ ink_parser_fixup_block(struct ink_parser *parser,
         case INK_AST_SWITCH_CASE:
         case INK_AST_IF_BRANCH:
         case INK_AST_ELSE_BRANCH:
-            stmt->rhs = block_node;
+            stmt->data.bin.rhs = block_node;
             return ink_parser_scratch_pop(scratch);
         default:
             break;
@@ -755,17 +719,17 @@ ink_parser_collect_stitch(struct ink_parser *parser,
                 body_node ? body_node->end_offset : proto_node->end_offset;
 
             ink_parser_scratch_pop(scratch);
-            return ink_ast_node_binary(INK_AST_STITCH_DECL,
-                                       proto_node->start_offset, end_offset,
-                                       proto_node, body_node, parser->arena);
+            return ink_ast_binary_new(INK_AST_STITCH_DECL,
+                                      proto_node->start_offset, end_offset,
+                                      proto_node, body_node, parser->arena);
         } else if (proto_node->type == INK_AST_FUNC_PROTO) {
             const size_t end_offset =
                 body_node ? body_node->end_offset : proto_node->end_offset;
 
             ink_parser_scratch_pop(scratch);
-            return ink_ast_node_binary(INK_AST_FUNC_DECL,
-                                       proto_node->start_offset, end_offset,
-                                       proto_node, body_node, parser->arena);
+            return ink_ast_binary_new(INK_AST_FUNC_DECL,
+                                      proto_node->start_offset, end_offset,
+                                      proto_node, body_node, parser->arena);
         }
     }
     return body_node;
@@ -801,8 +765,9 @@ ink_parser_collect_knot(struct ink_parser *parser,
                                          scratch->count, parser->arena);
 
             ink_parser_scratch_pop(scratch);
-            node = ink_ast_node_unary(INK_AST_KNOT_DECL, source_start,
-                                      source_end, proto_node, parser->arena);
+            node =
+                ink_ast_binary_new(INK_AST_KNOT_DECL, source_start, source_end,
+                                   proto_node, NULL, parser->arena);
             node->seq = seq;
         }
     }
@@ -902,9 +867,9 @@ static void ink_parser_handle_gather(struct ink_parser *parser,
                 ink_parser_collect_context(parser, context, level - 1, true);
 
             if (tmp->type == INK_AST_CHOICE_STMT) {
-                *node = ink_ast_node_binary(INK_AST_GATHERED_STMT,
-                                            tmp->start_offset, source_start,
-                                            tmp, *node, parser->arena);
+                *node =
+                    ink_ast_binary_new(INK_AST_GATHERED_STMT, tmp->start_offset,
+                                       source_start, tmp, *node, parser->arena);
             }
             if (!ink_parser_stack_is_empty(open_blocks)) {
                 const struct ink_parser_state block =
@@ -994,7 +959,7 @@ static struct ink_ast_node *ink_parse_atom(struct ink_parser *parser,
     /* NOTE: Advancing the parser MUST only happen after the node is
      * created. This prevents trailing whitespace. */
     const struct ink_token token = parser->token;
-    struct ink_ast_node *const node = ink_ast_node_leaf(
+    struct ink_ast_node *const node = ink_ast_leaf_new(
         node_type, token.start_offset, token.end_offset, parser->arena);
 
     ink_parser_advance(parser);
@@ -1061,7 +1026,7 @@ ink_parse_string(struct ink_parser *parser,
     while (!ink_parser_check_many(parser, token_set)) {
         ink_parser_advance(parser);
     }
-    return ink_ast_node_leaf(
+    return ink_ast_leaf_new(
         source_start == parser->token.start_offset ? INK_AST_EMPTY_STRING
                                                    : INK_AST_STRING,
         source_start, parser->token.start_offset, parser->arena);
@@ -1121,15 +1086,15 @@ static struct ink_ast_node *ink_parse_identifier_expr(struct ink_parser *parser)
                 return rhs;
             }
 
-            lhs = ink_ast_node_binary(INK_AST_SELECTOR_EXPR, lhs->start_offset,
-                                      parser->token.start_offset, lhs, rhs,
-                                      parser->arena);
+            lhs = ink_ast_binary_new(INK_AST_SELECTOR_EXPR, lhs->start_offset,
+                                     parser->token.start_offset, lhs, rhs,
+                                     parser->arena);
             break;
         case INK_TT_LEFT_PAREN:
             rhs = ink_parse_arglist(parser);
-            return ink_ast_node_binary(INK_AST_CALL_EXPR, lhs->start_offset,
-                                       parser->token.start_offset, lhs, rhs,
-                                       parser->arena);
+            return ink_ast_binary_new(INK_AST_CALL_EXPR, lhs->start_offset,
+                                      parser->token.start_offset, lhs, rhs,
+                                      parser->arena);
         default:
             return lhs;
         }
@@ -1143,8 +1108,9 @@ static struct ink_ast_node *ink_parse_divert(struct ink_parser *parser)
 
     ink_parser_advance(parser);
     node = ink_parse_identifier_expr(parser);
-    return ink_ast_node_unary(INK_AST_DIVERT, source_start,
-                              parser->token.start_offset, node, parser->arena);
+    return ink_ast_binary_new(INK_AST_DIVERT, source_start,
+                              parser->token.start_offset, node, NULL,
+                              parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_string_expr(struct ink_parser *parser)
@@ -1164,8 +1130,9 @@ static struct ink_ast_node *ink_parse_string_expr(struct ink_parser *parser)
     }
 
     ink_parser_advance(parser);
-    return ink_ast_node_unary(INK_AST_STRING_EXPR, source_start,
-                              parser->token.start_offset, lhs, parser->arena);
+    return ink_ast_binary_new(INK_AST_STRING_EXPR, source_start,
+                              parser->token.start_offset, lhs, NULL,
+                              parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_primary_expr(struct ink_parser *parser)
@@ -1214,8 +1181,8 @@ static struct ink_ast_node *ink_parse_prefix_expr(struct ink_parser *parser)
         if (!node) {
             return NULL;
         }
-        return ink_ast_node_unary(ink_token_prefix_type(type), source_start,
-                                  node->end_offset, node, parser->arena);
+        return ink_ast_binary_new(ink_token_prefix_type(type), source_start,
+                                  node->end_offset, node, NULL, parser->arena);
     }
     case INK_TT_RIGHT_ARROW:
         return ink_parse_divert(parser);
@@ -1248,9 +1215,9 @@ static struct ink_ast_node *ink_parse_infix_expr(struct ink_parser *parser,
                 return NULL;
             }
 
-            lhs = ink_ast_node_binary(ink_token_infix_type(type),
-                                      lhs->start_offset, rhs->end_offset, lhs,
-                                      rhs, parser->arena);
+            lhs = ink_ast_binary_new(ink_token_infix_type(type),
+                                     lhs->start_offset, rhs->end_offset, lhs,
+                                     rhs, parser->arena);
         } else {
             break;
         }
@@ -1263,8 +1230,9 @@ static struct ink_ast_node *ink_parse_divert_expr(struct ink_parser *parser)
     const size_t source_start = ink_parser_advance(parser);
     struct ink_ast_node *const node = ink_parse_identifier_expr(parser);
 
-    return ink_ast_node_unary(INK_AST_DIVERT, source_start,
-                              parser->token.start_offset, node, parser->arena);
+    return ink_ast_binary_new(INK_AST_DIVERT, source_start,
+                              parser->token.start_offset, node, NULL,
+                              parser->arena);
 }
 
 /**
@@ -1300,8 +1268,8 @@ static struct ink_ast_node *ink_parse_return_stmt(struct ink_parser *parser)
         !ink_parser_check(parser, INK_TT_EOF)) {
         node = ink_parse_expr(parser);
     }
-    return ink_ast_node_unary(INK_AST_RETURN_STMT, source_start,
-                              ink_parse_expect_stmt_end(parser), node,
+    return ink_ast_binary_new(INK_AST_RETURN_STMT, source_start,
+                              ink_parse_expect_stmt_end(parser), node, NULL,
                               parser->arena);
 }
 
@@ -1313,8 +1281,8 @@ static struct ink_ast_node *ink_parse_divert_stmt(struct ink_parser *parser)
     ink_parser_push_scanner(parser, INK_GRAMMAR_EXPRESSION);
     node = ink_parse_divert_expr(parser);
     ink_parser_pop_scanner(parser);
-    return ink_ast_node_unary(INK_AST_DIVERT_STMT, source_start,
-                              ink_parse_expect_stmt_end(parser), node,
+    return ink_ast_binary_new(INK_AST_DIVERT_STMT, source_start,
+                              ink_parse_expect_stmt_end(parser), node, NULL,
                               parser->arena);
 }
 
@@ -1325,7 +1293,7 @@ static struct ink_ast_node *ink_parse_glue(struct ink_parser *parser)
     const size_t source_start = parser->token.start_offset;
 
     ink_parser_advance(parser);
-    return ink_ast_node_leaf(INK_AST_GLUE, source_start,
+    return ink_ast_leaf_new(INK_AST_GLUE, source_start,
                              parser->token.start_offset, parser->arena);
 }
 */
@@ -1346,9 +1314,9 @@ static struct ink_ast_node *ink_parse_temp_decl(struct ink_parser *parser)
     if (!rhs) {
         return NULL;
     }
-    return ink_ast_node_binary(INK_AST_TEMP_DECL, source_start,
-                               ink_parse_expect_stmt_end(parser), lhs, rhs,
-                               parser->arena);
+    return ink_ast_binary_new(INK_AST_TEMP_DECL, source_start,
+                              ink_parse_expect_stmt_end(parser), lhs, rhs,
+                              parser->arena);
 }
 
 /**
@@ -1372,8 +1340,8 @@ static struct ink_ast_node *ink_parse_expr_stmt(struct ink_parser *parser,
     struct ink_ast_node *const node =
         ink_parse_infix_expr(parser, lhs, INK_PREC_NONE);
 
-    return ink_ast_node_unary(INK_AST_EXPR_STMT, source_start,
-                              ink_parse_expect_stmt_end(parser), node,
+    return ink_ast_binary_new(INK_AST_EXPR_STMT, source_start,
+                              ink_parse_expect_stmt_end(parser), node, NULL,
                               parser->arena);
 }
 
@@ -1391,9 +1359,9 @@ static struct ink_ast_node *ink_parse_assign_stmt(struct ink_parser *parser)
     if (!rhs) {
         return rhs;
     }
-    return ink_ast_node_binary(INK_AST_ASSIGN_STMT, source_start,
-                               ink_parse_expect_stmt_end(parser), lhs, rhs,
-                               parser->arena);
+    return ink_ast_binary_new(INK_AST_ASSIGN_STMT, source_start,
+                              ink_parse_expect_stmt_end(parser), lhs, rhs,
+                              parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_tilde_stmt(struct ink_parser *parser)
@@ -1537,8 +1505,9 @@ ink_parse_conditional_branch(struct ink_parser *parser,
     if (ink_parser_check(parser, INK_TT_NL)) {
         ink_parser_advance(parser);
     }
-    return ink_ast_node_unary(node_type, source_start,
-                              parser->token.start_offset, node, parser->arena);
+    return ink_ast_binary_new(node_type, source_start,
+                              parser->token.start_offset, node, NULL,
+                              parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_conditional(struct ink_parser *parser,
@@ -1585,7 +1554,7 @@ static struct ink_ast_node *ink_parse_conditional(struct ink_parser *parser,
                                  parser->token.start_offset, scratch_offset,
                                  &parser->scratch, parser->arena);
     if (node) {
-        node->lhs = expr;
+        node->data.bin.lhs = expr;
     }
     return node;
 }
@@ -1630,9 +1599,9 @@ static struct ink_ast_node *ink_parse_lbrace_expr(struct ink_parser *parser)
                 rhs = ink_parse_conditional(parser, lhs);
             } else {
                 rhs = ink_parse_content(parser, token_set);
-                rhs = ink_ast_node_binary(INK_AST_IF_EXPR, source_start,
-                                          parser->token.start_offset, lhs, rhs,
-                                          parser->arena);
+                rhs = ink_ast_binary_new(INK_AST_IF_EXPR, source_start,
+                                         parser->token.start_offset, lhs, rhs,
+                                         parser->arena);
             }
 
             ink_parser_pop_scanner(parser);
@@ -1640,8 +1609,8 @@ static struct ink_ast_node *ink_parse_lbrace_expr(struct ink_parser *parser)
         } else {
             ink_parser_pop_scanner(parser);
             ink_parser_expect_token(parser, INK_TT_RIGHT_BRACE);
-            return ink_ast_node_unary(INK_AST_INLINE_LOGIC, source_start,
-                                      parser->token.start_offset, lhs,
+            return ink_ast_binary_new(INK_AST_INLINE_LOGIC, source_start,
+                                      parser->token.start_offset, lhs, NULL,
                                       parser->arena);
         }
     } else {
@@ -1680,8 +1649,8 @@ static struct ink_ast_node *ink_parse_content_stmt(struct ink_parser *parser)
         /* FIXME: Trailing whitespace is interpreted as empty content. */
         ink_parser_match(parser, INK_TT_WHITESPACE);
     }
-    return ink_ast_node_unary(INK_AST_CONTENT_STMT, source_start, source_end,
-                              node, parser->arena);
+    return ink_ast_binary_new(INK_AST_CONTENT_STMT, source_start, source_end,
+                              node, NULL, parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_choice_content(struct ink_parser *parser)
@@ -1757,8 +1726,8 @@ ink_parse_choice(struct ink_parser *parser,
     if (ink_parser_check(parser, INK_TT_NL)) {
         ink_parser_advance(parser);
     }
-    return ink_ast_node_binary(ink_branch_type(token_type), source_start,
-                               source_end, node, NULL, parser->arena);
+    return ink_ast_binary_new(ink_branch_type(token_type), source_start,
+                              source_end, node, NULL, parser->arena);
 }
 
 static struct ink_ast_node *
@@ -1774,8 +1743,8 @@ ink_parse_gather_point(struct ink_parser *parser,
     source_end = parser->token.start_offset;
     ink_parser_match(parser, INK_TT_WHITESPACE);
     ink_parser_match(parser, INK_TT_NL);
-    return ink_ast_node_unary(INK_AST_GATHER_POINT_STMT, source_start,
-                              source_end, lhs, parser->arena);
+    return ink_ast_binary_new(INK_AST_GATHER_POINT_STMT, source_start,
+                              source_end, lhs, NULL, parser->arena);
 }
 
 /**
@@ -1799,7 +1768,7 @@ INK_PARSER_RULE(lhs, ink_parse_identifier, parser);
 if (ink_parser_check(parser, INK_TT_EQUAL)) {
 ink_parser_advance(parser);
 INK_PARSER_RULE(rhs, ink_parse_expr, parser);
-return ink_ast_node_binary(INK_AST_ASSIGN_STMT, source_start,
+return ink_ast_binary_new(INK_AST_ASSIGN_STMT, source_start,
                          parser->token.start_offset, lhs, rhs,
                          parser->arena);
 }
@@ -1855,7 +1824,7 @@ static struct ink_ast_node *ink_parse_list_decl(struct ink_parser *parser)
     source_end = rhs ? rhs->end_offset : parser->token.start_offset;
     ink_parser_pop_scanner(parser);
     ink_parser_expect_stmt_end(parser);
-    return ink_ast_node_binary(INK_AST_LIST_DECL, source_start, source_end,
+    return ink_ast_binary_new(INK_AST_LIST_DECL, source_start, source_end,
 lhs, rhs, parser->arena);
 }
 */
@@ -1879,9 +1848,9 @@ static struct ink_ast_node *ink_parse_var(struct ink_parser *parser,
     ink_parser_expect_token(parser, INK_TT_EQUAL);
     rhs = ink_parse_expect_expr(parser);
     ink_parser_pop_scanner(parser);
-    return ink_ast_node_binary(node_type, source_start,
-                               ink_parse_expect_stmt_end(parser), lhs, rhs,
-                               parser->arena);
+    return ink_ast_binary_new(node_type, source_start,
+                              ink_parse_expect_stmt_end(parser), lhs, rhs,
+                              parser->arena);
 }
 
 static struct ink_ast_node *ink_parse_var_decl(struct ink_parser *parser)

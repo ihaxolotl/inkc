@@ -438,11 +438,11 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
 
     ink_node_buffer_init(&nodes);
 
-    if (node->lhs) {
-        ink_node_buffer_push(&nodes, node->lhs);
+    if (node->data.bin.lhs) {
+        ink_node_buffer_push(&nodes, node->data.bin.lhs);
     }
-    if (node->rhs) {
-        ink_node_buffer_push(&nodes, node->rhs);
+    if (node->data.bin.rhs) {
+        ink_node_buffer_push(&nodes, node->data.bin.rhs);
     }
     if (node->seq) {
         for (size_t i = 0; i < node->seq->count; i++) {
@@ -485,29 +485,63 @@ void ink_ast_print(const struct ink_ast *tree, bool colors)
     ink_line_buffer_deinit(&lines);
 }
 
-struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
-                                      size_t start_offset, size_t end_offset,
-                                      struct ink_ast_node *lhs,
-                                      struct ink_ast_node *rhs,
-                                      struct ink_ast_node_list *seq,
-                                      struct ink_arena *arena)
+static struct ink_ast_node *ink_ast_base_new(enum ink_ast_node_type type,
+                                             size_t start_offset,
+                                             size_t end_offset,
+                                             struct ink_arena *arena)
 {
-    struct ink_ast_node *node;
+    struct ink_ast_node *const n = ink_arena_allocate(arena, sizeof(*n));
 
-    assert(start_offset <= end_offset);
-
-    node = ink_arena_allocate(arena, sizeof(*node));
-    if (!node) {
-        return node;
+    if (!n) {
+        return n;
     }
 
-    node->type = type;
-    node->start_offset = start_offset;
-    node->end_offset = end_offset;
-    node->lhs = lhs;
-    node->rhs = rhs;
-    node->seq = seq;
-    return node;
+    memset(n, 0, sizeof(*n));
+
+    n->type = type;
+    n->start_offset = start_offset;
+    n->end_offset = end_offset;
+    return n;
+}
+
+struct ink_ast_node *ink_ast_leaf_new(enum ink_ast_node_type type,
+                                      size_t source_start, size_t source_end,
+                                      struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, source_start, source_end, arena);
+
+    assert(n);
+    return n;
+}
+
+struct ink_ast_node *ink_ast_binary_new(enum ink_ast_node_type type,
+                                        size_t source_start, size_t source_end,
+                                        struct ink_ast_node *lhs,
+                                        struct ink_ast_node *rhs,
+                                        struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, source_start, source_end, arena);
+
+    assert(n);
+    n->data.bin.lhs = lhs;
+    n->data.bin.rhs = rhs;
+    return n;
+}
+
+struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
+                                      size_t source_start, size_t source_end,
+                                      struct ink_ast_node_list *list,
+                                      struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, source_start, source_end, arena);
+
+    assert(n);
+    /* n->data.many.list = list; */
+    n->seq = list;
+    return n;
 }
 
 void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
@@ -521,6 +555,9 @@ void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
 
 void ink_ast_deinit(struct ink_ast *tree)
 {
+    /**
+     * TODO: Maybe add the arena as a parameter?
+     */
     tree->filename = NULL;
     tree->source_bytes = NULL;
     tree->root = NULL;

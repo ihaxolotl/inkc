@@ -116,8 +116,16 @@ struct ink_ast_node {
     enum ink_ast_node_type type;
     size_t start_offset;
     size_t end_offset;
-    struct ink_ast_node *lhs;
-    struct ink_ast_node *rhs;
+    union {
+        struct {
+            struct ink_ast_node *lhs;
+            struct ink_ast_node *rhs;
+        } bin;
+
+        struct {
+            struct ink_ast_node_list *list;
+        } many;
+    } data;
     struct ink_ast_node_list *seq;
 };
 
@@ -164,11 +172,37 @@ struct ink_ast {
 /* FIXME: Make private. */
 extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
 
+/* FIXME: Deprecated. */
 extern struct ink_ast_node *
 ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
                  size_t end_offset, struct ink_ast_node *lhs,
                  struct ink_ast_node *rhs, struct ink_ast_node_list *seq,
                  struct ink_arena *arena);
+
+/**
+ * Create an AST node with no children.
+ */
+extern struct ink_ast_node *ink_ast_leaf_new(enum ink_ast_node_type type,
+                                             size_t source_start,
+                                             size_t source_end,
+                                             struct ink_arena *arena);
+
+/**
+ * Create an AST node for a binary expression.
+ */
+extern struct ink_ast_node *
+ink_ast_binary_new(enum ink_ast_node_type type, size_t start_offset,
+                   size_t end_offset, struct ink_ast_node *lhs,
+                   struct ink_ast_node *rhs, struct ink_arena *arena);
+
+/**
+ * Create an AST node for a compound expression / statement.
+ */
+extern struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
+                                             size_t start_offset,
+                                             size_t end_offset,
+                                             struct ink_ast_node_list *list,
+                                             struct ink_arena *arena);
 
 /**
  * Initialize abstract syntax tree.
