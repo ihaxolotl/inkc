@@ -468,9 +468,6 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
     ink_node_buffer_deinit(&nodes);
 }
 
-/**
- * Print AST.
- */
 void ink_ast_print(const struct ink_ast *tree, bool colors)
 {
     struct ink_line_buffer lines;
@@ -488,14 +485,11 @@ void ink_ast_print(const struct ink_ast *tree, bool colors)
     ink_line_buffer_deinit(&lines);
 }
 
-/**
- * Create an AST node.
- */
 struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
                                       size_t start_offset, size_t end_offset,
                                       struct ink_ast_node *lhs,
                                       struct ink_ast_node *rhs,
-                                      struct ink_ast_seq *seq,
+                                      struct ink_ast_node_list *seq,
                                       struct ink_arena *arena)
 {
     struct ink_ast_node *node;
@@ -508,7 +502,6 @@ struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
     }
 
     node->type = type;
-    node->flags = 0;
     node->start_offset = start_offset;
     node->end_offset = end_offset;
     node->lhs = lhs;
@@ -517,9 +510,6 @@ struct ink_ast_node *ink_ast_node_new(enum ink_ast_node_type type,
     return node;
 }
 
-/**
- * Initialize abstract syntax tree.
- */
 void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
                   const uint8_t *source_bytes)
 {
@@ -529,9 +519,6 @@ void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
     ink_ast_error_vec_init(&tree->errors);
 }
 
-/**
- * Cleanup abstract syntax tree.
- */
 void ink_ast_deinit(struct ink_ast *tree)
 {
     tree->filename = NULL;

@@ -677,7 +677,7 @@ static void ink_astgen_identifier(struct ink_astgen *astgen,
 
 static int ink_astgen_check_args_count(struct ink_astgen *astgen,
                                        const struct ink_ast_node *node,
-                                       struct ink_ast_seq *args_list,
+                                       struct ink_ast_node_list *args_list,
                                        struct ink_symbol *symbol)
 {
     int rc = -1;
@@ -730,7 +730,7 @@ static void ink_astgen_call_expr(struct ink_astgen *astgen,
         return;
     }
     if (args_node) {
-        struct ink_ast_seq *const args_list = args_node->seq;
+        struct ink_ast_node_list *const args_list = args_node->seq;
 
         rc = ink_astgen_check_args_count(astgen, name_node, args_list, &sym);
         if (rc < 0) {
@@ -868,7 +868,7 @@ static void ink_astgen_block_stmt(struct ink_astgen *parent_scope,
     ink_astgen_make(&block_scope, parent_scope, NULL);
 
     if (node) {
-        struct ink_ast_seq *const node_list = node->seq;
+        struct ink_ast_node_list *const node_list = node->seq;
         assert(node->type == INK_AST_BLOCK);
 
         for (size_t i = 0; i < node_list->count; i++) {
@@ -905,7 +905,7 @@ static void ink_astgen_if_stmt(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
-                                      struct ink_ast_seq *children,
+                                      struct ink_ast_node_list *children,
                                       size_t node_index)
 {
     if (node_index >= children->count) {
@@ -944,7 +944,7 @@ static void ink_astgen_switch_stmt(struct ink_astgen *astgen,
 {
     struct ink_astgen_global *const global = astgen->global;
     struct ink_content_path *const path = global->current_path;
-    struct ink_ast_seq *const node_list = node->seq;
+    struct ink_ast_node_list *const node_list = node->seq;
     const size_t label_top = global->labels.count;
     const size_t stack_slot = path->arity + path->locals_count++;
 
@@ -998,7 +998,7 @@ static void ink_astgen_conditional(struct ink_astgen *astgen,
         return;
     }
 
-    struct ink_ast_seq *const children = node->seq;
+    struct ink_ast_node_list *const children = node->seq;
     struct ink_ast_node *const first = children->nodes[0];
     struct ink_ast_node *const last = children->nodes[children->count - 1];
 
@@ -1047,7 +1047,7 @@ static void ink_astgen_conditional(struct ink_astgen *astgen,
 static void ink_astgen_content_expr(struct ink_astgen *astgen,
                                     const struct ink_ast_node *node)
 {
-    struct ink_ast_seq *const expr_list = node->seq;
+    struct ink_ast_node_list *const expr_list = node->seq;
 
     if (!expr_list) {
         return;
@@ -1267,7 +1267,7 @@ struct ink_astgen_choice {
 static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
                                    const struct ink_ast_node *node)
 {
-    struct ink_ast_seq *const node_list = node->seq;
+    struct ink_ast_node_list *const node_list = node->seq;
     struct ink_astgen_choice *const choice_data =
         ink_malloc(node_list->count * sizeof(*choice_data));
 
@@ -1282,7 +1282,7 @@ static void ink_astgen_choice_stmt(struct ink_astgen *astgen,
                choice_node->type == INK_AST_CHOICE_PLUS_STMT);
 
         struct ink_ast_node *const hdr_node = choice_node->lhs;
-        struct ink_ast_seq *const expr_list = hdr_node->seq;
+        struct ink_ast_node_list *const expr_list = hdr_node->seq;
         struct ink_object *const number =
             ink_number_new(astgen->global->story, (double)i);
 
@@ -1424,7 +1424,7 @@ static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
                                   const struct ink_symbol *sym)
 {
     int rc = INK_E_FAIL;
-    struct ink_ast_seq *const proto_list = node->seq;
+    struct ink_ast_node_list *const proto_list = node->seq;
     const size_t str_index = sym->as.knot.str_index;
 
     ink_astgen_add_knot(parent_scope, str_index);
@@ -1432,7 +1432,7 @@ static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
     if (proto_list->count > 1) {
         struct ink_astgen_global *const global = parent_scope->global;
         struct ink_ast_node *const args_node = proto_list->nodes[1];
-        struct ink_ast_seq *const args_list = args_node->seq;
+        struct ink_ast_node_list *const args_list = args_node->seq;
 
         if (args_list) {
             for (size_t i = 0; i < args_list->count; i++) {
@@ -1457,7 +1457,7 @@ static void ink_astgen_func_decl(struct ink_astgen *parent_scope,
     struct ink_astgen scope;
     struct ink_ast_node *const proto_node = node->lhs;
     struct ink_ast_node *const body_node = node->rhs;
-    struct ink_ast_seq *const proto_list = proto_node->seq;
+    struct ink_ast_node_list *const proto_list = proto_node->seq;
     struct ink_ast_node *const name_node = proto_list->nodes[0];
 
     if (ink_astgen_lookup_name(parent_scope, name_node, &sym) < 0) {
@@ -1481,7 +1481,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     struct ink_astgen scope;
     struct ink_ast_node *const proto_node = node->lhs;
     struct ink_ast_node *const body_node = node->rhs;
-    struct ink_ast_seq *const proto_list = proto_node->seq;
+    struct ink_ast_node_list *const proto_list = proto_node->seq;
     struct ink_ast_node *const name_node = proto_list->nodes[0];
 
     if (ink_astgen_lookup_name(parent_scope, name_node, &sym) < 0) {
@@ -1505,8 +1505,8 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
     struct ink_symbol sym;
     struct ink_astgen scope;
     struct ink_ast_node *const proto_node = node->lhs;
-    struct ink_ast_seq *const child_list = node->seq;
-    struct ink_ast_seq *const proto_list = proto_node->seq;
+    struct ink_ast_node_list *const child_list = node->seq;
+    struct ink_ast_node_list *const proto_list = proto_node->seq;
     struct ink_ast_node *const name_node = proto_list->nodes[0];
 
     if (ink_astgen_lookup_name(parent_scope, name_node, &sym) < 0) {
@@ -1565,7 +1565,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
     int rc = INK_E_FAIL;
     struct ink_astgen_global *const global = parent_scope->global;
     struct ink_symtab_pool *const st_pool = &global->symtab_pool;
-    struct ink_ast_seq *const proto_list = proto_node->seq;
+    struct ink_ast_node_list *const proto_list = proto_node->seq;
     struct ink_ast_node *const name_node = proto_list->nodes[0];
     struct ink_string_ref knot_str =
         ink_string_from_node(parent_scope, name_node);
@@ -1596,7 +1596,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
     }
     if (proto_list->count > 1) {
         struct ink_ast_node *const args_node = proto_list->nodes[1];
-        struct ink_ast_seq *const args_list = args_node->seq;
+        struct ink_ast_node_list *const args_list = args_node->seq;
 
         if (args_list) {
             for (size_t i = 0; i < args_list->count; i++) {
@@ -1653,7 +1653,7 @@ static int ink_astgen_intern_knot(struct ink_astgen *parent_scope,
     int rc;
     struct ink_astgen knot_scope;
     struct ink_ast_node *const proto_node = root_node->lhs;
-    struct ink_ast_seq *const body_list = root_node->seq;
+    struct ink_ast_node_list *const body_list = root_node->seq;
 
     rc = ink_astgen_record_proto(parent_scope, proto_node, &knot_scope);
     if (rc < 0) {
@@ -1693,7 +1693,7 @@ static int ink_astgen_intern_paths(struct ink_astgen *parent_scope,
                                    const struct ink_ast_node *root_node)
 {
     int rc = 0;
-    struct ink_ast_seq *const decl_list = root_node->seq;
+    struct ink_ast_node_list *const decl_list = root_node->seq;
 
     if (!decl_list) {
         return rc;
@@ -1725,7 +1725,7 @@ static int ink_astgen_intern_paths(struct ink_astgen *parent_scope,
 static void ink_astgen_file(struct ink_astgen_global *global,
                             const struct ink_ast_node *node)
 {
-    struct ink_ast_seq *const node_list = node->seq;
+    struct ink_ast_node_list *const node_list = node->seq;
     struct ink_symtab_pool *const st_pool = &global->symtab_pool;
     struct ink_astgen file_scope = {
         .parent = NULL,

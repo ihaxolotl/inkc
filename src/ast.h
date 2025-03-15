@@ -1,5 +1,5 @@
-#ifndef __INK_TREE_H__
-#define __INK_TREE_H__
+#ifndef __INK_AST_H__
+#define __INK_AST_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,36 +13,6 @@ extern "C" {
 
 struct ink_arena;
 struct ink_ast_node;
-
-enum ink_ast_error_type {
-    INK_AST_OK = 0,
-    INK_AST_E_PANIC,
-    INK_AST_E_UNEXPECTED_TOKEN,
-    INK_AST_E_EXPECTED_NEWLINE,
-    INK_AST_E_EXPECTED_DQUOTE,
-    INK_AST_E_EXPECTED_IDENTIFIER,
-    INK_AST_E_EXPECTED_EXPR,
-    INK_AST_E_INVALID_EXPR,
-    INK_AST_E_INVALID_LVALUE,
-    INK_AST_E_UNKNOWN_IDENTIFIER,
-    INK_AST_E_REDEFINED_IDENTIFIER,
-    INK_AST_E_TOO_FEW_ARGS,
-    INK_AST_E_TOO_MANY_ARGS,
-    INK_AST_E_TOO_MANY_PARAMS,
-    INK_AST_E_SWITCH_EXPR,
-    INK_AST_E_CONDITIONAL_EMPTY,
-    INK_AST_E_ELSE_EXPECTED,
-    INK_AST_E_ELSE_MULTIPLE,
-    INK_AST_E_ELSE_FINAL,
-};
-
-struct ink_ast_error {
-    enum ink_ast_error_type type;
-    size_t source_start;
-    size_t source_end;
-};
-
-INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
 
 #define INK_MAKE_AST_NODES(T)                                                  \
     T(AST_FILE, "File")                                                        \
@@ -126,19 +96,12 @@ enum ink_ast_node_type {
 };
 #undef T
 
-enum ink_syntax_node_flags {
-    INK_AST_F_ERROR = (1 << 0),
-    INK_AST_F_FUNCTION = (1 << 1),
-    INK_AST_F_SEQ_STOPPING = (1 << 2),
-    INK_AST_F_SEQ_CYCLE = (1 << 3),
-    INK_AST_F_SEQ_SHUFFLE = (1 << 4),
-    INK_AST_F_SEQ_ONCE = (1 << 5),
-};
-
 /**
- * Sequence of syntax tree nodes.
+ * Fixed-size list of tree nodes.
+ *
+ * NOTE: For nodes with a variable number of children.
  */
-struct ink_ast_seq {
+struct ink_ast_node_list {
     size_t count;
     struct ink_ast_node *nodes[1];
 };
@@ -146,19 +109,47 @@ struct ink_ast_seq {
 /**
  * Abstract syntax tree node.
  *
- * Each node's memory is arranged for reasonably efficient storage. Nodes do
- * not directly store token information, instead opting to reference source
- * positions by index.
+ * Nodes do not directly store tokens, instead opting to reference a range of
+ * bytes within the source file.
  */
 struct ink_ast_node {
     enum ink_ast_node_type type;
-    int flags;
     size_t start_offset;
     size_t end_offset;
     struct ink_ast_node *lhs;
     struct ink_ast_node *rhs;
-    struct ink_ast_seq *seq;
+    struct ink_ast_node_list *seq;
 };
+
+enum ink_ast_error_type {
+    INK_AST_OK = 0,
+    INK_AST_E_PANIC,
+    INK_AST_E_UNEXPECTED_TOKEN,
+    INK_AST_E_EXPECTED_NEWLINE,
+    INK_AST_E_EXPECTED_DQUOTE,
+    INK_AST_E_EXPECTED_IDENTIFIER,
+    INK_AST_E_EXPECTED_EXPR,
+    INK_AST_E_INVALID_EXPR,
+    INK_AST_E_INVALID_LVALUE,
+    INK_AST_E_UNKNOWN_IDENTIFIER,
+    INK_AST_E_REDEFINED_IDENTIFIER,
+    INK_AST_E_TOO_FEW_ARGS,
+    INK_AST_E_TOO_MANY_ARGS,
+    INK_AST_E_TOO_MANY_PARAMS,
+    INK_AST_E_SWITCH_EXPR,
+    INK_AST_E_CONDITIONAL_EMPTY,
+    INK_AST_E_ELSE_EXPECTED,
+    INK_AST_E_ELSE_MULTIPLE,
+    INK_AST_E_ELSE_FINAL,
+};
+
+struct ink_ast_error {
+    enum ink_ast_error_type type;
+    size_t source_start;
+    size_t source_end;
+};
+
+INK_VEC_T(ink_ast_error_vec, struct ink_ast_error)
 
 /**
  * Abstract syntax tree.
@@ -170,18 +161,34 @@ struct ink_ast {
     struct ink_ast_error_vec errors; /* Syntax errors. */
 };
 
+/* FIXME: Make private. */
 extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
 
 extern struct ink_ast_node *
 ink_ast_node_new(enum ink_ast_node_type type, size_t start_offset,
                  size_t end_offset, struct ink_ast_node *lhs,
-                 struct ink_ast_node *rhs, struct ink_ast_seq *seq,
+                 struct ink_ast_node *rhs, struct ink_ast_node_list *seq,
                  struct ink_arena *arena);
 
+/**
+ * Initialize abstract syntax tree.
+ */
 extern void ink_ast_init(struct ink_ast *tree, const uint8_t *filename,
                          const uint8_t *source_bytes);
+
+/**
+ * Cleanup abstract syntax tree.
+ */
 extern void ink_ast_deinit(struct ink_ast *tree);
+
+/**
+ * Render the abstract syntax tree.
+ */
 extern void ink_ast_print(const struct ink_ast *tree, bool colors);
+
+/**
+ * Render the abstract syntax tree's errors.
+ */
 extern void ink_ast_render_errors(const struct ink_ast *tree);
 
 #ifdef __cplusplus

@@ -133,12 +133,12 @@ enum ink_precedence {
 /**
  * Create a syntax node sequence from a range of nodes from the scratch buffer.
  */
-static struct ink_ast_seq *
+static struct ink_ast_node_list *
 ink_ast_seq_from_scratch(struct ink_parser_scratch *scratch,
                          size_t start_offset, size_t end_offset,
                          struct ink_arena *arena)
 {
-    struct ink_ast_seq *seq = NULL;
+    struct ink_ast_node_list *seq = NULL;
     size_t seq_index = 0;
 
     if (start_offset < end_offset) {
@@ -327,7 +327,7 @@ ink_ast_node_sequence(enum ink_ast_node_type type, size_t source_start,
                       struct ink_parser_scratch *scratch,
                       struct ink_arena *arena)
 {
-    struct ink_ast_seq *seq = NULL;
+    struct ink_ast_node_list *seq = NULL;
 
     if (scratch->count != scratch_offset) {
         seq = ink_ast_seq_from_scratch(scratch, scratch_offset, scratch->count,
@@ -796,7 +796,7 @@ ink_parser_collect_knot(struct ink_parser *parser,
             const size_t source_start = proto_node->start_offset;
             const size_t source_end =
                 child_node ? child_node->end_offset : proto_node->end_offset;
-            struct ink_ast_seq *const seq =
+            struct ink_ast_node_list *const seq =
                 ink_ast_seq_from_scratch(scratch, context->knot_offset + 1,
                                          scratch->count, parser->arena);
 
