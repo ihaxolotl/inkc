@@ -921,38 +921,43 @@ static void ink_astgen_if_stmt(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_multi_if_block(struct ink_astgen *astgen,
-                                      struct ink_ast_node_list *children,
-                                      size_t node_index)
+                                      struct ink_ast_node_list *cases,
+                                      size_t index)
 {
-    if (node_index >= children->count) {
+    size_t then_br = 0;
+    size_t else_br = 0;
+    struct ink_ast_node *lhs = NULL;
+    struct ink_ast_node *rhs = NULL;
+    struct ink_ast_node *then_stmt = NULL;
+    struct ink_ast_node *else_stmt = NULL;
+
+    if (index >= cases->count) {
         return;
     }
 
-    struct ink_ast_node *const then_node = children->nodes[node_index];
+    then_stmt = cases->nodes[index];
+    else_stmt = index + 1 < cases->count ? cases->nodes[index + 1] : NULL;
+    lhs = then_stmt->data.bin.lhs;
+    rhs = then_stmt->data.bin.rhs;
 
-    ink_astgen_expr(astgen, then_node->data.bin.lhs);
-
-    const size_t then_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP_F);
-
+    ink_astgen_expr(astgen, lhs);
+    then_br = ink_astgen_emit_jump(astgen, INK_OP_JMP_F);
     ink_astgen_emit_byte(astgen, INK_OP_POP);
-    ink_astgen_block_stmt(astgen, then_node->data.bin.rhs);
-
-    const size_t else_branch = ink_astgen_emit_jump(astgen, INK_OP_JMP);
-
-    ink_astgen_patch_jump(astgen, then_branch);
+    ink_astgen_block_stmt(astgen, rhs);
+    else_br = ink_astgen_emit_jump(astgen, INK_OP_JMP);
+    ink_astgen_patch_jump(astgen, then_br);
     ink_astgen_emit_byte(astgen, INK_OP_POP);
 
-    if (node_index + 1 < children->count) {
-        struct ink_ast_node *const else_node = children->nodes[node_index + 1];
-
-        if (else_node->type == INK_AST_ELSE_BRANCH) {
-            ink_astgen_block_stmt(astgen, else_node->data.bin.rhs);
+    if (else_stmt) {
+        if (else_stmt->type == INK_AST_ELSE_BRANCH) {
+            rhs = else_stmt->data.bin.rhs;
+            ink_astgen_block_stmt(astgen, rhs);
         } else {
-            ink_astgen_multi_if_block(astgen, children, node_index + 1);
+            ink_astgen_multi_if_block(astgen, cases, index + 1);
         }
     }
 
-    ink_astgen_patch_jump(astgen, else_branch);
+    ink_astgen_patch_jump(astgen, else_br);
 }
 
 static void ink_astgen_switch_stmt(struct ink_astgen *astgen,
@@ -1057,6 +1062,10 @@ static void ink_astgen_conditional(struct ink_astgen *astgen,
     }
     switch (node->type) {
     case INK_AST_IF_STMT:
+        if (!expr) {
+            ink_astgen_error(astgen, INK_AST_E_EXPECTED_EXPR, node);
+            return;
+        }
         ink_astgen_if_stmt(astgen, expr, first, first == last ? NULL : last);
         break;
     case INK_AST_MULTI_IF_STMT:

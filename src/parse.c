@@ -1487,7 +1487,7 @@ static struct ink_ast_node *ink_parse_conditional(struct ink_parser *p,
         l = ink_ast_list_from_scratch(s, s_top, s->count, p->arena);
         if (expr && !ctx.is_block_created) {
             type = INK_AST_SWITCH_STMT;
-        } else if (!expr) {
+        } else if (!expr && !ctx.is_block_created) {
             type = INK_AST_MULTI_IF_STMT;
         } else {
             type = INK_AST_IF_STMT;
@@ -1941,6 +1941,11 @@ case INK_TT_LEFT_ARROW:
         n = ink_parse_divert_stmt(p);
         break;
     case INK_TT_EQUAL:
+    case INK_TT_EQUAL_EQUAL:
+        /**
+         * FIXME: For some reason, the EQUAL_EQUAL bug keeps coming back.
+         * This is due to the mode stack not being popped early enough.
+         */
         if (!ctx->is_conditional) {
             n = ink_parse_knot_decl(p);
         } else {
