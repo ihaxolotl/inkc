@@ -448,9 +448,14 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
     ink_node_buffer_init(&nodes);
 
     switch (node->type) {
+    case INK_AST_ARG_LIST:
     case INK_AST_BLOCK:
+    case INK_AST_CHOICE_STMT:
+    case INK_AST_CONTENT:
+    case INK_AST_EMPTY_STRING:
+    case INK_AST_FILE:
+    case INK_AST_PARAM_LIST:
         list = node->data.many.list;
-
         if (list) {
             for (size_t i = 0; i < list->count; i++) {
                 ink_node_buffer_push(&nodes, list->nodes[i]);
@@ -472,9 +477,29 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
             ink_node_buffer_push(&nodes, rhs);
         }
         break;
-    case INK_AST_CHOICE_STMT:
-        list = node->data.many.list;
+    case INK_AST_IF_STMT:
+    case INK_AST_MULTI_IF_STMT:
+    case INK_AST_SWITCH_STMT:
+        lhs = node->data.switch_stmt.cond_expr;
+        list = node->data.switch_stmt.cases;
 
+        if (lhs) {
+            ink_node_buffer_push(&nodes, lhs);
+        }
+        if (list) {
+            for (size_t i = 0; i < list->count; i++) {
+                ink_node_buffer_push(&nodes, list->nodes[i]);
+            }
+        }
+
+        break;
+    case INK_AST_KNOT_DECL:
+        lhs = node->data.knot_decl.proto;
+        list = node->data.knot_decl.children;
+
+        if (lhs) {
+            ink_node_buffer_push(&nodes, lhs);
+        }
         if (list) {
             for (size_t i = 0; i < list->count; i++) {
                 ink_node_buffer_push(&nodes, list->nodes[i]);
@@ -484,18 +509,12 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
     default:
         lhs = node->data.bin.lhs;
         rhs = node->data.bin.rhs;
-        list = node->seq;
 
         if (lhs) {
             ink_node_buffer_push(&nodes, lhs);
         }
         if (rhs) {
             ink_node_buffer_push(&nodes, rhs);
-        }
-        if (list) {
-            for (size_t i = 0; i < list->count; i++) {
-                ink_node_buffer_push(&nodes, list->nodes[i]);
-            }
         }
         break;
     }
@@ -588,16 +607,7 @@ struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
     struct ink_ast_node *const n =
         ink_ast_base_new(type, bytes_start, bytes_end, arena);
 
-    assert(n);
-    switch (type) {
-    case INK_AST_BLOCK:
-    case INK_AST_CHOICE_STMT:
-        n->data.many.list = list;
-        break;
-    default:
-        n->seq = list;
-        break;
-    }
+    n->data.many.list = list;
     return n;
 }
 
@@ -613,6 +623,37 @@ struct ink_ast_node *ink_ast_choice_expr_new(
     n->data.choice_expr.start_expr = start_expr;
     n->data.choice_expr.option_expr = option_expr;
     n->data.choice_expr.inner_expr = inner_expr;
+    return n;
+}
+
+struct ink_ast_node *ink_ast_switch_stmt_new(enum ink_ast_node_type type,
+                                             size_t bytes_start,
+                                             size_t bytes_end,
+                                             struct ink_ast_node *cond_expr,
+                                             struct ink_ast_node_list *cases,
+                                             struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
+
+    assert(n);
+    n->data.switch_stmt.cond_expr = cond_expr;
+    n->data.switch_stmt.cases = cases;
+    return n;
+}
+
+struct ink_ast_node *ink_ast_knot_decl_new(enum ink_ast_node_type type,
+                                           size_t bytes_start, size_t bytes_end,
+                                           struct ink_ast_node *proto,
+                                           struct ink_ast_node_list *children,
+                                           struct ink_arena *arena)
+{
+    struct ink_ast_node *const n =
+        ink_ast_base_new(type, bytes_start, bytes_end, arena);
+
+    assert(n);
+    n->data.knot_decl.proto = proto;
+    n->data.knot_decl.children = children;
     return n;
 }
 

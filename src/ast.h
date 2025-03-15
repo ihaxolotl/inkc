@@ -134,8 +134,17 @@ struct ink_ast_node {
             struct ink_ast_node *option_expr;
             struct ink_ast_node *inner_expr;
         } choice_expr;
+
+        struct {
+            struct ink_ast_node *cond_expr;
+            struct ink_ast_node_list *cases;
+        } switch_stmt;
+
+        struct {
+            struct ink_ast_node *proto;
+            struct ink_ast_node_list *children;
+        } knot_decl;
     } data;
-    struct ink_ast_node_list *seq;
 };
 
 enum ink_ast_error_type {
@@ -181,13 +190,6 @@ struct ink_ast {
 /* FIXME: Make private. */
 extern const char *ink_ast_node_type_strz(enum ink_ast_node_type type);
 
-/* FIXME: Deprecated. */
-extern struct ink_ast_node *
-ink_ast_node_new(enum ink_ast_node_type type, size_t bytes_start,
-                 size_t bytes_end, struct ink_ast_node *lhs,
-                 struct ink_ast_node *rhs, struct ink_ast_node_list *seq,
-                 struct ink_arena *arena);
-
 /**
  * Create an AST node with no children.
  */
@@ -220,6 +222,24 @@ extern struct ink_ast_node *ink_ast_choice_expr_new(
     enum ink_ast_node_type type, size_t bytes_start, size_t bytes_end,
     struct ink_ast_node *start_expr, struct ink_ast_node *option_expr,
     struct ink_ast_node *inner_expr, struct ink_arena *arena);
+
+/**
+ * Create an AST node for switch statement.
+ */
+extern struct ink_ast_node *
+ink_ast_switch_stmt_new(enum ink_ast_node_type type, size_t bytes_start,
+                        size_t bytes_end, struct ink_ast_node *cond_expr,
+                        struct ink_ast_node_list *cases,
+                        struct ink_arena *arena);
+
+/**
+ * Create an AST node for a knot declaration.
+ */
+extern struct ink_ast_node *
+ink_ast_knot_decl_new(enum ink_ast_node_type type, size_t bytes_start,
+                      size_t bytes_end, struct ink_ast_node *proto,
+                      struct ink_ast_node_list *children,
+                      struct ink_arena *arena);
 
 /**
  * Initialize abstract syntax tree.
