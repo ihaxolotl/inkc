@@ -14,6 +14,9 @@ extern "C" {
 struct ink_arena;
 struct ink_ast_node;
 
+/**
+ * TODO: Rename `AST_BLOCK` to `AST_BLOCK_STMT`.
+ */
 #define INK_MAKE_AST_NODES(T)                                                  \
     T(AST_FILE, "File")                                                        \
     T(AST_ADD_EXPR, "AddExpr")                                                 \

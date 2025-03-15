@@ -45,6 +45,7 @@ struct ink_error_info {
     char *message;
 };
 
+/* TODO: Rename `ink_node_buffer` to `ink_node_vec`. */
 INK_VEC_T(ink_node_buffer, struct ink_ast_node *)
 INK_VEC_T(ink_line_buffer, struct ink_source_range)
 
@@ -433,21 +434,46 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
                                const char *prefix, const char **pointers,
                                bool colors)
 {
+    /**
+     * TODO: Have this entire procedure write characters to a stream instead of
+     * directly to STDOUT.
+     *
+     * TODO: `new_prefix` needs bounds checking.
+     */
     char new_prefix[1024];
+    struct ink_ast_node *lhs, *rhs;
+    struct ink_ast_node_list *list;
     struct ink_node_buffer nodes;
 
     ink_node_buffer_init(&nodes);
 
-    if (node->data.bin.lhs) {
-        ink_node_buffer_push(&nodes, node->data.bin.lhs);
-    }
-    if (node->data.bin.rhs) {
-        ink_node_buffer_push(&nodes, node->data.bin.rhs);
-    }
-    if (node->seq) {
-        for (size_t i = 0; i < node->seq->count; i++) {
-            ink_node_buffer_push(&nodes, node->seq->nodes[i]);
+    switch (node->type) {
+    case INK_AST_BLOCK:
+        list = node->data.many.list;
+
+        if (list) {
+            for (size_t i = 0; i < list->count; i++) {
+                ink_node_buffer_push(&nodes, list->nodes[i]);
+            }
         }
+        break;
+    default:
+        lhs = node->data.bin.lhs;
+        rhs = node->data.bin.rhs;
+        list = node->seq;
+
+        if (lhs) {
+            ink_node_buffer_push(&nodes, lhs);
+        }
+        if (rhs) {
+            ink_node_buffer_push(&nodes, rhs);
+        }
+        if (list) {
+            for (size_t i = 0; i < list->count; i++) {
+                ink_node_buffer_push(&nodes, list->nodes[i]);
+            }
+        }
+        break;
     }
     for (size_t i = 0; i < nodes.count; i++) {
         const char **pointers =
@@ -539,8 +565,14 @@ struct ink_ast_node *ink_ast_many_new(enum ink_ast_node_type type,
         ink_ast_base_new(type, source_start, source_end, arena);
 
     assert(n);
-    /* n->data.many.list = list; */
-    n->seq = list;
+    switch (type) {
+    case INK_AST_BLOCK:
+        n->data.many.list = list;
+        break;
+    default:
+        n->seq = list;
+        break;
+    }
     return n;
 }
 

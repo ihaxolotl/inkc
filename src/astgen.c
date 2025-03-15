@@ -876,18 +876,19 @@ static void ink_astgen_if_expr(struct ink_astgen *astgen,
 }
 
 static void ink_astgen_block_stmt(struct ink_astgen *parent_scope,
-                                  const struct ink_ast_node *node)
+                                  const struct ink_ast_node *stmt)
 {
     struct ink_astgen block_scope;
 
+    assert(!stmt || stmt->type == INK_AST_BLOCK);
+
     ink_astgen_make(&block_scope, parent_scope, NULL);
 
-    if (node) {
-        struct ink_ast_node_list *const node_list = node->seq;
-        assert(node->type == INK_AST_BLOCK);
+    if (stmt) {
+        struct ink_ast_node_list *const stmt_list = stmt->data.many.list;
 
-        for (size_t i = 0; i < node_list->count; i++) {
-            ink_astgen_stmt(&block_scope, node_list->nodes[i]);
+        for (size_t i = 0; i < stmt_list->count; i++) {
+            ink_astgen_stmt(&block_scope, stmt_list->nodes[i]);
         }
     }
 
