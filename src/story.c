@@ -10,6 +10,7 @@
 #include "logging.h"
 #include "object.h"
 #include "opcode.h"
+#include "source.h"
 #include "story.h"
 
 #define INK_STORY_STACK_MAX (128ul)
@@ -503,7 +504,7 @@ static struct ink_number *ink_object_to_number(struct ink_story *story,
 static void ink_object_print(const struct ink_object *obj)
 {
     if (!obj) {
-        printf("<NULL>");
+        fprintf(stderr, "<NULL>");
         return;
     }
 
@@ -513,50 +514,50 @@ static void ink_object_print(const struct ink_object *obj)
     case INK_OBJ_BOOL: {
         struct ink_bool *const typed_obj = INK_OBJ_AS_BOOL(obj);
 
-        printf("<%s value=%s, addr=%p>", type_str,
-               typed_obj->value ? "true" : "false", (void *)obj);
+        fprintf(stderr, "<%s value=%s, addr=%p>", type_str,
+                typed_obj->value ? "true" : "false", (void *)obj);
         break;
     }
     case INK_OBJ_NUMBER: {
         struct ink_number *const typed_obj = INK_OBJ_AS_NUMBER(obj);
 
-        printf("<%s value=%lf, addr=%p>", type_str, typed_obj->value,
-               (void *)obj);
+        fprintf(stderr, "<%s value=%lf, addr=%p>", type_str, typed_obj->value,
+                (void *)obj);
         break;
     }
     case INK_OBJ_STRING: {
         struct ink_string *const typed_obj = INK_OBJ_AS_STRING(obj);
 
-        printf("<%s value=\"%s\", addr=%p>", type_str, typed_obj->bytes,
-               (void *)obj);
+        fprintf(stderr, "<%s value=\"%s\", addr=%p>", type_str,
+                typed_obj->bytes, (void *)obj);
         break;
     }
     case INK_OBJ_TABLE: {
         struct ink_table *const typed_obj = INK_OBJ_AS_TABLE(obj);
 
-        printf("{");
+        fprintf(stderr, "{");
 
         for (size_t i = 0; i < typed_obj->capacity; i++) {
             struct ink_table_kv entry = typed_obj->entries[i];
 
             if (entry.key) {
-                printf("[\"%s\"] => ", entry.key->bytes);
+                fprintf(stderr, "[\"%s\"] => ", entry.key->bytes);
 
                 if (entry.value) {
                     ink_object_print(entry.value);
                 } else {
-                    printf("NULL");
+                    fprintf(stderr, "NULL");
                 }
 
-                printf(", ");
+                fprintf(stderr, ", ");
             }
         }
 
-        printf("}");
+        fprintf(stderr, "}");
         break;
     }
     case INK_OBJ_CONTENT_PATH:
-        printf("<%s addr=%p>", type_str, (void *)obj);
+        fprintf(stderr, "<%s addr=%p>", type_str, (void *)obj);
         break;
     }
 }
@@ -937,7 +938,7 @@ static size_t ink_disassemble_simple_inst(const struct ink_story *story,
                                           const uint8_t *bytes, size_t offset,
                                           enum ink_vm_opcode opcode)
 {
-    printf("%s\n", ink_opcode_strz(opcode));
+    fprintf(stderr, "%s\n", ink_opcode_strz(opcode));
     return offset + 1;
 }
 
@@ -954,11 +955,11 @@ static size_t ink_disassemble_byte_inst(const struct ink_story *story,
     const uint8_t arg = bytes[offset + 1];
 
     if (opcode == INK_OP_CONST) {
-        printf("%-16s 0x%x {", ink_opcode_strz(opcode), arg);
+        fprintf(stderr, "%-16s 0x%x {", ink_opcode_strz(opcode), arg);
         ink_object_print(const_pool->entries[arg]);
-        printf("}\n");
+        fprintf(stderr, "}\n");
     } else {
-        printf("%-16s 0x%x\n", ink_opcode_strz(opcode), arg);
+        fprintf(stderr, "%-16s 0x%x\n", ink_opcode_strz(opcode), arg);
     }
     return offset + 2;
 }
@@ -976,8 +977,8 @@ static size_t ink_disassemble_global_inst(
     const struct ink_string *global_name =
         INK_OBJ_AS_STRING(const_pool->entries[arg]);
 
-    printf("%-16s 0x%x '%s'\n", ink_opcode_strz(opcode), arg,
-           global_name->bytes);
+    fprintf(stderr, "%-16s 0x%x '%s'\n", ink_opcode_strz(opcode), arg,
+            global_name->bytes);
     return offset + 2;
 }
 
@@ -994,8 +995,8 @@ static size_t ink_disassemble_jump_inst(const struct ink_story *story,
 
     jump |= bytes[offset + 2];
 
-    printf("%-16s 0x%04x (0x%04lx -> 0x%04lx)\n", ink_opcode_strz(opcode), jump,
-           offset, offset + 3 + jump);
+    fprintf(stderr, "%-16s 0x%04x (0x%04lx -> 0x%04lx)\n",
+            ink_opcode_strz(opcode), jump, offset, offset + 3 + jump);
     return offset + 3;
 }
 
@@ -1014,9 +1015,9 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     const uint8_t op = bytes[offset];
 
     if (should_prefix) {
-        printf("<%s>:0x%04lx  | ", path_name->bytes, offset);
+        fprintf(stderr, "<%s>:0x%04lx  | ", path_name->bytes, offset);
     } else {
-        printf("0x%04lx  | ", offset);
+        fprintf(stderr, "0x%04lx  | ", offset);
     }
 
     switch (op) {
@@ -1057,7 +1058,7 @@ static size_t ink_story_disassemble(const struct ink_story *story,
     case INK_OP_JMP_F:
         return ink_disassemble_jump_inst(story, bytes, offset, op);
     default:
-        printf("Unknown opcode 0x%x\n", op);
+        fprintf(stderr, "Unknown opcode 0x%x\n", op);
         return offset + 1;
     }
 }
@@ -1135,19 +1136,19 @@ static void ink_trace_exec(struct ink_story *story,
     const uint8_t *const ip = frame->ip;
     struct ink_object **const sp = frame->sp;
 
-    printf("\tStack(%p): [ ", (void *)sp);
+    fprintf(stderr, "\tStack(%p): [ ", (void *)sp);
 
     if (story->stack_top > 0) {
         const size_t frame_offset = (size_t)(frame->sp - story->stack);
 
         for (size_t slot = frame_offset; slot < story->stack_top - 1; slot++) {
             ink_object_print(story->stack[slot]);
-            printf(", ");
+            fprintf(stderr, ", ");
         }
 
         ink_object_print(story->stack[story->stack_top - 1]);
     }
-    printf(" ]\n");
+    fprintf(stderr, " ]\n");
     ink_story_disassemble(story, path, code, (size_t)(ip - code), true);
 }
 
@@ -1640,8 +1641,8 @@ void ink_story_dump(struct ink_story *story)
                 INK_OBJ_AS_STRING(path->name);
 
             assert(path->code.count > 0);
-            printf("=== %s(args: %u, locals: %u) ===\n", path_name->bytes,
-                   path->arity, path->locals_count);
+            fprintf(stderr, "=== %s(args: %u, locals: %u) ===\n",
+                    path_name->bytes, path->arity, path->locals_count);
 
             for (size_t offset = 0; offset < path->code.count;) {
                 offset = ink_story_disassemble(story, path, path->code.entries,
@@ -1702,11 +1703,12 @@ err:
 }
 
 /**
- * Compile an Ink story from a NULL-teriminated string.
+ * Load an Ink story from a NULL-terminated string of source bytes.
  *
  * Returns a non-zero value on error.
  */
-int ink_story_load(struct ink_story *story, const char *source, int flags)
+int ink_story_load_string(struct ink_story *story, const char *source,
+                          int flags)
 {
     const struct ink_load_opts opts = {
         .flags = flags,
@@ -1716,6 +1718,34 @@ int ink_story_load(struct ink_story *story, const char *source, int flags)
     };
 
     return ink_story_load_opts(story, &opts);
+}
+
+/**
+ * Load an Ink story from the filesystem.
+ *
+ * Returns a non-zero value on error.
+ */
+int ink_story_load_file(struct ink_story *story, const char *file_path,
+                        int flags)
+{
+    int rc = -1;
+    struct ink_source s;
+
+    rc = ink_source_load(file_path, &s);
+    if (rc < 0) {
+        return rc;
+    }
+
+    const struct ink_load_opts opts = {
+        .flags = flags,
+        .source_bytes = (uint8_t *)s.bytes,
+        .source_length = s.length,
+        .filename = (uint8_t *)file_path,
+    };
+
+    rc = ink_story_load_opts(story, &opts);
+    ink_source_free(&s);
+    return rc;
 }
 
 /**

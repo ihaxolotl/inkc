@@ -7,7 +7,7 @@ DIST_ROOT         := build
 DIST              := $(DIST_ROOT)/$(PROFILE)
 BIN               := $(DIST)/inkc
 LIB               := $(DIST)/libink.a
-TEST_BIN          := $(DIST_ROOT)/libink-tests
+TEST_BIN          := $(DIST_ROOT)/libink-testing
 FUZZ_BIN          := $(DIST_ROOT)/libink-fuzzer
 FUZZ_COVERAGE_BIN := $(DIST_ROOT)/libink-coverage
 
@@ -57,6 +57,8 @@ LDFLAGS := -lm -L/usr/local/lib \
 		   ${LDFLAGS.${PROFILE}}
 
 ARFLAGS  := -crs
+
+MAKEFLAGS := --no-print-directory
 
 lib_srcs := src/logging.c                  \
             src/common.c                   \
@@ -126,15 +128,14 @@ driver: $(BIN)
 
 library: $(LIB)
 
-test: $(TEST_BIN)
-
 fuzzer:
-	$(Q)$(MAKE) --no-print-directory $(FUZZ_BIN) PROFILE=coverage
+	$(Q)$(MAKE) $(MAKEFLAGS) $(FUZZ_BIN) PROFILE=coverage
 
 coverage:
-	$(Q)$(MAKE) --no-print-directory library PROFILE=coverage
-	$(Q)$(MAKE) --no-print-directory driver PROFILE=coverage
-	$(Q)$(MAKE) --no-print-directory $(FUZZ_COVERAGE_BIN) PROFILE=coverage
+	$(Q)$(MAKE) $(MAKEFLAGS) library PROFILE=coverage
+	$(Q)$(MAKE) $(MAKEFLAGS) driver PROFILE=coverage
+	$(Q)$(MAKE) $(MAKEFLAGS) $(TEST_BIN) PROFILE=coverage
+	$(Q)$(MAKE) $(MAKEFLAGS) $(FUZZ_COVERAGE_BIN) PROFILE=coverage
 
 clean:
 	$(Q)$(RM) $(DIST_ROOT)

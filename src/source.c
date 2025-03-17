@@ -1,9 +1,8 @@
-#include <fcntl.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "common.h"
 #include "memory.h"
@@ -14,76 +13,70 @@
 static const char *INK_FILE_EXT = ".ink";
 static const size_t INK_FILE_EXT_LENGTH = 4;
 
-int unix_load_file(const char *filename, uint8_t **bytes, size_t *length)
+static int ink_read_file(const char *file_path, uint8_t **bytes, size_t *length)
 {
-    int fd;
-    ssize_t nread;
-    off_t bufsz;
-    uint8_t *buf;
+    size_t sz = 0, nr = 0;
+    uint8_t *b = NULL;
+    FILE *const fp = fopen(file_path, "rb");
 
-    fd = open(filename, O_RDONLY);
-    if (fd == -1) {
+    if (!fp) {
+        fprintf(stderr, "Could not read file '%s'\n", file_path);
         return -1;
     }
 
-    bufsz = lseek(fd, 0, SEEK_END);
-    if (bufsz == -1) {
-        goto err_file;
-    }
-    if (lseek(fd, 0, SEEK_SET) == -1) {
-        goto err_file;
+    fseek(fp, 0u, SEEK_END);
+    sz = (size_t)ftell(fp);
+    fseek(fp, 0u, SEEK_SET);
+
+    b = ink_malloc(sz + 1);
+    if (!b) {
+        fclose(fp);
+        return -1;
     }
 
-    buf = ink_malloc((size_t)bufsz + 1);
-    if (buf == NULL) {
-        goto err_file;
+    nr = fread(b, 1u, sz, fp);
+    if (nr < sz) {
+        fprintf(stderr, "Could not read file '%s'.\n", file_path);
+        fclose(fp);
+        ink_free(b);
+        return -1;
     }
 
-    nread = read(fd, buf, (size_t)bufsz);
-    if (nread != bufsz) {
-        goto err_memory;
-    }
-
-    buf[bufsz] = '\0';
-    *bytes = buf;
-    *length = (size_t)bufsz;
-    close(fd);
+    b[nr] = '\0';
+    *bytes = b;
+    *length = sz;
+    fclose(fp);
     return 0;
-err_memory:
-    ink_free(buf);
-err_file:
-    close(fd);
-    return -1;
 }
 
 /**
  * Load an Ink source file from STDIN.
  */
-int ink_source_load_stdin(struct ink_source *source)
+int ink_source_load_stdin(struct ink_source *s)
 {
-    char buf[INK_SOURCE_BUF_MAX];
+    uint8_t *tmp;
+    char b[INK_SOURCE_BUF_MAX];
 
-    source->bytes = NULL;
-    source->length = 0;
+    s->bytes = NULL;
+    s->length = 0;
 
-    while (fgets(buf, INK_SOURCE_BUF_MAX, stdin)) {
-        uint8_t *tmp;
-        const size_t len = source->length;
-        const size_t buflen = strlen(buf);
+    while (fgets(b, INK_SOURCE_BUF_MAX, stdin)) {
+        const size_t len = s->length;
+        const size_t buflen = strlen(b);
 
-        tmp = realloc(source->bytes, len + buflen + 1);
+        tmp = realloc(s->bytes, len + buflen + 1);
         if (!tmp) {
-            ink_source_free(source);
+            ink_source_free(s);
             return -INK_E_OOM;
         }
 
-        source->bytes = tmp;
-        memcpy(source->bytes + len, buf, buflen);
-        source->length += buflen;
-        source->bytes[source->length] = '\0';
+        s->bytes = tmp;
+        memcpy(s->bytes + len, b, buflen);
+        s->length += buflen;
+        s->bytes[s->length] = '\0';
     }
     if (ferror(stdin)) {
-        ink_source_free(source);
+        ink_source_free(s);
         return -INK_E_OOM;
     }
     return INK_E_OK;
@@ -92,28 +85,28 @@ int ink_source_load_stdin(struct ink_source *source)
 /**
  * Load an Ink source file from the file system.
  */
-int ink_source_load(const char *filename, struct ink_source *source)
+int ink_source_load(const char *file_path, struct ink_source *s)
 {
     const char *ext;
-    const size_t namelen = strlen(filename);
+    const size_t namelen = strlen(file_path);
 
-    source->bytes = NULL;
-    source->length = 0;
+    s->bytes = NULL;
+    s->length = 0;
 
     if (namelen < INK_FILE_EXT_LENGTH) {
         return -INK_E_FILE;
     }
 
-    ext = filename + namelen - INK_FILE_EXT_LENGTH;
+    ext = file_path + namelen - INK_FILE_EXT_LENGTH;
     if (!(strncmp(ext, INK_FILE_EXT, INK_FILE_EXT_LENGTH) == 0)) {
         return -INK_E_FILE;
     }
-    return unix_load_file(filename, &source->bytes, &source->length);
+    return ink_read_file(file_path, &s->bytes, &s->length);
 }
 
-void ink_source_free(struct ink_source *source)
+void ink_source_free(struct ink_source *s)
 {
-    ink_free(source->bytes);
-    source->bytes = NULL;
-    source->length = 0;
+    ink_free(s->bytes);
+    s->bytes = NULL;
+    s->length = 0;
 }

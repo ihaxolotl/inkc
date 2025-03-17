@@ -6,14 +6,20 @@
 //
 //===----------------------------------------------------------------------===*/
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int LLVMFuzzerTestOneInput(const unsigned char *data, size_t size);
+extern int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 __attribute__((weak)) extern int LLVMFuzzerInitialize(int *argc, char ***argv);
 
 int main(int argc, char **argv)
 {
+    size_t len = 0;
+    size_t nr = 0;
+    uint8_t *b = NULL;
+    FILE *fp = NULL;
+
     fprintf(stderr, "StandaloneFuzzTargetMain: running %d inputs\n", argc - 1);
 
     if (LLVMFuzzerInitialize) {
@@ -21,24 +27,22 @@ int main(int argc, char **argv)
     }
     for (int i = 1; i < argc; i++) {
         fprintf(stderr, "Running: %s\n", argv[i]);
-        FILE *f = fopen(argv[i], "r");
+        fp = fopen(argv[i], "r");
+        assert(fp);
 
-        assert(f);
+        fseek(fp, 0, SEEK_END);
+        len = (size_t)ftell(fp);
+        fseek(fp, 0, SEEK_SET);
 
-        fseek(f, 0, SEEK_END);
+        b = (uint8_t *)malloc(len + 1);
+        nr = (size_t)fread(b, 1, len, fp);
+        fclose(fp);
 
-        size_t len = (size_t)ftell(f);
+        assert(nr == len);
+        b[nr] = '\0';
 
-        fseek(f, 0, SEEK_SET);
-
-        unsigned char *buf = (unsigned char *)malloc(len);
-        size_t n_read = (size_t)fread(buf, 1, len, f);
-        fclose(f);
-
-        assert(n_read == len);
-        LLVMFuzzerTestOneInput(buf, len);
-
-        free(buf);
-        fprintf(stderr, "Done:    %s: (%zd bytes)\n", argv[i], n_read);
+        LLVMFuzzerTestOneInput(b, len);
+        free(b);
+        fprintf(stderr, "Done:    %s: (%zd bytes)\n", argv[i], nr);
     }
 }

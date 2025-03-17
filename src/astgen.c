@@ -134,7 +134,7 @@ static int ink_astgen_make(struct ink_astgen *scope,
     if (!symbol_table) {
         symbol_table = ink_symtab_make(st_pool);
         if (!symbol_table) {
-            return INK_E_FAIL;
+            return -INK_E_FAIL;
         }
     }
 
@@ -1309,6 +1309,7 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
 
     assert(l != NULL);
 
+    /* FIXME: This leaks on panic. */
     data = ink_malloc(l->count * sizeof(*data));
     if (!data) {
         return;
@@ -1804,23 +1805,29 @@ static void ink_astgen_file(struct ink_astgen_global *g,
  */
 int ink_astgen(struct ink_ast *tree, struct ink_story *story, int flags)
 {
+    int rc = -INK_E_FAIL;
     struct ink_astgen_global g;
+
+    ink_astgen_global_init(&g, tree, story);
 
     if (!ink_ast_error_vec_is_empty(&tree->errors)) {
         ink_ast_render_errors(tree);
-        return -INK_E_FAIL;
+        goto out;
     }
     if (setjmp(g.jmpbuf) == 0) {
-        ink_astgen_global_init(&g, tree, story);
         ink_byte_vec_push(&g.string_bytes, '\0');
         ink_astgen_file(&g, tree->root);
-        ink_astgen_global_deinit(&g);
     } else {
-        return -INK_E_PANIC;
+        rc = -INK_E_PANIC;
+        goto out;
     }
     if (!ink_ast_error_vec_is_empty(&tree->errors)) {
         ink_ast_render_errors(tree);
-        return -INK_E_FAIL;
+        rc = -INK_E_FAIL;
+    } else {
+        rc = INK_E_OK;
     }
-    return INK_E_OK;
+out:
+    ink_astgen_global_deinit(&g);
+    return rc;
 }
