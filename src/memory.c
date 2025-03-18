@@ -24,36 +24,41 @@ static void ink_default_dealloc(struct ink_allocator *gpa, void *pointer)
     free(pointer);
 }
 
-static struct ink_allocator INK_DEFAULT_ALLOCATOR = {
+static struct ink_allocator INK_DEFAULT_GPA = {
     .allocate = ink_default_alloc,
     .resize = ink_default_realloc,
     .free = ink_default_dealloc,
 };
 
-static struct ink_allocator *INK_ALLOCATOR = &INK_DEFAULT_ALLOCATOR;
+static struct ink_allocator *INK_GPA = &INK_DEFAULT_GPA;
 
 void ink_set_global_allocator(struct ink_allocator *gpa)
 {
-    INK_ALLOCATOR = gpa;
+    INK_GPA = gpa;
+}
+
+void ink_get_global_allocator(struct ink_allocator **gpa)
+{
+    *gpa = INK_GPA;
 }
 
 void *ink_malloc(size_t size)
 {
-    struct ink_allocator *const gpa = INK_ALLOCATOR;
+    struct ink_allocator *const gpa = INK_GPA;
 
     return gpa->allocate(gpa, size);
 }
 
 void *ink_realloc(void *memory, size_t size)
 {
-    struct ink_allocator *const gpa = INK_ALLOCATOR;
+    struct ink_allocator *const gpa = INK_GPA;
 
     return gpa->resize(gpa, memory, size);
 }
 
 void ink_free(void *memory)
 {
-    struct ink_allocator *const gpa = INK_ALLOCATOR;
+    struct ink_allocator *const gpa = INK_GPA;
 
     gpa->free(gpa, memory);
 }

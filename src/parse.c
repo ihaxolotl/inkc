@@ -8,7 +8,6 @@
 #include "arena.h"
 #include "ast.h"
 #include "common.h"
-#include "hashmap.h"
 #include "parse.h"
 #include "scanner.h"
 #include "token.h"
@@ -16,7 +15,6 @@
 
 #define INK_PARSER_ARGS_MAX (255)
 #define INK_PARSE_DEPTH (128)
-#define INK_PARSER_CACHE_LOAD_MAX (80ul)
 
 struct ink_parser_state {
     size_t level;
@@ -24,29 +22,8 @@ struct ink_parser_state {
     size_t source_offset;
 };
 
-struct ink_parser_cache_key {
-    size_t source_offset;
-    void *rule_address;
-};
-
-INK_HASHMAP_T(ink_parser_cache, struct ink_parser_cache_key,
-              struct ink_ast_node *)
 INK_VEC_T(ink_parser_scratch, struct ink_ast_node *)
 INK_VEC_T(ink_parser_stack, struct ink_parser_state)
-
-static uint32_t ink_parser_cache_key_hash(const void *key, size_t length)
-{
-    return ink_fnv32a((uint8_t *)key, length);
-}
-
-static bool ink_parser_cache_key_cmp(const void *lhs, const void *rhs)
-{
-    const struct ink_parser_cache_key *const key_lhs = lhs;
-    const struct ink_parser_cache_key *const key_rhs = rhs;
-
-    return (key_lhs->source_offset == key_rhs->source_offset) &&
-           (key_lhs->rule_address == key_rhs->rule_address);
-}
 
 static int ink_parser_stack_emplace(struct ink_parser_stack *stack,
                                     size_t level, size_t scratch_offset,
@@ -109,7 +86,6 @@ struct ink_parser {
     struct ink_arena *arena;
     struct ink_scanner scanner;
     struct ink_parser_scratch scratch;
-    struct ink_parser_cache cache;
     struct ink_token token;
     struct ink_ast *tree;
     bool panic_mode;
@@ -350,8 +326,6 @@ static void ink_parser_init(struct ink_parser *p, struct ink_ast *tree,
     p->tree = tree;
 
     ink_parser_scratch_init(&p->scratch);
-    ink_parser_cache_init(&p->cache, INK_PARSER_CACHE_LOAD_MAX,
-                          ink_parser_cache_key_hash, ink_parser_cache_key_cmp);
 }
 
 /**
@@ -359,7 +333,6 @@ static void ink_parser_init(struct ink_parser *p, struct ink_ast *tree,
  */
 static void ink_parser_deinit(struct ink_parser *p)
 {
-    ink_parser_cache_deinit(&p->cache);
     ink_parser_scratch_deinit(&p->scratch);
 }
 

@@ -145,7 +145,7 @@ enum ink_hashmap_entry_state {
         struct __T##_kv *entries, *src, *dst;                                  \
         size_t count = 0;                                                      \
         const size_t capacity = __T##_next_size(self);                         \
-        const size_t size = sizeof(*self->entries) * capacity;                 \
+        const size_t size = sizeof(*entries) * capacity;                       \
                                                                                \
         entries = (struct __T##_kv *)ink_malloc(size);                         \
         if (!entries) {                                                        \
@@ -159,6 +159,7 @@ enum ink_hashmap_entry_state {
             if (src->state == INK_HASHMAP_IS_OCCUPIED) {                       \
                 dst = __T##_find_slot(entries, capacity, &src->key,            \
                                       self->hasher, self->compare);            \
+                dst->state = src->state;                                       \
                 dst->key = src->key;                                           \
                 dst->value = src->value;                                       \
                 count++;                                                       \
@@ -214,15 +215,15 @@ enum ink_hashmap_entry_state {
                                 self->hasher, self->compare);                  \
         if (entry->state != INK_HASHMAP_IS_OCCUPIED) {                         \
             entry->state = INK_HASHMAP_IS_OCCUPIED;                            \
-            entry->key = key;                                                  \
-            entry->value = value;                                              \
             self->count++;                                                     \
-            return INK_E_OK;                                                   \
+            rc = INK_E_OK;                                                     \
+        } else {                                                               \
+            rc = -INK_E_OVERWRITE;                                             \
         }                                                                      \
                                                                                \
         entry->key = key;                                                      \
         entry->value = value;                                                  \
-        return -INK_E_OVERWRITE;                                               \
+        return rc;                                                             \
     }                                                                          \
                                                                                \
     /**                                                                        \

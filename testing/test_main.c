@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -7,8 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <cmocka.h>
+
+#include "hashmap.h"
+#include "memory.h"
 #include "object.h"
 #include "story.h"
+#include "vec.h"
 
 #define PATH_MAX 1024
 
@@ -28,6 +34,33 @@ static const char *TEST_FILES[] = {
 
 static const size_t TEST_FILES_COUNT =
     sizeof(TEST_FILES) / sizeof(TEST_FILES[0]);
+
+static void *nullgpa_alloc(struct ink_allocator *self, size_t size)
+{
+    (void)self;
+    (void)size;
+    return NULL;
+}
+
+static void *nullgpa_realloc(struct ink_allocator *self, void *ptr, size_t size)
+{
+    (void)self;
+    (void)ptr;
+    (void)size;
+    return NULL;
+}
+
+static void nullgpa_dealloc(struct ink_allocator *self, void *ptr)
+{
+    (void)self;
+    (void)ptr;
+}
+
+static struct ink_allocator NULL_GPA = {
+    .allocate = nullgpa_alloc,
+    .resize = nullgpa_realloc,
+    .free = nullgpa_dealloc,
+};
 
 static int parse_int(const char *chars, size_t length)
 {
@@ -207,7 +240,7 @@ static int process_story(struct ink_story *story, struct test_stream *input,
     return rc;
 }
 
-int main(void)
+static void test_exec(void)
 {
     int rc = -1;
     int story_flags = INK_F_DUMP_AST | INK_F_DUMP_CODE | INK_F_GC_ENABLE |
@@ -245,4 +278,169 @@ int main(void)
         free_stream(&output);
         free_stream(&expected);
     }
+}
+
+struct test_state {
+    struct ink_allocator *gpa;
+};
+
+static int t_group_setup(void **state)
+{
+    struct test_state *t = calloc(1, sizeof(*t));
+
+    assert(t);
+
+    ink_get_global_allocator(&t->gpa);
+    *state = t;
+    return 0;
+}
+
+static int t_group_teardown(void **state)
+{
+    struct test_state *t = *state;
+
+    free(t);
+    return 0;
+}
+
+static int t_setup(void **state)
+{
+    struct test_state *t = *state;
+    ink_set_global_allocator(t->gpa);
+    return 0;
+}
+
+static int t_teardown(void **state)
+{
+    struct test_state *t = *state;
+    ink_set_global_allocator(t->gpa);
+    return 0;
+}
+
+INK_VEC_T(tvec, int)
+INK_HASHMAP_T(tht, int, int)
+
+static void test_vec_oom(void **state)
+{
+    struct tvec v;
+
+    tvec_init(&v);
+    ink_set_global_allocator(&NULL_GPA);
+    assert_int_equal(tvec_reserve(&v, 100), -INK_E_OOM);
+    assert_int_equal(tvec_push(&v, 100), -INK_E_OOM);
+    tvec_deinit(&v);
+}
+
+static void test_vec_push(void **state)
+{
+    struct tvec v;
+
+    tvec_init(&v);
+
+    for (int i = 0; i < 100000; i++) {
+        assert_int_equal(tvec_push(&v, i), INK_E_OK);
+    }
+
+    assert_int_equal(v.entries[123], 123);
+    assert_int_equal(v.entries[456], 456);
+    assert_int_equal(v.entries[789], 789);
+    tvec_deinit(&v);
+}
+
+static void test_vec_pop(void **state)
+{
+    struct tvec v;
+
+    tvec_init(&v);
+    assert_int_equal(tvec_push(&v, 100), INK_E_OK);
+    assert_int_equal(tvec_pop(&v), 100);
+    assert_int_equal(v.count, 0);
+    tvec_deinit(&v);
+}
+
+static void test_vec_reserve(void **state)
+{
+    struct tvec v;
+
+    tvec_init(&v);
+    tvec_reserve(&v, 10000);
+    assert_int_equal(v.capacity, 10000);
+    assert_int_equal(v.count, 0);
+    assert_non_null(v.entries);
+    tvec_deinit(&v);
+}
+
+static uint32_t tht_hash(const void *key, size_t length)
+{
+    return ink_fnv32a((uint8_t *)key, length);
+}
+
+static bool tht_cmp(const void *lhs, const void *rhs)
+{
+    const int key_lhs = *(int *)lhs;
+    const int key_rhs = *(int *)rhs;
+
+    return (key_lhs == key_rhs);
+}
+
+static void test_hashmap_oom(void **state)
+{
+    struct tht ht;
+
+    tht_init(&ht, 80u, tht_hash, tht_cmp);
+    ink_set_global_allocator(&NULL_GPA);
+    assert_int_equal(tht_insert(&ht, 100, 100), -INK_E_OOM);
+    tht_deinit(&ht);
+}
+
+static void test_hashmap_insert(void **state)
+{
+    struct tht ht;
+    int entry = 0;
+
+    tht_init(&ht, 80u, tht_hash, tht_cmp);
+
+    for (int i = 0; i < 0x1000; i++) {
+        assert_int_equal(tht_insert(&ht, i, i), INK_E_OK);
+    }
+    assert_int_equal(ht.count, 0x1000);
+    assert_int_equal(tht_lookup(&ht, 123, &entry), INK_E_OK);
+    assert_int_equal(entry, 123);
+    tht_deinit(&ht);
+}
+
+static void test_hashmap_remove(void **state)
+{
+    struct tht ht;
+
+    tht_init(&ht, 80u, tht_hash, tht_cmp);
+
+    for (int i = 0; i < 100000; i++) {
+        assert_int_equal(tht_insert(&ht, 100 + i, i + 1), INK_E_OK);
+    }
+
+    assert_int_equal(tht_remove(&ht, 150), INK_E_OK);
+    assert_int_equal(tht_remove(&ht, 199), INK_E_OK);
+    assert_int_equal(tht_remove(&ht, 101), INK_E_OK);
+
+    tht_deinit(&ht);
+}
+
+int main(void)
+{
+    test_exec();
+
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test_setup_teardown(test_vec_oom, t_setup, t_teardown),
+        cmocka_unit_test_setup_teardown(test_vec_push, t_setup, t_teardown),
+        cmocka_unit_test_setup_teardown(test_vec_pop, t_setup, t_teardown),
+        cmocka_unit_test_setup_teardown(test_vec_reserve, t_setup, t_teardown),
+        cmocka_unit_test_setup_teardown(test_hashmap_oom, t_setup, t_teardown),
+        cmocka_unit_test_setup_teardown(test_hashmap_insert, t_setup,
+                                        t_teardown),
+        cmocka_unit_test_setup_teardown(test_hashmap_remove, t_setup,
+                                        t_teardown),
+    };
+
+    return cmocka_run_group_tests(tests, t_group_setup, t_group_teardown);
 }

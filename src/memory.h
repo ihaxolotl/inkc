@@ -14,6 +14,7 @@ struct ink_allocator {
 };
 
 extern void ink_set_global_allocator(struct ink_allocator *gpa);
+extern void ink_get_global_allocator(struct ink_allocator **gpa);
 extern void *ink_malloc(size_t size);
 extern void *ink_realloc(void *memory, size_t size);
 extern void ink_free(void *memory);

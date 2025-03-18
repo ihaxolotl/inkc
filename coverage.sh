@@ -22,12 +22,20 @@ LLVM_PROFILE_FILE="$PROFILE_ROOT/testing-coverage.profraw" \
 
 find $PROFILE_ROOT -name "*.profraw" > $PROFILE_ROOT/profraw-files.txt
 
-llvm-profdata merge -sparse \
-    --input-files=$PROFILE_ROOT/profraw-files.txt \
+llvm-profdata merge -sparse                            \
+    --input-files=$PROFILE_ROOT/profraw-files.txt      \
     -o $PROFILE_ROOT/coverage.profdata
 
-llvm-cov show $BUILD_ROOT/libink-coverage \
-    -instr-profile=$PROFILE_ROOT/coverage.profdata \
+llvm-cov show \
+    -object $BUILD_ROOT/libink-coverage                \
+    -object $BUILD_ROOT/libink-testing                 \
+    -instr-profile=$PROFILE_ROOT/coverage.profdata     \
     --ignore-filename-regex='(fuzzing|testing)[/\\].*' \
-    --format=html \
+    --format=html                                      \
     --output-dir=$PROFILE_ROOT/html
+
+llvm-cov report \
+    -object $BUILD_ROOT/libink-coverage                \
+    -object $BUILD_ROOT/libink-testing                 \
+    -instr-profile=$PROFILE_ROOT/coverage.profdata     \
+    --ignore-filename-regex='(fuzzing|testing)[/\\].*'

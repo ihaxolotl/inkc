@@ -17,14 +17,14 @@ RM    := rm -rf
 MKDIR := mkdir -p
 MAKE  := make
 
-CFLAGS.release := -O2 -DNDEBUG
+CFLAGS.release := -O2 -DNDEBUG -march=native
 
 CFLAGS.debug   := -O0 -g3                 \
                   -fsanitize=address      \
                   -fsanitize=undefined    \
                   -fno-omit-frame-pointer
 
-CFLAGS.coverage := -O2 -g                    \
+CFLAGS.coverage := -O2 -g -march=native      \
                    -fprofile-instr-generate  \
                    -fcoverage-mapping        \
                    -fsanitize=address        \
@@ -45,7 +45,7 @@ LDFLAGS.debug := -fsanitize=address      \
                  -fsanitize=undefined    \
 	             -fno-omit-frame-pointer
 
-LDFLAGS.release :=
+LDFLAGS.release := -flto
 
 LDFLAGS.coverage := -fprofile-instr-generate  \
                     -fcoverage-mapping        \
