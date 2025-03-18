@@ -10,11 +10,12 @@ TEST_ROOT=${TEST_ROOT:-"testing"}
 
 make coverage 2>/dev/null
 mkdir -p $CRASH_ROOT $CORPUS_ROOT
-python3 ./lit.site.py --per-test-coverage $TEST_ROOT
 
 # Test against the fuzzing corpus
 LLVM_PROFILE_FILE="$PROFILE_ROOT/fuzzing-coverage.profraw" \
     $BUILD_ROOT/libink-coverage $CORPUS_ROOT/*
+
+python3 ./lit.site.py --per-test-coverage $TEST_ROOT
 
 # Test against the runtime tests
 LLVM_PROFILE_FILE="$PROFILE_ROOT/testing-coverage.profraw" \
