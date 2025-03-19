@@ -14,6 +14,7 @@
 #include "memory.h"
 #include "object.h"
 #include "story.h"
+#include "stream.h"
 #include "vec.h"
 
 #define PATH_MAX 1024
@@ -28,6 +29,7 @@ static const char *TEST_ROOT = "testing";
 
 static const char *TEST_FILES[] = {
     "exec/content/hello-world",
+    "exec/content/glue",
     "exec/choices/monsieur-fogg",
     "exec/gathers/monsieur-fogg",
 };
@@ -85,7 +87,7 @@ static int parse_int(const char *chars, size_t length)
     return sign * res;
 }
 
-static int read_file_to_stream(struct test_stream *s, const char *filename)
+static int read_file_to_stream(struct ink_stream *s, const char *filename)
 {
     size_t sz = 0, nr = 0;
     FILE *const fp = fopen(filename, "rb");
@@ -120,76 +122,13 @@ static int read_file_to_stream(struct test_stream *s, const char *filename)
     return 0;
 }
 
-static int read_from_stream(struct test_stream *s, uint8_t **data,
-                            size_t *length)
-{
-    uint8_t *p_start = s->bytes + s->read_position;
-    uint8_t *p_end = p_start;
-
-    while (*p_end != '\0' && *p_end != '\n') {
-        p_end++;
-    }
-
-    *data = p_start;
-    *length = (size_t)(p_end - p_start);
-    s->read_position += *length;
-    return 0;
-}
-
-static int write_to_stream(struct test_stream *s, const char *fmt, ...)
-{
-    int n = 0;
-    size_t bsz = 0;
-    va_list ap;
-
-    va_start(ap, fmt);
-    n = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
-
-    if (n < 0) {
-        return -1;
-    }
-
-    bsz = s->length + (size_t)n + 1;
-    s->bytes = realloc(s->bytes, bsz);
-    if (!s->bytes) {
-        return -1;
-    }
-
-    va_start(ap, fmt);
-    n = vsnprintf((char *)s->bytes + s->length, bsz - s->length, fmt, ap);
-    va_end(ap);
-
-    if (n < 0) {
-        return -1;
-    }
-
-    s->length = bsz - 1;
-    return 0;
-}
-
-static bool cmp_stream(struct test_stream *a, struct test_stream *b)
+static bool cmp_stream(struct ink_stream *a, struct ink_stream *b)
 {
     return a->length == b->length && memcmp(a->bytes, b->bytes, a->length) == 0;
 }
 
-static void init_stream(struct test_stream *s)
-{
-    s->bytes = NULL;
-    s->length = 0;
-    s->read_position = 0;
-}
-
-static void free_stream(struct test_stream *s)
-{
-    free(s->bytes);
-    s->bytes = NULL;
-    s->length = 0;
-    s->read_position = 0;
-}
-
-static int process_story(struct ink_story *s, struct test_stream *input,
-                         struct test_stream *output)
+static int process_story(struct ink_story *s, struct ink_stream *input,
+                         struct ink_stream *output)
 {
     int rc = -1;
     uint8_t *line = NULL;
@@ -205,7 +144,7 @@ static int process_story(struct ink_story *s, struct test_stream *input,
         assert(!rc);
 
         if (line) {
-            rc = write_to_stream(output, "%.*s\n", (int)linelen, line);
+            rc = ink_stream_writef(output, "%.*s", (int)linelen, line);
             assert(!rc);
         }
 
@@ -214,12 +153,12 @@ static int process_story(struct ink_story *s, struct test_stream *input,
         if (cvec.count > 0) {
             for (size_t i = 0; i < cvec.count; i++) {
                 c = &cvec.entries[i];
-                rc = write_to_stream(output, "%zu: %.*s\n", i + 1,
-                                     (int)c->length, c->bytes);
+                rc = ink_stream_writef(output, "%zu: %.*s\n", i + 1,
+                                       (int)c->length, c->bytes);
                 assert(!rc);
             }
 
-            rc = read_from_stream(input, &line, &linelen);
+            rc = ink_stream_read_line(input, &line, &linelen);
             assert(!rc);
 
             cidx = parse_int((char *)line, linelen);
@@ -228,7 +167,7 @@ static int process_story(struct ink_story *s, struct test_stream *input,
             rc = ink_story_choose(s, (size_t)cidx);
             assert(!rc);
 
-            rc = write_to_stream(output, "?> ");
+            rc = ink_stream_writef(output, "?> ");
             assert(!rc);
         }
     }
@@ -244,12 +183,12 @@ static void test_exec(void)
                       INK_F_GC_STRESS | INK_F_GC_TRACING | INK_F_VM_TRACING;
     char path[PATH_MAX];
     struct ink_story *story = NULL;
-    struct test_stream input, output, expected;
+    struct ink_stream input, output, expected;
 
     for (size_t i = 0; i < TEST_FILES_COUNT; i++) {
-        init_stream(&input);
-        init_stream(&expected);
-        init_stream(&output);
+        ink_stream_init(&input);
+        ink_stream_init(&expected);
+        ink_stream_init(&output);
 
         snprintf(path, PATH_MAX, "%s/%s/transcript.txt", TEST_ROOT,
                  TEST_FILES[i]);
@@ -268,12 +207,13 @@ static void test_exec(void)
         assert(!rc);
 
         process_story(story, &input, &output);
+        printf("%s\n", output.bytes);
         printf("'%s', result=%d\n", path, cmp_stream(&expected, &output));
         ink_close(story);
 
-        free_stream(&input);
-        free_stream(&output);
-        free_stream(&expected);
+        ink_stream_deinit(&input);
+        ink_stream_deinit(&output);
+        ink_stream_deinit(&expected);
     }
 }
 
