@@ -36,7 +36,8 @@ enum ink_flags {
 
 struct ink_choice {
     struct ink_object *id;
-    struct ink_string *text;
+    uint8_t *bytes;
+    size_t length;
 };
 
 INK_VEC_T(ink_choice_vec, struct ink_choice)
@@ -63,8 +64,8 @@ extern struct ink_object *ink_story_stack_pop(struct ink_story *story);
 extern struct ink_object *ink_story_stack_peek(struct ink_story *story,
                                                size_t offset);
 extern bool ink_story_can_continue(struct ink_story *story);
-extern int ink_story_continue(struct ink_story *story,
-                              struct ink_string **content);
+extern int ink_story_continue(struct ink_story *story, uint8_t **line,
+                              size_t *linelen);
 extern void ink_story_get_choices(struct ink_story *story,
                                   struct ink_choice_vec *choices);
 extern int ink_story_choose(struct ink_story *story, size_t index);

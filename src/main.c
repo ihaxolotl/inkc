@@ -169,42 +169,42 @@ int main(int argc, char *argv[])
         goto out;
     }
     if (!compile_only) {
-        struct ink_string *content = NULL;
-        struct ink_choice_vec choices;
+        uint8_t *line = NULL;
+        size_t linelen = 0;
+        size_t cidx = 0;
+        struct ink_choice *c = NULL;
+        struct ink_choice_vec cvec;
 
-        ink_choice_vec_init(&choices);
+        ink_choice_vec_init(&cvec);
 
         while (ink_story_can_continue(story)) {
-            rc = ink_story_continue(story, &content);
+            rc = ink_story_continue(story, &line, &linelen);
             if (rc < 0) {
                 break;
             }
-            if (content) {
-                printf("%s\n", content->bytes);
+            if (line) {
+                printf("%.*s\n", (int)linelen, line);
             }
 
-            ink_story_get_choices(story, &choices);
+            ink_story_get_choices(story, &cvec);
 
-            if (choices.count > 0) {
-                size_t choice_index = 0;
-
-                for (size_t i = 0; i < choices.count; i++) {
-                    struct ink_choice *const choice = &choices.entries[i];
-
-                    printf("[%zu] %s\n", i + 1, choice->text->bytes);
+            if (cvec.count > 0) {
+                for (size_t i = 0; i < cvec.count; i++) {
+                    c = &cvec.entries[i];
+                    printf("%zu: %.*s\n", i + 1, (int)c->length, c->bytes);
                 }
 
                 printf("> ");
-                scanf("%zu", &choice_index);
+                scanf("%zu", &cidx);
 
-                rc = ink_story_choose(story, choice_index);
+                rc = ink_story_choose(story, cidx);
                 if (rc < 0) {
                     break;
                 }
             }
         }
 
-        ink_choice_vec_deinit(&choices);
+        ink_choice_vec_deinit(&cvec);
     }
     if (rc < 0) {
         inkc_render_error(filename, rc);

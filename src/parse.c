@@ -1211,17 +1211,13 @@ static struct ink_ast_node *ink_parse_divert_stmt(struct ink_parser *p)
                               ink_parse_expect_stmt_end(p), n, NULL, p->arena);
 }
 
-/**
- * FIXME: Add back once fully supported.
-static struct ink_ast_node *ink_parse_glue(struct ink_parser *parser)
+static struct ink_ast_node *ink_parse_glue(struct ink_parser *p)
 {
-    const size_t source_start = parser->token.bytes_start;
+    const struct ink_token t = p->token;
 
-    ink_parser_advance(parser);
-    return ink_ast_leaf_new(INK_AST_GLUE, source_start,
-                             parser->token.bytes_start, parser->arena);
+    ink_parser_advance(p);
+    return ink_ast_leaf_new(INK_AST_GLUE, t.bytes_start, t.bytes_end, p->arena);
 }
-*/
 
 static struct ink_ast_node *ink_parse_temp_decl(struct ink_parser *p)
 {
@@ -1335,10 +1331,10 @@ ink_parse_content(struct ink_parser *p, const enum ink_token_type *token_set)
         case INK_TT_LEFT_ARROW:
             node = ink_parse_thread_expr(parser);
             break;
-        case INK_TT_GLUE:
-            node = ink_parse_glue(parser);
-            break;
 */
+            case INK_TT_GLUE:
+                n = ink_parse_glue(p);
+                break;
             default:
                 goto exit_loop;
             }
@@ -1476,17 +1472,9 @@ static struct ink_ast_node *ink_parse_conditional(struct ink_parser *p,
 
 static struct ink_ast_node *ink_parse_lbrace_expr(struct ink_parser *p)
 {
-    /**
- * FIXME: Add back once fully supported.
-    static const enum ink_token_type token_set[] = {
-        INK_TT_LEFT_BRACE,  INK_TT_LEFT_ARROW, INK_TT_RIGHT_BRACE,
-        INK_TT_RIGHT_ARROW, INK_TT_GLUE,       INK_TT_NL,
-        INK_TT_EOF,
-    };
-*/
     static const enum ink_token_type token_set[] = {
         INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE, INK_TT_RIGHT_ARROW,
-        INK_TT_NL,         INK_TT_EOF,
+        INK_TT_GLUE,       INK_TT_NL,          INK_TT_EOF,
     };
 
     struct ink_ast_node *lhs = NULL;
@@ -1541,17 +1529,9 @@ static struct ink_ast_node *ink_parse_lbrace_expr(struct ink_parser *p)
 
 static struct ink_ast_node *ink_parse_content_stmt(struct ink_parser *p)
 {
-    /**
- * FIXME: Add back once fully supported.
-    static const enum ink_token_type token_set[] = {
-        INK_TT_LEFT_BRACE,  INK_TT_LEFT_ARROW, INK_TT_RIGHT_BRACE,
-        INK_TT_RIGHT_ARROW, INK_TT_GLUE,       INK_TT_NL,
-        INK_TT_EOF,
-    };
-*/
     static const enum ink_token_type token_set[] = {
         INK_TT_LEFT_BRACE, INK_TT_RIGHT_BRACE, INK_TT_RIGHT_ARROW,
-        INK_TT_NL,         INK_TT_EOF,
+        INK_TT_GLUE,       INK_TT_NL,          INK_TT_EOF,
     };
     const size_t b_start = p->token.bytes_start;
     struct ink_ast_node *const n = ink_parse_content(p, token_set);

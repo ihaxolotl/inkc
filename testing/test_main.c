@@ -188,47 +188,44 @@ static void free_stream(struct test_stream *s)
     s->read_position = 0;
 }
 
-static int process_story(struct ink_story *story, struct test_stream *input,
+static int process_story(struct ink_story *s, struct test_stream *input,
                          struct test_stream *output)
 {
     int rc = -1;
-    int ch_index = 0;
-    size_t line_len = 0;
     uint8_t *line = NULL;
-    struct ink_string *content = NULL;
-    struct ink_choice *choice = NULL;
-    struct ink_choice_vec choices;
+    size_t linelen = 0;
+    int cidx = 0;
+    struct ink_choice *c = NULL;
+    struct ink_choice_vec cvec;
 
-    ink_choice_vec_init(&choices);
+    ink_choice_vec_init(&cvec);
 
-    while (ink_story_can_continue(story)) {
-        rc = ink_story_continue(story, &content);
+    while (ink_story_can_continue(s)) {
+        rc = ink_story_continue(s, &line, &linelen);
         assert(!rc);
 
-        if (content) {
-            rc = write_to_stream(output, "%s\n", content->bytes);
+        if (line) {
+            rc = write_to_stream(output, "%.*s\n", (int)linelen, line);
             assert(!rc);
         }
 
-        ink_story_get_choices(story, &choices);
+        ink_story_get_choices(s, &cvec);
 
-        if (choices.count > 0) {
-            ch_index = 0;
-
-            for (size_t i = 0; i < choices.count; i++) {
-                choice = &choices.entries[i];
-                rc = write_to_stream(output, "%zu: %s\n", i + 1,
-                                     choice->text->bytes);
+        if (cvec.count > 0) {
+            for (size_t i = 0; i < cvec.count; i++) {
+                c = &cvec.entries[i];
+                rc = write_to_stream(output, "%zu: %.*s\n", i + 1,
+                                     (int)c->length, c->bytes);
                 assert(!rc);
             }
 
-            rc = read_from_stream(input, &line, &line_len);
+            rc = read_from_stream(input, &line, &linelen);
             assert(!rc);
 
-            ch_index = parse_int((char *)line, line_len);
-            assert(ch_index >= 0);
+            cidx = parse_int((char *)line, linelen);
+            assert(cidx >= 0);
 
-            rc = ink_story_choose(story, (size_t)ch_index);
+            rc = ink_story_choose(s, (size_t)cidx);
             assert(!rc);
 
             rc = write_to_stream(output, "?> ");
@@ -236,7 +233,7 @@ static int process_story(struct ink_story *story, struct test_stream *input,
         }
     }
 
-    ink_choice_vec_deinit(&choices);
+    ink_choice_vec_deinit(&cvec);
     return rc;
 }
 

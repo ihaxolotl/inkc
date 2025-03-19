@@ -1084,39 +1084,43 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
                                     const struct ink_ast_node *node)
 {
     struct ink_ast_node_list *const l = node->data.many.list;
+    struct ink_ast_node *expr = NULL;
 
     if (!l) {
         return;
     }
     for (size_t i = 0; i < l->count; i++) {
-        struct ink_ast_node *const expr = l->nodes[i];
+        expr = l->nodes[i];
 
         switch (expr->type) {
         case INK_AST_STRING:
             ink_astgen_string(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
             break;
         case INK_AST_INLINE_LOGIC:
             ink_astgen_inline_logic(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
             break;
         case INK_AST_IF_STMT:
         case INK_AST_MULTI_IF_STMT:
         case INK_AST_SWITCH_STMT:
             ink_astgen_conditional(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
             break;
         case INK_AST_IF_EXPR:
             ink_astgen_if_expr(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
             break;
         case INK_AST_GLUE:
-            INK_ASTGEN_TODO("GlueExpr");
+            ink_astgen_emit_byte(astgen, INK_OP_GLUE);
             break;
         default:
             INK_ASTGEN_BUG(expr);
             break;
         }
+    }
+    if (!expr || expr->type != INK_AST_GLUE) {
+        ink_astgen_emit_byte(astgen, INK_OP_LINE);
     }
 }
 
@@ -1232,7 +1236,6 @@ static void ink_astgen_content_stmt(struct ink_astgen *scope,
     struct ink_ast_node *const lhs = stmt->data.bin.lhs;
 
     ink_astgen_content_expr(scope, lhs);
-    ink_astgen_emit_byte(scope, INK_OP_FLUSH);
 }
 
 static void ink_astgen_divert_stmt(struct ink_astgen *scope,
@@ -1314,6 +1317,9 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
     if (!data) {
         return;
     }
+
+    ink_astgen_emit_byte(scope, INK_OP_FLUSH);
+
     for (size_t i = 0; i < l->count; i++) {
         struct ink_astgen_choice *choice = &data[i];
         struct ink_ast_node *br_stmt = l->nodes[i];
@@ -1333,16 +1339,16 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
 
         if (lhs) {
             ink_astgen_string(scope, lhs);
-            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
         }
         if (rhs) {
             ink_astgen_string(scope, rhs);
-            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
         }
 
         choice->constant = (uint16_t)ink_astgen_add_const(scope, choice->id);
         ink_astgen_emit_const(scope, INK_OP_CONST, choice->constant);
-        ink_astgen_emit_byte(scope, INK_OP_CHOICE_PUSH);
+        ink_astgen_emit_byte(scope, INK_OP_CHOICE);
     }
 
     ink_astgen_emit_byte(scope, INK_OP_FLUSH);
@@ -1373,11 +1379,11 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
 
         if (lhs) {
             ink_astgen_string(scope, lhs);
-            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
         }
         if (rhs) {
             ink_astgen_string(scope, rhs);
-            ink_astgen_emit_byte(scope, INK_OP_CONTENT_PUSH);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
         }
 
         ink_astgen_emit_byte(scope, INK_OP_FLUSH);

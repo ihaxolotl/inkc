@@ -34,8 +34,10 @@ extern "C" {
     T(OP_LOAD_GLOBAL, "load_global")                                           \
     T(OP_STORE_GLOBAL, "store_global")                                         \
     T(OP_LOAD_CHOICE_ID, "load_choice_id")                                     \
-    T(OP_CONTENT_PUSH, "content_push")                                         \
-    T(OP_CHOICE_PUSH, "choice_push")                                           \
+    T(OP_CONTENT, "content")                                                   \
+    T(OP_LINE, "line")                                                         \
+    T(OP_GLUE, "glue")                                                         \
+    T(OP_CHOICE, "choice")                                                     \
     T(OP_FLUSH, "flush")
 
 #define T(name, description) INK_##name,
