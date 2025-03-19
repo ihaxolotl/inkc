@@ -1,15 +1,15 @@
 #include <assert.h>
-#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <ink/ink.h>
+
+#include "cli/option.h"
 #include "common.h"
 #include "logging.h"
 #include "object.h"
-#include "option.h"
 #include "source.h"
-#include "story.h"
 
 enum {
     OPT_COLORS = 1000,

@@ -39,6 +39,7 @@ CFLAGS  := -Wall                            \
            -Wconversion                     \
            -std=c99                         \
            -Isrc                            \
+           -Iinclude                        \
            ${CFLAGS.${PROFILE}}
 
 LDFLAGS.debug := -fsanitize=address      \
@@ -60,23 +61,23 @@ ARFLAGS  := -crs
 
 MAKEFLAGS := --no-print-directory
 
-lib_srcs := src/logging.c                  \
-            src/common.c                   \
-            src/memory.c                   \
-            src/arena.c                    \
-            src/symtab.c                   \
-            src/stream.c                  \
-            src/story.c                    \
-            src/source.c                   \
-            src/token.c                    \
-            src/ast.c                      \
-            src/scanner.c                  \
-            src/parse.c                    \
-            src/astgen.c                   \
+lib_srcs := src/logging.c \
+            src/common.c  \
+            src/memory.c  \
+            src/arena.c   \
+            src/symtab.c  \
+            src/stream.c  \
+            src/story.c   \
+            src/source.c  \
+            src/token.c   \
+            src/ast.c     \
+            src/scanner.c \
+            src/parse.c   \
+            src/astgen.c  \
             src/compile.c
 
-bin_srcs := src/option.c                   \
-            src/main.c
+bin_srcs := src/cli/option.c \
+            src/cli/main.c
 
 test_bin_srcs := testing/test_main.c
 

@@ -1,5 +1,5 @@
-#ifndef __INK_COMPILE_H__
-#define __INK_COMPILE_H__
+#ifndef INK_COMPILE_H
+#define INK_COMPILE_H
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,5 +1,5 @@
-#ifndef __INK_VEC_H__
-#define __INK_VEC_H__
+#ifndef INK_VEC_H
+#define INK_VEC_H
 
 #include <assert.h>
 #include <stdbool.h>

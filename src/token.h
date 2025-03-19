@@ -1,5 +1,5 @@
-#ifndef __INK_TOKEN_H__
-#define __INK_TOKEN_H__
+#ifndef INK_TOKEN_H
+#define INK_TOKEN_H
 
 #ifdef __cplusplus
 extern "C" {

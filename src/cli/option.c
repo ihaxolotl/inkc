@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "option.h"
+#include "cli/option.h"
 
 static const struct option *_g_option_opts;
 static char *_g_arg_ptr;

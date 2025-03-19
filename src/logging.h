@@ -1,5 +1,5 @@
-#ifndef __INK_LOGGING_H__
-#define __INK_LOGGING_H__
+#ifndef INK_LOGGING_H
+#define INK_LOGGING_H
 
 #ifdef __cplusplus
 extern "C" {

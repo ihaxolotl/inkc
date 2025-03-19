@@ -1,5 +1,5 @@
-#ifndef __INK_STREAM_H__
-#define __INK_STREAM_H__
+#ifndef INK_STREAM_H
+#define INK_STREAM_H
 
 #ifdef __cplusplus
 extern "C" {

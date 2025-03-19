@@ -5,13 +5,14 @@
 #include <string.h>
 #include <time.h>
 
+#include <ink/ink.h>
+
 #include "compile.h"
 #include "hashmap.h"
 #include "logging.h"
 #include "object.h"
 #include "opcode.h"
 #include "source.h"
-#include "story.h"
 #include "stream.h"
 
 #define INK_STORY_STACK_MAX (128ul)
@@ -1157,6 +1158,44 @@ static void ink_trace_exec(struct ink_story *story,
 }
 
 /**
+ * Push an object onto the evaluation stack.
+ */
+static int ink_story_stack_push(struct ink_story *story, struct ink_object *obj)
+{
+    assert(obj != NULL);
+
+    if (story->stack_top >= INK_STORY_STACK_MAX) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+
+    story->stack[story->stack_top++] = obj;
+    return INK_E_OK;
+}
+
+/**
+ * Pop an object from the evaluation stack.
+ */
+static struct ink_object *ink_story_stack_pop(struct ink_story *story)
+{
+    if (story->stack_top == 0) {
+        return NULL;
+    }
+    return story->stack[--story->stack_top];
+}
+
+/**
+ * Retrieve an object from the evaluation stack without removing it.
+ */
+static struct ink_object *ink_story_stack_peek(struct ink_story *story,
+                                               size_t offset)
+{
+    if (story->stack_top == 0) {
+        return NULL;
+    }
+    return story->stack[story->stack_top - offset - 1];
+}
+
+/**
  * Main interpreter loop.
  *
  * Returns a non-zero value upon error.
@@ -1515,53 +1554,11 @@ exit_loop:
 #undef INK_READ_ADDR
 }
 
-/**
- * Push an object onto the evaluation stack.
- */
-int ink_story_stack_push(struct ink_story *story, struct ink_object *obj)
-{
-    assert(obj != NULL);
-
-    if (story->stack_top >= INK_STORY_STACK_MAX) {
-        return -INK_E_STACK_OVERFLOW;
-    }
-
-    story->stack[story->stack_top++] = obj;
-    return INK_E_OK;
-}
-
-/**
- * Pop an object from the evaluation stack.
- */
-struct ink_object *ink_story_stack_pop(struct ink_story *story)
-{
-    if (story->stack_top == 0) {
-        return NULL;
-    }
-    return story->stack[--story->stack_top];
-}
-
-/**
- * Retrieve an object from the evaluation stack without removing it.
- */
-struct ink_object *ink_story_stack_peek(struct ink_story *story, size_t offset)
-{
-    if (story->stack_top == 0) {
-        return NULL;
-    }
-    return story->stack[story->stack_top - offset - 1];
-}
-
 bool ink_story_can_continue(struct ink_story *s)
 {
     return s->can_continue;
 }
 
-/**
- * Advance the story and output content, if available.
- *
- * Returns a non-zero value on error.
- */
 int ink_story_continue(struct ink_story *s, uint8_t **line, size_t *linelen)
 {
     int rc = -1;
@@ -1595,11 +1592,6 @@ int ink_story_continue(struct ink_story *s, uint8_t **line, size_t *linelen)
     }
 }
 
-/**
- * Select a choice by its index.
- *
- * Returns a non-zero value on error.
- */
 int ink_story_choose(struct ink_story *s, size_t index)
 {
     struct ink_choice *ch;
@@ -1634,11 +1626,6 @@ struct ink_object *ink_story_get_paths(struct ink_story *story)
     return story->paths;
 }
 
-/**
- * Dump a compiled Ink story.
- *
- * Disassemble bytecode instructions and print values, where available.
- */
 void ink_story_dump(struct ink_story *story)
 {
     const struct ink_table *const paths_table = INK_OBJ_AS_TABLE(story->paths);
@@ -1664,11 +1651,6 @@ void ink_story_dump(struct ink_story *story)
     }
 }
 
-/**
- * Load an Ink story with extended options.
- *
- * Returns a non-zero value on error.
- */
 int ink_story_load_opts(struct ink_story *story,
                         const struct ink_load_opts *opts)
 {
@@ -1714,11 +1696,6 @@ err:
     return rc;
 }
 
-/**
- * Load an Ink story from a NULL-terminated string of source bytes.
- *
- * Returns a non-zero value on error.
- */
 int ink_story_load_string(struct ink_story *story, const char *source,
                           int flags)
 {
@@ -1732,11 +1709,6 @@ int ink_story_load_string(struct ink_story *story, const char *source,
     return ink_story_load_opts(story, &opts);
 }
 
-/**
- * Load an Ink story from the filesystem.
- *
- * Returns a non-zero value on error.
- */
 int ink_story_load_file(struct ink_story *story, const char *file_path,
                         int flags)
 {
@@ -1760,9 +1732,6 @@ int ink_story_load_file(struct ink_story *story, const char *file_path,
     return rc;
 }
 
-/**
- * Open a new Ink story context.
- */
 struct ink_story *ink_open(void)
 {
     struct ink_story *const story = ink_malloc(sizeof(*story));
@@ -1795,9 +1764,6 @@ struct ink_story *ink_open(void)
     return story;
 }
 
-/**
- * Free and deinitialize an Ink story context.
- */
 void ink_close(struct ink_story *story)
 {
     ink_choice_vec_deinit(&story->current_choices);

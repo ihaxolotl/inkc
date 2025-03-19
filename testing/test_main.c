@@ -10,10 +10,11 @@
 
 #include <cmocka.h>
 
+#include <ink/ink.h>
+
 #include "hashmap.h"
 #include "memory.h"
 #include "object.h"
-#include "story.h"
 #include "stream.h"
 #include "vec.h"
 

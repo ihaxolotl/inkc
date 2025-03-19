@@ -1,5 +1,5 @@
-#ifndef __OPTION_H__
-#define __OPTION_H__
+#ifndef INKC_OPTION_H
+#define INKC_OPTION_H
 
 #include <stdbool.h>
 

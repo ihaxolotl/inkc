@@ -1,5 +1,5 @@
-#ifndef __INK_AST_H__
-#define __INK_AST_H__
+#ifndef INK_AST_H
+#define INK_AST_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -8,7 +8,6 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "source.h"
 #include "vec.h"
 
 struct ink_arena;

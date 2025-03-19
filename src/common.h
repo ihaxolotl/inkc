@@ -1,5 +1,5 @@
-#ifndef __INK_COMMON_H__
-#define __INK_COMMON_H__
+#ifndef INK_COMMON_H
+#define INK_COMMON_H
 
 #include <stddef.h>
 #include <stdint.h>

@@ -1,5 +1,5 @@
-#ifndef __INK_PARSER_H__
-#define __INK_PARSER_H__
+#ifndef INK_PARSER_H
+#define INK_PARSER_H
 
 #ifdef __cplusplus
 extern "C" {

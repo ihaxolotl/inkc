@@ -1,5 +1,5 @@
-#ifndef __INK_ASTGEN_H__
-#define __INK_ASTGEN_H__
+#ifndef INK_ASTGEN_H
+#define INK_ASTGEN_H
 
 #ifdef __cplusplus
 extern "C" {

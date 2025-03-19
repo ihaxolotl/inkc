@@ -1,5 +1,5 @@
-#ifndef __INK_MEMORY_H__
-#define __INK_MEMORY_H__
+#ifndef INK_MEMORY_H
+#define INK_MEMORY_H
 
 #include <stddef.h>
 

@@ -6,12 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <ink/ink.h>
+
 #include "ast.h"
 #include "astgen.h"
 #include "common.h"
 #include "object.h"
 #include "opcode.h"
-#include "story.h"
 #include "symtab.h"
 #include "vec.h"
 

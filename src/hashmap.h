@@ -1,5 +1,5 @@
-#ifndef __INK_HASHMAP_H__
-#define __INK_HASHMAP_H__
+#ifndef INK_HASHMAP_H
+#define INK_HASHMAP_H
 
 #include <assert.h>
 #include <stdbool.h>

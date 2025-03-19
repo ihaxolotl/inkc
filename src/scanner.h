@@ -1,5 +1,5 @@
-#ifndef __INK_SCANNER_H__
-#define __INK_SCANNER_H__
+#ifndef INK_SCANNER_H
+#define INK_SCANNER_H
 
 #ifdef __cplusplus
 extern "C" {

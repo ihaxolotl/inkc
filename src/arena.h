@@ -1,5 +1,5 @@
-#ifndef __INK_ARENA_H__
-#define __INK_ARENA_H__
+#ifndef INK_ARENA_H
+#define INK_ARENA_H
 
 #ifdef __cplusplus
 extern "C" {

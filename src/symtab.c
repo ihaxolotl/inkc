@@ -1,5 +1,8 @@
-#include "symtab.h"
+#include <stddef.h>
+#include <stdint.h>
+
 #include "common.h"
+#include "symtab.h"
 
 #define INK_SYMTAB_LOAD_MAX 80u
 

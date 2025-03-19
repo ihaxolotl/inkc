@@ -1,5 +1,5 @@
-#ifndef __INK_SYMTAB_H__
-#define __INK_SYMTAB_H__
+#ifndef INK_SYMTAB_H
+#define INK_SYMTAB_H
 
 #ifdef __cplusplus
 extern "C" {
