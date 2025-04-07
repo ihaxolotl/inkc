@@ -166,6 +166,7 @@ enum ink_ast_error_type {
     INK_AST_E_ELSE_EXPECTED,
     INK_AST_E_ELSE_MULTIPLE,
     INK_AST_E_ELSE_FINAL,
+    INK_AST_E_CONST_ASSIGN,
 };
 
 struct ink_ast_error {

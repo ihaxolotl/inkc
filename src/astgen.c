@@ -1269,6 +1269,10 @@ static void ink_astgen_assign_stmt(struct ink_astgen *scope,
         ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
         return;
     }
+    if (sym.as.var.is_const) {
+        ink_astgen_error(scope, INK_AST_E_CONST_ASSIGN, lhs);
+        return;
+    }
 
     ink_astgen_expr(scope, rhs);
 

@@ -207,6 +207,9 @@ static int ink_ast_error_render(const struct ink_ast *tree,
         return ink_ast_error_renderf(
             tree, error, arena,
             "expected switch case expression to be constant value");
+    case INK_AST_E_CONST_ASSIGN:
+        return ink_ast_error_renderf(tree, error, arena,
+                                     "attempt to modify constant value");
     default:
         return ink_ast_error_renderf(tree, error, arena, "unknown error");
     }
