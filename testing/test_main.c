@@ -135,10 +135,7 @@ static int process_story(struct ink_story *s, struct ink_stream *input,
     uint8_t *line = NULL;
     size_t linelen = 0;
     int cidx = 0;
-    struct ink_choice *c = NULL;
-    struct ink_choice_vec cvec;
-
-    ink_choice_vec_init(&cvec);
+    struct ink_choice c;
 
     while (ink_story_can_continue(s)) {
         rc = ink_story_continue(s, &line, &linelen);
@@ -149,31 +146,24 @@ static int process_story(struct ink_story *s, struct ink_stream *input,
             assert(!rc);
         }
 
-        ink_story_get_choices(s, &cvec);
-
-        if (cvec.count > 0) {
-            for (size_t i = 0; i < cvec.count; i++) {
-                c = &cvec.entries[i];
-                rc = ink_stream_writef(output, "%zu: %.*s\n", i + 1,
-                                       (int)c->length, c->bytes);
-                assert(!rc);
-            }
-
-            rc = ink_stream_read_line(input, &line, &linelen);
-            assert(!rc);
-
-            cidx = parse_int((char *)line, linelen);
-            assert(cidx >= 0);
-
-            rc = ink_story_choose(s, (size_t)cidx);
-            assert(!rc);
-
-            rc = ink_stream_writef(output, "?> ");
+        while (ink_story_choice_next(s, &c) >= 0) {
+            rc = ink_stream_writef(output, "%zu: %.*s\n", cidx + 1,
+                                   (int)c.length, c.bytes);
             assert(!rc);
         }
-    }
 
-    ink_choice_vec_deinit(&cvec);
+        rc = ink_stream_read_line(input, &line, &linelen);
+        assert(!rc);
+
+        cidx = parse_int((char *)line, linelen);
+        assert(cidx >= 0);
+
+        rc = ink_story_choose(s, (size_t)cidx);
+        assert(!rc);
+
+        rc = ink_stream_writef(output, "?> ");
+        assert(!rc);
+    }
     return rc;
 }
 

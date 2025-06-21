@@ -92,11 +92,16 @@ static void inkc_render_error(const char *filename, int rc)
 int main(int argc, char *argv[])
 {
     struct ink_source source;
+    struct ink_choice choice;
     bool compile_only = false;
     int flags = INK_F_GC_ENABLE | INK_F_GC_STRESS;
     int opt = 0;
     int rc = -1;
-    const char *filename = 0;
+    size_t choice_index = 0;
+    size_t linelen = 0;
+    uint8_t *line = NULL;
+    const char *filename = NULL;
+    struct ink_story *story = NULL;
 
     option_setopts(opts, argv);
 
@@ -149,8 +154,7 @@ int main(int argc, char *argv[])
         return rc;
     }
 
-    struct ink_story *const story = ink_open();
-
+    story = ink_open();
     if (!story) {
         goto out;
     }
@@ -169,42 +173,26 @@ int main(int argc, char *argv[])
         goto out;
     }
     if (!compile_only) {
-        uint8_t *line = NULL;
-        size_t linelen = 0;
-        size_t cidx = 0;
-        struct ink_choice *c = NULL;
-        struct ink_choice_vec cvec;
-
-        ink_choice_vec_init(&cvec);
-
         while (ink_story_can_continue(story)) {
-            rc = ink_story_continue(story, &line, &linelen);
-            if (rc < 0) {
-                break;
+            line = NULL;
+            linelen = 0;
+            choice_index = 0;
+
+            if (ink_story_continue(story, &line, &linelen) < 0) {
+                goto out;
             }
             if (line) {
                 printf("%.*s\n", (int)linelen, line);
             }
-
-            ink_story_get_choices(story, &cvec);
-
-            if (cvec.count > 0) {
-                for (size_t i = 0; i < cvec.count; i++) {
-                    c = &cvec.entries[i];
-                    printf("%zu: %.*s\n", i + 1, (int)c->length, c->bytes);
-                }
-
-                printf("> ");
-                scanf("%zu", &cidx);
-
-                rc = ink_story_choose(story, cidx);
-                if (rc < 0) {
-                    break;
-                }
+            while (ink_story_choice_next(story, &choice) >= 0) {
+                printf("%zu: %.*s\n", choice_index + 1, (int)choice.length,
+                       choice.bytes);
             }
-        }
 
-        ink_choice_vec_deinit(&cvec);
+            printf("> ");
+            scanf("%zu", &choice_index);
+            ink_story_choose(story, choice_index);
+        }
     }
     if (rc < 0) {
         inkc_render_error(filename, rc);

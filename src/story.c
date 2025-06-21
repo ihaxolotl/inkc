@@ -29,6 +29,7 @@ struct ink_object_set_key {
     struct ink_object *obj;
 };
 
+INK_VEC_T(ink_choice_vec, struct ink_choice)
 INK_HASHMAP_T(ink_object_set, struct ink_object_set_key, void *)
 
 struct ink_call_frame {
@@ -47,6 +48,7 @@ struct ink_story {
     /* TODO: Could this be added to `flags`? */
     bool can_continue;
     int flags;
+    size_t choice_index;
     size_t stack_top;
     size_t call_stack_top;
     size_t gc_allocated;
@@ -1596,9 +1598,9 @@ int ink_story_choose(struct ink_story *s, size_t index)
 {
     struct ink_choice *ch;
 
-    if (index < 0) {
-        index = 0;
-    } else if (index > 0) {
+    s->choice_index = 0;
+
+    if (index > 0) {
         index--;
     }
     if (index < s->current_choices.count) {
@@ -1611,14 +1613,13 @@ int ink_story_choose(struct ink_story *s, size_t index)
     return -INK_E_INVALID_ARG;
 }
 
-void ink_story_get_choices(struct ink_story *story,
-                           struct ink_choice_vec *choices)
+int ink_story_choice_next(struct ink_story *s, struct ink_choice *choice)
 {
-    ink_choice_vec_shrink(choices, 0);
-
-    for (size_t i = 0; i < story->current_choices.count; i++) {
-        ink_choice_vec_push(choices, story->current_choices.entries[i]);
+    if (s->choice_index < s->current_choices.count) {
+        *choice = s->current_choices.entries[s->choice_index++];
+        return 0;
     }
+    return -1;
 }
 
 struct ink_object *ink_story_get_paths(struct ink_story *story)
@@ -1743,6 +1744,7 @@ struct ink_story *ink_open(void)
     story->is_exited = false;
     story->can_continue = false;
     story->flags = 0;
+    story->choice_index = 0;
     story->stack_top = 0;
     story->call_stack_top = 0;
     story->gc_allocated = 0;

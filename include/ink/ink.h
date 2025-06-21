@@ -5,10 +5,9 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include "vec.h"
 
 struct ink_story;
 struct ink_object;
@@ -38,8 +37,6 @@ struct ink_choice {
     size_t length;
 };
 
-INK_VEC_T(ink_choice_vec, struct ink_choice)
-
 struct ink_load_opts {
     const uint8_t *filename;
     const uint8_t *source_bytes;
@@ -55,21 +52,21 @@ extern struct ink_story *ink_open(void);
 /**
  * Free and deinitialize an Ink story context.
  */
-extern void ink_close(struct ink_story *s);
+extern void ink_close(struct ink_story *story);
 
 /**
  * Load an Ink story with extended options.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_opts(struct ink_story *s,
+extern int ink_story_load_opts(struct ink_story *story,
                                const struct ink_load_opts *opts);
 /**
  * Load an Ink story from a NULL-terminated string of source bytes.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_string(struct ink_story *s, const char *text,
+extern int ink_story_load_string(struct ink_story *story, const char *text,
                                  int flags);
 
 /**
@@ -77,36 +74,39 @@ extern int ink_story_load_string(struct ink_story *s, const char *text,
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_file(struct ink_story *, const char *file_path,
+extern int ink_story_load_file(struct ink_story *story, const char *file_path,
                                int flags);
 /**
  * Dump a compiled Ink story.
  *
  * Disassemble bytecode instructions and print values, where available.
  */
-extern void ink_story_dump(struct ink_story *s);
+extern void ink_story_dump(struct ink_story *story);
 
 /**
  * Determine if the story can continue.
  */
-extern bool ink_story_can_continue(struct ink_story *s);
+extern bool ink_story_can_continue(struct ink_story *story);
 
 /**
  * Advance the story and output content, if available.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_continue(struct ink_story *s, uint8_t **line,
+extern int ink_story_continue(struct ink_story *story, uint8_t **line,
                               size_t *linelen);
 /**
  * Select a choice by its index.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_choose(struct ink_story *s, size_t index);
+extern int ink_story_choose(struct ink_story *story, size_t index);
 
-extern void ink_story_get_choices(struct ink_story *s,
-                                  struct ink_choice_vec *choices);
+/**
+ * Iterator for choices.
+ */
+extern int ink_story_choice_next(struct ink_story *story,
+                                 struct ink_choice *choice);
 
 #ifdef __cplusplus
 }
