@@ -37,7 +37,7 @@ if(ENABLE_TESTING)
     include(cmake/cmocka.cmake)
     add_executable(ink_tests)
 
-    target_sources(ink_tests PRIVATE testing/main.c)
+    target_sources(ink_tests PRIVATE tests/main.c)
 
     target_include_directories(ink_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/include

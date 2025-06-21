@@ -87,7 +87,7 @@ function(register_cmocka_test test_name target)
 
     set_tests_properties(${test_name}
         PROPERTIES
-        ENVIRONMENT "CMOCKA_XML_FILE=${CMOCKA_TEST_OUTPUT_DIR}/%g.xml;TEST_SUITE_ROOT=${PROJECT_SOURCE_DIR}/testing"
+        ENVIRONMENT "CMOCKA_XML_FILE=${CMOCKA_TEST_OUTPUT_DIR}/%g.xml;TEST_SUITE_ROOT=${PROJECT_SOURCE_DIR}/tests"
         DEPENDS CMocka.ClearResults
     )
 endfunction()
