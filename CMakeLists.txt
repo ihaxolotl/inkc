@@ -14,37 +14,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
 
-set(USE_SANITIZER
-    "" CACHE STRING
-    "Compile with a sanitizer. Options are: Address, Memory, Leak, Undefined, Thread, 'Address;Undefined'"
-)
+include(CMakeDependentOption)
+include(CTest)
+include(cmake/sanitizers.cmake)
 
-if(USE_SANITIZER MATCHES "([Aa]ddress)")
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-elseif(USE_SANITIZER MATCHES "([Tt]hread)")
-    add_compile_options(-fsanitize=thread)
-    add_link_options(-fsanitize=thread)
-elseif(USE_SANITIZER MATCHES "([Uu]ndefined)")
-    add_compile_options(-fsanitize=undefined)
-    add_link_options(-fsanitize=undefined)
-elseif(USE_SANITIZER MATCHES "([Ll]eak)")
-    add_compile_options(-fsanitize=leak)
-    add_link_options(-fsanitize=leak)
-elseif(USE_SANITIZER MATCHES "([Mm]emory)")
-    add_compile_options(-fsanitize=memory)
-    add_link_options(-fsanitize=memory)
-elseif(USE_SANITIZER MATCHES "([Aa]ddress),([Uu]ndefined)")
-    add_compile_options(-fsanitize=address,undefined)
-    add_link_options(-fsanitize=address,undefined)
-elseif(NOT "${USE_SANITIZER}" STREQUAL "" AND NOT "${USE_SANITIZER}" STREQUAL "None")
-    message(FATAL_ERROR "Unsupported value of USE_SANITIZER: ${USE_SANITIZER}")
+if (ENABLE_COVERAGE)
+    include(cmake/coverage.cmake)
+    append_coverage_compiler_flags()
 endif()
-
-# Set the possible values of build type for cmake-gui/ccmake
-set_property(CACHE USE_SANITIZER
-    PROPERTY STRINGS "None" "Address" "Thread" "Undefined" "Leak" "Memory" "Address,Undefined"
-)
 
 add_compile_options(
     -Wall
@@ -55,4 +32,30 @@ add_compile_options(
 )
 
 add_subdirectory(src)
-add_subdirectory(src/cli)
+
+if(ENABLE_TESTING)
+    include(cmake/cmocka.cmake)
+    add_executable(ink_tests)
+
+    target_sources(ink_tests PRIVATE testing/main.c)
+
+    target_include_directories(ink_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ink_tests PRIVATE ink_static m cmocka)
+    set_target_properties(ink_tests PROPERTIES OUTPUT_NAME ink-tests)
+
+    register_cmocka_test(Ink.Test ink_tests)
+endif()
+
+if(ENABLE_COVERAGE)
+    setup_target_for_coverage_gcovr_html(
+        NAME coverage-html
+        EXECUTABLE ctest
+        DEPENDENCIES ink_tests
+    )
+
+    add_custom_target(coverage DEPENDS coverage-html)
+endif()

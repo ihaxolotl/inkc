@@ -1,7 +1,3 @@
-###############
-# Ink library #
-###############
-
 set(INK_LIB_SOURCES
     arena.c
     ast.c
@@ -40,3 +36,5 @@ target_include_directories(ink_shared PRIVATE
 )
 
 set_target_properties(ink_shared PROPERTIES OUTPUT_NAME ink)
+
+add_subdirectory(cli)

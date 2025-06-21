@@ -1,7 +1,3 @@
-####################
-# Ink compiler CLI #
-####################
-
 add_executable(ink_cli)
 
 target_sources(ink_cli PRIVATE

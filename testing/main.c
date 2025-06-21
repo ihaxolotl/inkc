@@ -26,8 +26,6 @@ struct test_stream {
     size_t read_position;
 };
 
-static const char *TEST_ROOT = "testing";
-
 static const char *TEST_FILES[] = {
     "exec/content/hello-world",
     "exec/content/glue",
@@ -132,12 +130,13 @@ static int process_story(struct ink_story *s, struct ink_stream *input,
                          struct ink_stream *output)
 {
     int rc = -1;
+    int cidx = 0;
     uint8_t *line = NULL;
     size_t linelen = 0;
-    int cidx = 0;
     struct ink_choice c;
 
     while (ink_story_can_continue(s)) {
+        cidx = 0;
         rc = ink_story_continue(s, &line, &linelen);
         assert(!rc);
 
@@ -147,22 +146,23 @@ static int process_story(struct ink_story *s, struct ink_stream *input,
         }
 
         while (ink_story_choice_next(s, &c) >= 0) {
-            rc = ink_stream_writef(output, "%zu: %.*s\n", cidx + 1,
-                                   (int)c.length, c.bytes);
+            rc = ink_stream_writef(output, "%zu: %.*s\n", ++cidx, (int)c.length,
+                                   c.bytes);
             assert(!rc);
         }
+        if (cidx > 0) {
+            rc = ink_stream_read_line(input, &line, &linelen);
+            assert(!rc);
 
-        rc = ink_stream_read_line(input, &line, &linelen);
-        assert(!rc);
+            cidx = parse_int((char *)line, linelen);
+            assert(cidx >= 0);
 
-        cidx = parse_int((char *)line, linelen);
-        assert(cidx >= 0);
+            rc = ink_story_choose(s, (size_t)cidx);
+            assert(!rc);
 
-        rc = ink_story_choose(s, (size_t)cidx);
-        assert(!rc);
-
-        rc = ink_stream_writef(output, "?> ");
-        assert(!rc);
+            rc = ink_stream_writef(output, "?> ");
+            assert(!rc);
+        }
     }
     return rc;
 }
@@ -175,22 +175,23 @@ static void test_exec(void)
     char path[PATH_MAX];
     struct ink_story *story = NULL;
     struct ink_stream input, output, expected;
+    const char *test_root = getenv("TEST_SUITE_ROOT");
 
     for (size_t i = 0; i < TEST_FILES_COUNT; i++) {
         ink_stream_init(&input);
         ink_stream_init(&expected);
         ink_stream_init(&output);
 
-        snprintf(path, PATH_MAX, "%s/%s/transcript.txt", TEST_ROOT,
+        snprintf(path, PATH_MAX, "%s/%s/transcript.txt", test_root,
                  TEST_FILES[i]);
         rc = read_file_to_stream(&expected, path);
         assert(!rc);
 
-        snprintf(path, PATH_MAX, "%s/%s/input.txt", TEST_ROOT, TEST_FILES[i]);
+        snprintf(path, PATH_MAX, "%s/%s/input.txt", test_root, TEST_FILES[i]);
         rc = read_file_to_stream(&input, path);
         assert(!rc);
 
-        snprintf(path, PATH_MAX, "%s/%s/story.ink", TEST_ROOT, TEST_FILES[i]);
+        snprintf(path, PATH_MAX, "%s/%s/story.ink", test_root, TEST_FILES[i]);
         story = ink_open();
         assert(story);
 

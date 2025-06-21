@@ -185,13 +185,14 @@ int main(int argc, char *argv[])
                 printf("%.*s\n", (int)linelen, line);
             }
             while (ink_story_choice_next(story, &choice) >= 0) {
-                printf("%zu: %.*s\n", choice_index + 1, (int)choice.length,
+                printf("%zu: %.*s\n", ++choice_index, (int)choice.length,
                        choice.bytes);
             }
-
-            printf("> ");
-            scanf("%zu", &choice_index);
-            ink_story_choose(story, choice_index);
+            if (choice_index > 0) {
+                printf("> ");
+                scanf("%zu", &choice_index);
+                ink_story_choose(story, choice_index);
+            }
         }
     }
     if (rc < 0) {
