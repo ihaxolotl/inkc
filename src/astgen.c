@@ -23,7 +23,6 @@
  * TODO: Stitches could be allowed to be functions. Might help with code
  * organization.
  */
-struct ink_object *ink_story_get_paths(struct ink_story *);
 
 #define INK_STRINGSET_LOAD_MAX (80u)
 
@@ -271,10 +270,10 @@ static int ink_astgen_update_name(struct ink_astgen *scope,
 /**
  * Recursive function to perform a qualified lookup on two nodes.
  */
-int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
-                             const struct ink_ast_node *lhs,
-                             const struct ink_ast_node *rhs,
-                             struct ink_symbol *sym)
+static int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
+                                    const struct ink_ast_node *lhs,
+                                    const struct ink_ast_node *rhs,
+                                    struct ink_symbol *sym)
 
 {
     int rc = INK_E_FAIL;

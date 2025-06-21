@@ -522,18 +522,18 @@ static void ink_ast_print_walk(const struct ink_ast *tree,
         break;
     }
     for (size_t i = 0; i < nodes.count; i++) {
-        const char **pointers =
+        const char **ptrs =
             i == nodes.count - 1 ? INK_AST_FMT_FINAL : INK_AST_FMT_INNER;
 
-        snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, pointers[1]);
+        snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, ptrs[1]);
 
         if (nodes.entries[i]) {
-            ink_ast_print_node(tree, lines, nodes.entries[i], prefix, pointers,
+            ink_ast_print_node(tree, lines, nodes.entries[i], prefix, ptrs,
                                colors);
-            ink_ast_print_walk(tree, lines, nodes.entries[i], new_prefix,
-                               pointers, colors);
+            ink_ast_print_walk(tree, lines, nodes.entries[i], new_prefix, ptrs,
+                               colors);
         } else {
-            printf("%s%sNullNode\n", prefix, pointers[0]);
+            printf("%s%sNullNode\n", prefix, ptrs[0]);
         }
     }
 

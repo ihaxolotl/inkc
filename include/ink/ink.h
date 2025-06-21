@@ -108,6 +108,8 @@ extern int ink_story_choose(struct ink_story *story, size_t index);
 extern int ink_story_choice_next(struct ink_story *story,
                                  struct ink_choice *choice);
 
+extern struct ink_object *ink_story_get_paths(struct ink_story *);
+
 #ifdef __cplusplus
 }
 #endif

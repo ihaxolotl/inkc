@@ -22,7 +22,7 @@ enum {
     OPT_HELP,
 };
 
-static const struct option opts[] = {
+static const struct option cli_options[] = {
     {"--colors", OPT_COLORS, false},
     {"--compile-only", OPT_COMPILE_ONLY, false},
     {"--dump-ast", OPT_DUMP_AST, false},
@@ -31,10 +31,10 @@ static const struct option opts[] = {
     {"--trace-gc", OPT_GC_TRACING, false},
     {"--help", OPT_HELP, false},
     {"-h", OPT_HELP, false},
-    (struct option){0},
+    {0},
 };
 
-static const char *USAGE_MSG =
+static const char *usage_msg =
     "Usage: %s [OPTION]... [FILE]\n"
     "Load and execute an Ink story.\n\n"
     "  -h, --help       Print this message\n"
@@ -48,7 +48,7 @@ static const char *USAGE_MSG =
 
 static void print_usage(const char *name)
 {
-    fprintf(stderr, USAGE_MSG, name);
+    fprintf(stderr, usage_msg, name);
 }
 
 static void inkc_render_error(const char *filename, int rc)
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     const char *filename = NULL;
     struct ink_story *story = NULL;
 
-    option_setopts(opts, argv);
+    option_setopts(cli_options, argv);
 
     while ((opt = option_nextopt())) {
         switch (opt) {
