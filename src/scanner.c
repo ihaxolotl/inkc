@@ -26,11 +26,6 @@ enum ink_lex_state {
     INK_LEX_INVALID_ASCII,
 };
 
-static const char *INK_GRAMMAR_TYPE_STR[] = {
-    [INK_GRAMMAR_CONTENT] = "Content",
-    [INK_GRAMMAR_EXPRESSION] = "Expression",
-};
-
 static const uint8_t INK_ASCII_CHARS[256] = {
     '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
@@ -55,11 +50,6 @@ static const uint8_t INK_ASCII_CHARS[256] = {
     '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     '\0', '\0', '\0', '\0',
 };
-
-const char *ink_grammar_type_strz(enum ink_grammar_type type)
-{
-    return INK_GRAMMAR_TYPE_STR[type];
-}
 
 static inline bool ink_is_printable(uint8_t ch)
 {
