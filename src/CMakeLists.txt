@@ -2,9 +2,7 @@
 # Ink library #
 ###############
 
-add_library(ink STATIC)
-
-target_sources(ink PRIVATE
+set(INK_LIB_SOURCES
     arena.c
     ast.c
     astgen.c
@@ -21,25 +19,24 @@ target_sources(ink PRIVATE
     token.c
 )
 
-target_include_directories(ink PRIVATE
+add_library(ink_static STATIC)
+
+target_sources(ink_static PRIVATE ${INK_LIB_SOURCES})
+
+target_include_directories(ink_static PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
 )
 
-####################
-# Ink compiler CLI #
-####################
+set_target_properties(ink_static PROPERTIES OUTPUT_NAME ink)
 
-add_executable(inkc)
+add_library(ink_shared SHARED)
 
-target_sources(inkc PRIVATE
-    cli/main.c
-    cli/option.c
-)
+target_sources(ink_shared PRIVATE ${INK_LIB_SOURCES})
 
-target_include_directories(inkc PRIVATE
+target_include_directories(ink_shared PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
 )
 
-target_link_libraries(inkc PRIVATE ink -lm)
+set_target_properties(ink_shared PROPERTIES OUTPUT_NAME ink)
