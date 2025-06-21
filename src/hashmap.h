@@ -49,7 +49,7 @@ enum ink_hashmap_entry_state {
      *                                                                         \
      * Heap memory for the buckets store is allocated lazily upon insertion.   \
      */                                                                        \
-    __attribute__((unused)) static inline void __T##_init(                     \
+    static inline void __T##_init(                                             \
         struct __T *self, size_t max_load_percentage,                          \
         uint32_t (*hasher)(const void *bytes, size_t length),                  \
         bool (*compare)(const void *lhs, const void *rhs))                     \
@@ -68,7 +68,7 @@ enum ink_hashmap_entry_state {
      *                                                                         \
      * The buckets store will be freed and all members shall be cleared.       \
      */                                                                        \
-    __attribute__((unused)) static inline void __T##_deinit(struct __T *self)  \
+    static inline void __T##_deinit(struct __T *self)                          \
     {                                                                          \
         ink_free(self->entries);                                               \
         self->count = 0;                                                       \
@@ -82,8 +82,7 @@ enum ink_hashmap_entry_state {
     /**                                                                        \
      * Calculate the next total capacity of the buckets store.                 \
      */                                                                        \
-    __attribute__((unused)) static inline size_t __T##_next_size(              \
-        const struct __T *self)                                                \
+    static inline size_t __T##_next_size(const struct __T *self)               \
     {                                                                          \
         if (self->capacity < INK_HASHMAP_CAPACITY_MIN) {                       \
             return INK_HASHMAP_CAPACITY_MIN;                                   \
@@ -96,8 +95,7 @@ enum ink_hashmap_entry_state {
      *                                                                         \
      * This is calculated based on the the load factor supplied by the user.   \
      */                                                                        \
-    __attribute__((unused)) static inline bool __T##_needs_resize(             \
-        struct __T *self)                                                      \
+    static inline bool __T##_needs_resize(struct __T *self)                    \
     {                                                                          \
         if (self->capacity == 0) {                                             \
             return true;                                                       \
@@ -112,7 +110,7 @@ enum ink_hashmap_entry_state {
      * An entry pointer shall be returned if the entry's key matches or if the \
      * key has not yet been set.                                               \
      */                                                                        \
-    __attribute__((unused)) static inline struct __T##_kv *__T##_find_slot(    \
+    static inline struct __T##_kv *__T##_find_slot(                            \
         struct __T##_kv *entries, size_t capacity, const void *key,            \
         uint32_t (*hasher)(const void *bytes, size_t length),                  \
         bool (*compare)(const void *lhs, const void *rhs))                     \
@@ -140,7 +138,7 @@ enum ink_hashmap_entry_state {
     /**                                                                        \
      * The buckets store shall be resized quadratically.                       \
      */                                                                        \
-    __attribute__((unused)) static inline int __T##_resize(struct __T *self)   \
+    static inline int __T##_resize(struct __T *self)                           \
     {                                                                          \
         struct __T##_kv *entries, *src, *dst;                                  \
         size_t count = 0;                                                      \
@@ -176,8 +174,7 @@ enum ink_hashmap_entry_state {
     /**                                                                        \
      * Lookup and retrieve an element within the hashmap.                      \
      */                                                                        \
-    __attribute__((unused)) static inline int __T##_lookup(                    \
-        struct __T *self, __K key, __V *value)                                 \
+    static inline int __T##_lookup(struct __T *self, __K key, __V *value)      \
     {                                                                          \
         struct __T##_kv *entry;                                                \
                                                                                \
@@ -198,8 +195,7 @@ enum ink_hashmap_entry_state {
     /**                                                                        \
      * Insert an element into the hashmap.                                     \
      */                                                                        \
-    __attribute__((unused)) static inline int __T##_insert(struct __T *self,   \
-                                                           __K key, __V value) \
+    static inline int __T##_insert(struct __T *self, __K key, __V value)       \
     {                                                                          \
         int rc;                                                                \
         struct __T##_kv *entry;                                                \
@@ -233,8 +229,7 @@ enum ink_hashmap_entry_state {
      * witha  tombstone value and return zero. Otherwise the operation shall   \
      * fail and return a non-zero failure code.                                \
      */                                                                        \
-    __attribute__((unused)) static inline int __T##_remove(struct __T *self,   \
-                                                           __K key)            \
+    static inline int __T##_remove(struct __T *self, __K key)                  \
     {                                                                          \
         struct __T##_kv *entry;                                                \
                                                                                \

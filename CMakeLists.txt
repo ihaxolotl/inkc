@@ -23,21 +23,27 @@ if (ENABLE_COVERAGE)
     append_coverage_compiler_flags()
 endif()
 
-add_compile_options(
-    -Wall
-    -Wextra
-    -Wconversion
-    -Winline
-    -Wlogical-op
-    -Wshadow
-    -Wmissing-declarations
-    -Wmissing-include-dirs
-    -Wpedantic
-    -Wundef
-    -Wno-unused-parameter
-)
+if (MSVC)
+    add_compile_options(/W3)
+else()
+    add_compile_options(
+        -Wall
+        -Wextra
+        -Wconversion
+        -Winline
+        -Wlogical-op
+        -Wshadow
+        -Wmissing-declarations
+        -Wmissing-include-dirs
+        -Wpedantic
+        -Wundef
+        -Wno-unused-parameter
+    )
+endif()
 
 add_subdirectory(src)
+
+option(BUILD_SHARED "Build shared library" ON)
 
 if(ENABLE_TESTING)
     include(cmake/cmocka.cmake)
@@ -50,7 +56,7 @@ if(ENABLE_TESTING)
         ${PROJECT_SOURCE_DIR}/src
     )
 
-    target_link_libraries(ink_tests PRIVATE ink_static m cmocka)
+    target_link_libraries(ink_tests PRIVATE ink m cmocka)
     set_target_properties(ink_tests PROPERTIES OUTPUT_NAME ink-tests)
 
     register_cmocka_test(Ink.Test ink_tests)

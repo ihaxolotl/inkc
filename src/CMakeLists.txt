@@ -15,26 +15,17 @@ set(INK_LIB_SOURCES
     token.c
 )
 
-add_library(ink_static STATIC)
+option(BUILD_SHARED "Build shared library" ON)
 
-target_sources(ink_static PRIVATE ${INK_LIB_SOURCES})
+if(BUILD_SHARED)
+    add_library(ink SHARED ${INK_LIB_SOURCES})
+else()
+    add_library(ink STATIC ${INK_LIB_SOURCES})
+endif()
 
-target_include_directories(ink_static PRIVATE
+target_include_directories(ink PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
 )
-
-set_target_properties(ink_static PROPERTIES OUTPUT_NAME ink)
-
-add_library(ink_shared SHARED)
-
-target_sources(ink_shared PRIVATE ${INK_LIB_SOURCES})
-
-target_include_directories(ink_shared PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/src
-)
-
-set_target_properties(ink_shared PROPERTIES OUTPUT_NAME ink)
 
 add_subdirectory(cli)
