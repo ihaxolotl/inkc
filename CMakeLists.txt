@@ -27,7 +27,13 @@ add_compile_options(
     -Wall
     -Wextra
     -Wconversion
+    -Winline
+    -Wlogical-op
+    -Wshadow
+    -Wmissing-declarations
+    -Wmissing-include-dirs
     -Wpedantic
+    -Wundef
     -Wno-unused-parameter
 )
 
