@@ -9,7 +9,7 @@ config.test_format = lit.formats.ShTest(True)
 config.tools = ["FileCheck"]
 
 config.test_source_root = os.path.dirname(__file__)
-config.test_exec_root = os.path.join(config.test_source_root, "build", "coverage")
+config.test_exec_root = os.path.join(config.test_source_root, "build", "bin")
 config.test_times_file = os.path.join(config.test_exec_root, ".lit_test_times.txt")
 
 config.substitutions.append(

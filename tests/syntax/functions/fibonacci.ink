@@ -1,4 +1,4 @@
-// RUN: %ink-compiler < %s --stdin --compile-only --dump-ast | FileCheck %s
+// RUN: %ink-compiler --stdin --compile-only --dump-ast < %s | FileCheck %s
 
 // CHECK: File "<STDIN>"
 // CHECK-NEXT: |--BlockStmt <line:52, line:52>
