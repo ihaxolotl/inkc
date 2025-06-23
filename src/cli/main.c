@@ -19,6 +19,7 @@ enum {
     OPT_CACHING,
     OPT_DUMP_AST,
     OPT_DUMP_STORY,
+    OPT_STDIN,
     OPT_HELP,
 };
 
@@ -29,6 +30,7 @@ static const struct option cli_options[] = {
     {"--dump-story", OPT_DUMP_STORY, false},
     {"--trace", OPT_VM_TRACING, false},
     {"--trace-gc", OPT_GC_TRACING, false},
+    {"--stdin", OPT_STDIN, false},
     {"--help", OPT_HELP, false},
     {"-h", OPT_HELP, false},
     {0},
@@ -44,6 +46,7 @@ static const char *usage_msg =
     "  --dump-story     Dump a story's bytecode\n"
     "  --trace          Enable execution tracing\n"
     "  --trace-gc       Enable garbage collector tracing\n"
+    "  --stdin          Read source file from standard input\n"
     "\n";
 
 static void print_usage(const char *name)
@@ -94,6 +97,7 @@ int main(int argc, char *argv[])
     struct ink_source source;
     struct ink_choice choice;
     bool compile_only = false;
+    bool use_stdin = false;
     int flags = INK_F_GC_ENABLE | INK_F_GC_STRESS;
     int opt = 0;
     int rc = -1;
@@ -128,6 +132,9 @@ int main(int argc, char *argv[])
         case OPT_COMPILE_ONLY:
             compile_only = true;
             break;
+        case OPT_STDIN:
+            use_stdin = true;
+            break;
         case OPTION_UNKNOWN:
             fprintf(stderr, "Unrecognised option %s.\n\n", option_unknown_opt);
             print_usage(argv[0]);
@@ -144,8 +151,13 @@ int main(int argc, char *argv[])
         }
     }
     if (filename == NULL || *filename == '\0') {
-        rc = ink_source_load_stdin(&source);
-        filename = "<STDIN>";
+        if (use_stdin) {
+            rc = ink_source_load_stdin(&source);
+            filename = "<STDIN>";
+        } else {
+            print_usage(argv[0]);
+            return EXIT_FAILURE;
+        }
     } else {
         rc = ink_source_load(filename, &source);
     }
