@@ -27,10 +27,10 @@ struct test_stream {
 };
 
 static const char *TEST_FILES[] = {
-    "exec/content/hello-world",
-    "exec/content/glue",
-    "exec/choices/monsieur-fogg",
-    "exec/gathers/monsieur-fogg",
+    "runtime/content/hello-world",
+    "runtimej/content/glue",
+    "runtime/choices/monsieur-fogg",
+    "runtime/gathers/monsieur-fogg",
 };
 
 static const size_t TEST_FILES_COUNT =
