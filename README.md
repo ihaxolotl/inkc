@@ -25,19 +25,17 @@ A significant deviation from the reference implementation is the inclusion of le
 
 Source files also currently only support the US-ASCII character set.
 
-## Installation
+## Building
 
 ```bash
-# Debug
+# Quick Makefile wrapper method
 make
 
-# Production
-make PROFILE=release
+# CMake method
+cmake -DCMAKE_BUILD_TYPE=Debug -B build
+cd build
+make
 ```
-
-InkC does not yet provide a Windows-compatible build, though this need will soon be filled.
-
-By default, the build process uses the LLVM toolchain, with [Clang](https://clang.llvm.org/) as the compiler. Support for other compilers can be achieved by overriding variables within the Makefile.
 
 ## Usage
 
