@@ -1,4 +1,4 @@
-set(INK_LIB_SOURCES
+set(ink_sources
     arena.c
     ast.c
     astgen.c
@@ -18,9 +18,9 @@ set(INK_LIB_SOURCES
 option(BUILD_SHARED "Build shared library" ON)
 
 if(BUILD_SHARED)
-    add_library(ink SHARED ${INK_LIB_SOURCES})
+    add_library(ink SHARED ${ink_sources})
 else()
-    add_library(ink STATIC ${INK_LIB_SOURCES})
+    add_library(ink STATIC ${ink_sources})
 endif()
 
 target_include_directories(ink PRIVATE
@@ -29,5 +29,10 @@ target_include_directories(ink PRIVATE
 )
 
 target_compile_definitions(ink PRIVATE BUILDING_INKLIB)
+
+set_target_properties(ink PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+)
 
 add_subdirectory(cli)
