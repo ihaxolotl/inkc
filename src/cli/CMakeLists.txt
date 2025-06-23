@@ -10,6 +10,9 @@ target_include_directories(ink_cli PRIVATE
     ${PROJECT_SOURCE_DIR}/src
 )
 
-target_link_libraries(ink_cli PRIVATE ink m)
+target_link_libraries(ink_cli PRIVATE
+    ink
+    $<$<NOT:$<PLATFORM_ID:Windows>>:m>
+)
 
 set_target_properties(ink_cli PROPERTIES OUTPUT_NAME inkc)

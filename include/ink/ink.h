@@ -5,6 +5,20 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+#ifdef BUILDING_INKLIB
+#define INK_API __declspec(dllexport)
+#else
+#define INK_API __declspec(dllimport)
+#endif
+#else
+#if defined(__GNUC__) || defined(__clang__)
+#define INK_API __attribute__((visibility("default")))
+#else
+#define INK_API
+#endif
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -47,68 +61,68 @@ struct ink_load_opts {
 /**
  * Open a new Ink story context.
  */
-extern struct ink_story *ink_open(void);
+INK_API struct ink_story *ink_open(void);
 
 /**
  * Free and deinitialize an Ink story context.
  */
-extern void ink_close(struct ink_story *story);
+INK_API void ink_close(struct ink_story *story);
 
 /**
  * Load an Ink story with extended options.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_opts(struct ink_story *story,
-                               const struct ink_load_opts *opts);
+INK_API int ink_story_load_opts(struct ink_story *story,
+                                const struct ink_load_opts *opts);
 /**
  * Load an Ink story from a NULL-terminated string of source bytes.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_string(struct ink_story *story, const char *text,
-                                 int flags);
+INK_API int ink_story_load_string(struct ink_story *story, const char *text,
+                                  int flags);
 
 /**
  * Load an Ink story from the filesystem.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_load_file(struct ink_story *story, const char *file_path,
-                               int flags);
+INK_API int ink_story_load_file(struct ink_story *story, const char *file_path,
+                                int flags);
 /**
  * Dump a compiled Ink story.
  *
  * Disassemble bytecode instructions and print values, where available.
  */
-extern void ink_story_dump(struct ink_story *story);
+INK_API void ink_story_dump(struct ink_story *story);
 
 /**
  * Determine if the story can continue.
  */
-extern bool ink_story_can_continue(struct ink_story *story);
+INK_API bool ink_story_can_continue(struct ink_story *story);
 
 /**
  * Advance the story and output content, if available.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_continue(struct ink_story *story, uint8_t **line,
-                              size_t *linelen);
+INK_API int ink_story_continue(struct ink_story *story, uint8_t **line,
+                               size_t *linelen);
 /**
  * Select a choice by its index.
  *
  * Returns a non-zero value on error.
  */
-extern int ink_story_choose(struct ink_story *story, size_t index);
+INK_API int ink_story_choose(struct ink_story *story, size_t index);
 
 /**
  * Iterator for choices.
  */
-extern int ink_story_choice_next(struct ink_story *story,
-                                 struct ink_choice *choice);
+INK_API int ink_story_choice_next(struct ink_story *story,
+                                  struct ink_choice *choice);
 
-extern struct ink_object *ink_story_get_paths(struct ink_story *);
+INK_API struct ink_object *ink_story_get_paths(struct ink_story *);
 
 #ifdef __cplusplus
 }

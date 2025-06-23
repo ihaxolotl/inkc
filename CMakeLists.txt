@@ -56,7 +56,12 @@ if(ENABLE_TESTING)
         ${PROJECT_SOURCE_DIR}/src
     )
 
-    target_link_libraries(ink_tests PRIVATE ink m cmocka)
+    target_link_libraries(ink_tests PRIVATE
+        ink
+        cmocka
+        $<$<NOT:$<PLATFORM_ID:Windows>>:m>
+    )
+
     set_target_properties(ink_tests PROPERTIES OUTPUT_NAME ink-tests)
 
     register_cmocka_test(Ink.Test ink_tests)

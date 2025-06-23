@@ -28,4 +28,6 @@ target_include_directories(ink PRIVATE
     ${PROJECT_SOURCE_DIR}/src
 )
 
+target_compile_definitions(ink PRIVATE BUILDING_INKLIB)
+
 add_subdirectory(cli)
