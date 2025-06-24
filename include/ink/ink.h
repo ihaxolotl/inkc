@@ -59,12 +59,12 @@ struct ink_load_opts {
 };
 
 /**
- * Open a new Ink story context.
+ * Open an Ink story context.
  */
 INK_API struct ink_story *ink_open(void);
 
 /**
- * Free and deinitialize an Ink story context.
+ * Close an Ink story context.
  */
 INK_API void ink_close(struct ink_story *story);
 
