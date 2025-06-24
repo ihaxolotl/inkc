@@ -6,6 +6,7 @@ set(ink_sources
     compile.c
     logging.c
     memory.c
+    object.c
     parse.c
     scanner.c
     source.c

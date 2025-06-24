@@ -8,87 +8,18 @@
 #include <ink/ink.h>
 
 #include "compile.h"
-#include "hashmap.h"
 #include "logging.h"
 #include "object.h"
 #include "opcode.h"
 #include "source.h"
+#include "story.h"
 #include "stream.h"
-
-#define INK_STORY_STACK_MAX (128ul)
-#define INK_GC_GRAY_CAPACITY_MIN (16ul)
-#define INK_GC_GRAY_GROWTH_FACTOR (2ul)
-#define INK_GC_HEAP_SIZE_MIN (1024ul * 1024ul)
-#define INK_GC_HEAP_GROWTH_PERCENT (50ul)
-#define INK_TABLE_CAPACITY_MIN (8ul)
-#define INK_TABLE_SCALE_FACTOR (2ul)
-#define INK_TABLE_LOAD_MAX (80ul)
-#define INK_OBJECT_SET_LOAD_MAX (80ul)
-
-struct ink_object_set_key {
-    struct ink_object *obj;
-};
-
-INK_VEC_T(ink_choice_vec, struct ink_choice)
-INK_HASHMAP_T(ink_object_set, struct ink_object_set_key, void *)
-
-struct ink_call_frame {
-    struct ink_content_path *callee;
-    struct ink_content_path *caller;
-    uint8_t *ip;
-    struct ink_object **sp;
-};
-
-struct ink_story {
-    /* TODO: Could this be added to `flags`? */
-    bool is_exited;
-    /* TODO: Could this be added to `flags`? */
-    bool can_continue;
-    int flags;
-    size_t choice_index;
-    size_t stack_top;
-    size_t call_stack_top;
-    size_t gc_allocated;
-    size_t gc_threshold;
-    struct ink_object_vec gc_gray;
-    struct ink_object_set gc_owned;
-    struct ink_object *gc_objects;
-    struct ink_object *globals;
-    struct ink_object *paths;
-    struct ink_object *current_path;
-    struct ink_object *current_choice_id;
-    struct ink_choice_vec current_choices;
-    struct ink_stream stream;
-    struct ink_object *stack[INK_STORY_STACK_MAX];
-    struct ink_call_frame call_stack[INK_STORY_STACK_MAX];
-};
 
 const char *INK_DEFAULT_PATH = "@main";
 
 #define T(name, description) description,
 static const char *INK_OPCODE_TYPE_STR[] = {INK_MAKE_OPCODE_LIST(T)};
 #undef T
-
-static const char *INK_OBJ_TYPE_STR[] = {
-    [INK_OBJ_BOOL] = "Bool",
-    [INK_OBJ_NUMBER] = "Number",
-    [INK_OBJ_STRING] = "String",
-    [INK_OBJ_TABLE] = "Table",
-    [INK_OBJ_CONTENT_PATH] = "ContentPath",
-};
-
-static void *ink_story_mem_alloc(struct ink_story *, void *, size_t, size_t);
-static void ink_story_mem_free(struct ink_story *, void *);
-static struct ink_object *ink_object_new(struct ink_story *,
-                                         enum ink_object_type, size_t);
-static void ink_object_free(struct ink_story *, struct ink_object *);
-static struct ink_object *ink_object_to_string(struct ink_story *,
-                                               struct ink_object *);
-static struct ink_number *ink_object_to_number(struct ink_story *,
-                                               struct ink_object *);
-static bool ink_string_eq(const struct ink_object *, const struct ink_object *);
-static void ink_gc_own(struct ink_story *, struct ink_object *);
-static void ink_gc_disown(struct ink_story *, struct ink_object *);
 
 static uint32_t ink_object_set_key_hash(const void *key, size_t length)
 {
@@ -101,14 +32,6 @@ static bool ink_object_set_key_cmp(const void *lhs, const void *rhs)
     const struct ink_object_set_key *const key_rhs = rhs;
 
     return (key_lhs->obj == key_rhs->obj);
-}
-
-/**
- * Return a printable string for an object type.
- */
-static inline const char *ink_object_type_strz(enum ink_object_type type)
-{
-    return INK_OBJ_TYPE_STR[type];
 }
 
 /**
@@ -144,7 +67,7 @@ static void ink_gc_mark_object(struct ink_story *story, struct ink_object *obj)
 
     if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Marked object %p, type=%s", (void *)obj,
-                  INK_OBJ_TYPE_STR[obj->type]);
+                  ink_object_type_strz(obj->type));
     }
 
     ink_object_vec_push(&story->gc_gray, obj);
@@ -209,7 +132,7 @@ static void ink_gc_blacken_object(struct ink_story *story,
 
     if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Blackened object %p, type=%s, size=%zu", (void *)obj,
-                  INK_OBJ_TYPE_STR[obj->type], obj_size);
+                  ink_object_type_strz(obj->type), obj_size);
     }
 }
 
@@ -294,11 +217,8 @@ static void ink_gc_collect(struct ink_story *story)
     }
 }
 
-/**
- * Allocate memory for runtime objects.
- */
-static void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
-                                 size_t size_old, size_t size_new)
+void *ink_story_mem_alloc(struct ink_story *story, void *ptr, size_t size_old,
+                          size_t size_new)
 {
     if (story->flags & INK_F_GC_TRACING) {
         if (size_new > size_old) {
@@ -326,270 +246,13 @@ static void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
     return ink_realloc(ptr, size_new);
 }
 
-/**
- * Free memory allocated for runtime objects.
- */
-static void ink_story_mem_free(struct ink_story *story, void *ptr)
+void ink_story_mem_free(struct ink_story *story, void *ptr)
 {
     if (story->flags & INK_F_GC_TRACING) {
         ink_trace("Free memory %p", ptr);
     }
 
     ink_story_mem_alloc(story, ptr, 0, 0);
-}
-
-/**
- * Create a new runtime object.
- *
- * Return the object on success, and NULL upon allocation failure.
- */
-static struct ink_object *ink_object_new(struct ink_story *story,
-                                         enum ink_object_type type, size_t size)
-{
-    struct ink_object *const obj = ink_story_mem_alloc(story, NULL, 0, size);
-
-    if (!obj) {
-        return NULL;
-    }
-
-    assert(size >= sizeof(*obj));
-    obj->type = type;
-    obj->is_marked = false;
-    obj->next = story->gc_objects;
-    story->gc_objects = obj;
-    return obj;
-}
-
-/**
- * Free a runtime object.
- */
-static void ink_object_free(struct ink_story *story, struct ink_object *obj)
-{
-    switch (obj->type) {
-    case INK_OBJ_BOOL:
-    case INK_OBJ_NUMBER:
-    case INK_OBJ_STRING:
-        break;
-    case INK_OBJ_TABLE: {
-        struct ink_table *const typed_obj = INK_OBJ_AS_TABLE(obj);
-
-        ink_story_mem_free(story, typed_obj->entries);
-        break;
-    }
-    case INK_OBJ_CONTENT_PATH: {
-        struct ink_content_path *const typed_obj = INK_OBJ_AS_CONTENT_PATH(obj);
-
-        ink_byte_vec_deinit(&typed_obj->code);
-        ink_object_vec_deinit(&typed_obj->const_pool);
-        break;
-    }
-    }
-    if (story->flags & INK_F_GC_TRACING) {
-        ink_trace("Free object %p, type=%s", (void *)obj,
-                  INK_OBJ_TYPE_STR[obj->type]);
-    }
-
-    ink_story_mem_free(story, obj);
-}
-
-/**
- * Determine if an object is falsey.
- */
-static inline bool ink_object_is_falsey(const struct ink_object *obj)
-{
-    return (INK_OBJ_IS_BOOL(obj) && !INK_OBJ_AS_BOOL(obj)->value);
-}
-
-/**
- * Determine the equality of two objects.
- *
- * Returns the result as a new object.
- */
-static struct ink_object *ink_object_eq(struct ink_story *story,
-                                        const struct ink_object *lhs,
-                                        const struct ink_object *rhs)
-{
-    bool value = false;
-
-    if (lhs->type != rhs->type) {
-        value = false;
-    } else {
-        switch (lhs->type) {
-        case INK_OBJ_BOOL:
-            value = INK_OBJ_AS_BOOL(lhs)->value == INK_OBJ_AS_BOOL(rhs)->value;
-            break;
-        case INK_OBJ_NUMBER:
-            value =
-                INK_OBJ_AS_NUMBER(lhs)->value == INK_OBJ_AS_NUMBER(rhs)->value;
-            break;
-        case INK_OBJ_STRING:
-            value = ink_string_eq(lhs, rhs);
-            break;
-        default:
-            value = false;
-            break;
-        }
-    }
-    return ink_bool_new(story, value);
-}
-
-/**
- * Coerce an object to a string.
- *
- * Returns the result as a new object.
- */
-static struct ink_object *ink_object_to_string(struct ink_story *story,
-                                               struct ink_object *obj)
-{
-#define INK_NUMBER_BUFLEN (20u)
-    uint8_t buf[INK_NUMBER_BUFLEN];
-    size_t buflen = 0;
-
-    switch (obj->type) {
-    case INK_OBJ_BOOL:
-        if (INK_OBJ_AS_BOOL(obj)->value) {
-            buflen = 4;
-            memcpy(buf, "true", buflen);
-        } else {
-            buflen = 5;
-            memcpy(buf, "false", buflen);
-        }
-        break;
-    case INK_OBJ_NUMBER: {
-        struct ink_number *nobj = INK_OBJ_AS_NUMBER(obj);
-        buflen = (size_t)snprintf(NULL, 0, "%lf", nobj->value);
-
-        snprintf((char *)buf, INK_NUMBER_BUFLEN, "%lf", nobj->value);
-        break;
-    }
-    case INK_OBJ_STRING:
-        return obj;
-    default:
-        break;
-    }
-
-    obj = ink_string_new(story, buf, buflen);
-    ink_gc_own(story, obj);
-    return obj;
-#undef INK_NUMBER_BUFLEN
-}
-
-/**
- * Coerce an object to a number.
- *
- * Returns the result as a new object.
- */
-static struct ink_number *ink_object_to_number(struct ink_story *story,
-                                               struct ink_object *obj)
-{
-    double value = 0.0f;
-
-    switch (obj->type) {
-    case INK_OBJ_BOOL:
-        value = (double)(INK_OBJ_AS_BOOL(obj)->value);
-        break;
-    case INK_OBJ_NUMBER:
-        return INK_OBJ_AS_NUMBER(obj);
-    default:
-        value = 1;
-        break;
-    }
-
-    obj = ink_number_new(story, value);
-    ink_gc_own(story, obj);
-    return INK_OBJ_AS_NUMBER(obj);
-}
-
-/**
- * Print a runtime object.
- */
-static void ink_object_print(const struct ink_object *obj)
-{
-    if (!obj) {
-        fprintf(stderr, "<NULL>");
-        return;
-    }
-
-    const char *const type_str = ink_object_type_strz(obj->type);
-
-    switch (obj->type) {
-    case INK_OBJ_BOOL: {
-        struct ink_bool *const typed_obj = INK_OBJ_AS_BOOL(obj);
-
-        fprintf(stderr, "<%s value=%s, addr=%p>", type_str,
-                typed_obj->value ? "true" : "false", (void *)obj);
-        break;
-    }
-    case INK_OBJ_NUMBER: {
-        struct ink_number *const typed_obj = INK_OBJ_AS_NUMBER(obj);
-
-        fprintf(stderr, "<%s value=%lf, addr=%p>", type_str, typed_obj->value,
-                (void *)obj);
-        break;
-    }
-    case INK_OBJ_STRING: {
-        struct ink_string *const typed_obj = INK_OBJ_AS_STRING(obj);
-
-        fprintf(stderr, "<%s value=\"%s\", addr=%p>", type_str,
-                typed_obj->bytes, (void *)obj);
-        break;
-    }
-    case INK_OBJ_TABLE: {
-        struct ink_table *const typed_obj = INK_OBJ_AS_TABLE(obj);
-
-        fprintf(stderr, "{");
-
-        for (size_t i = 0; i < typed_obj->capacity; i++) {
-            struct ink_table_kv entry = typed_obj->entries[i];
-
-            if (entry.key) {
-                fprintf(stderr, "[\"%s\"] => ", entry.key->bytes);
-
-                if (entry.value) {
-                    ink_object_print(entry.value);
-                } else {
-                    fprintf(stderr, "NULL");
-                }
-
-                fprintf(stderr, ", ");
-            }
-        }
-
-        fprintf(stderr, "}");
-        break;
-    }
-    case INK_OBJ_CONTENT_PATH:
-        fprintf(stderr, "<%s addr=%p>", type_str, (void *)obj);
-        break;
-    }
-}
-
-/**
- * Create a boolean object.
- */
-struct ink_object *ink_bool_new(struct ink_story *story, bool value)
-{
-    struct ink_bool *const obj =
-        INK_OBJ_AS_BOOL(ink_object_new(story, INK_OBJ_BOOL, sizeof(*obj)));
-
-    if (obj) {
-        obj->value = value;
-    }
-    return INK_OBJ(obj);
-}
-
-/**
- * Create a number object.
- */
-struct ink_object *ink_number_new(struct ink_story *story, double value)
-{
-    struct ink_number *const obj =
-        INK_OBJ_AS_NUMBER(ink_object_new(story, INK_OBJ_NUMBER, sizeof(*obj)));
-
-    if (obj) {
-        obj->value = value;
-    }
-    return INK_OBJ(obj);
 }
 
 /**
@@ -665,228 +328,7 @@ static struct ink_object *ink_number_bool_op(struct ink_story *story,
     return ink_bool_new(story, value);
 }
 
-/**
- * Create a string object.
- *
- * Strings will be automatically null-terminated.
- */
-struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
-                                  size_t length)
-{
-    struct ink_string *const obj = INK_OBJ_AS_STRING(
-        ink_object_new(story, INK_OBJ_STRING, sizeof(*obj) + length + 1));
-
-    if (obj) {
-        if (length != 0) {
-            memcpy(obj->bytes, bytes, length);
-        }
-
-        obj->bytes[length] = '\0';
-        obj->length = (uint32_t)length;
-    }
-    return INK_OBJ(obj);
-}
-
-/**
- * Check two strings for equality.
- */
-static bool ink_string_eq(const struct ink_object *lhs,
-                          const struct ink_object *rhs)
-{
-    struct ink_string *const str_lhs = INK_OBJ_AS_STRING(lhs);
-    struct ink_string *const str_rhs = INK_OBJ_AS_STRING(rhs);
-
-    return str_lhs->length == str_rhs->length &&
-           memcmp(str_lhs->bytes, str_rhs->bytes, str_lhs->length) == 0;
-}
-
-/**
- * Concatenate two strings.
- *
- * Return a new string upon success, and NULL upon failure,
- */
-static struct ink_object *ink_string_concat(struct ink_story *story,
-                                            const struct ink_object *lhs,
-                                            const struct ink_object *rhs)
-{
-    struct ink_object *value = NULL;
-    struct ink_string *const str_lhs = INK_OBJ_AS_STRING(lhs);
-    struct ink_string *const str_rhs = INK_OBJ_AS_STRING(rhs);
-    const size_t length = str_lhs->length + str_rhs->length;
-    uint8_t *const bytes = ink_malloc(length);
-
-    if (!bytes) {
-        return NULL;
-    }
-
-    memcpy(bytes, str_lhs->bytes, str_lhs->length);
-    memcpy(bytes + str_lhs->length, str_rhs->bytes, str_rhs->length);
-    ink_gc_disown(story, INK_OBJ(lhs));
-    ink_gc_disown(story, INK_OBJ(rhs));
-    value = ink_string_new(story, bytes, length);
-    ink_free(bytes);
-    return value;
-}
-
-/**
- * Create a table object.
- */
-struct ink_object *ink_table_new(struct ink_story *story)
-{
-    struct ink_table *const obj =
-        INK_OBJ_AS_TABLE(ink_object_new(story, INK_OBJ_TABLE, sizeof(*obj)));
-
-    if (!obj) {
-        return NULL;
-    }
-
-    obj->count = 0;
-    obj->capacity = 0;
-    obj->entries = NULL;
-    return INK_OBJ(obj);
-}
-
-/**
- * Probe sequence for table objects.
- */
-static struct ink_table_kv *ink_table_find_slot(struct ink_table_kv *entries,
-                                                size_t capacity,
-                                                struct ink_string *key)
-{
-    size_t index = key->hash & (capacity - 1);
-
-    for (;;) {
-        struct ink_table_kv *const entry = &entries[index];
-
-        if (entry->key == NULL ||
-            ink_string_eq(INK_OBJ(entry->key), INK_OBJ(key))) {
-            return entry;
-        }
-
-        index = (index + 1) & (capacity - 1);
-    }
-}
-
-/**
- * Calculate the next size for a table object's buckets.
- */
-static inline uint32_t ink_table_next_size(const struct ink_table *table)
-{
-    const uint32_t capacity = table->capacity;
-
-    if (capacity < INK_TABLE_CAPACITY_MIN) {
-        return INK_TABLE_CAPACITY_MIN;
-    }
-    return capacity * INK_TABLE_SCALE_FACTOR;
-}
-
-/**
- * Determine if a table object needs more buckets.
- */
-static inline bool ink_table_needs_resize(struct ink_table *table)
-{
-    if (table->capacity == 0) {
-        return true;
-    }
-    return ((table->count * 100ul) / table->capacity) > INK_TABLE_LOAD_MAX;
-}
-
-/**
- * Increase the number of buckets within a table object.
- */
-static int ink_table_resize(struct ink_story *story, struct ink_table *table)
-{
-    struct ink_table_kv *entries, *src, *dst;
-    const uint32_t capacity = ink_table_next_size(table);
-    const uint32_t size = sizeof(*table->entries) * capacity;
-    uint32_t count = 0;
-
-    entries =
-        ink_story_mem_alloc(story, NULL, 0, capacity * (sizeof(*entries)));
-    if (!entries) {
-        return -INK_E_OOM;
-    }
-
-    memset(entries, 0, size);
-
-    for (size_t i = 0; i < table->capacity; i++) {
-        src = &table->entries[i];
-        if (src->key) {
-            dst = ink_table_find_slot(entries, capacity, src->key);
-            dst->key = src->key;
-            dst->value = src->value;
-            count++;
-        }
-    }
-
-    ink_story_mem_free(story, table->entries);
-    table->entries = entries;
-    table->capacity = capacity;
-    table->count = count;
-    return INK_E_OK;
-}
-
-/**
- * Perform a lookup for an object within a table object.
- */
-int ink_table_lookup(struct ink_story *story, struct ink_object *obj,
-                     struct ink_object *key, struct ink_object **value)
-{
-    struct ink_table *const table = INK_OBJ_AS_TABLE(obj);
-
-    assert(INK_OBJ_IS_TABLE(obj));
-
-    if (table->count == 0) {
-        return -INK_E_OOM;
-    }
-
-    struct ink_table_kv *const kv = ink_table_find_slot(
-        table->entries, table->capacity, INK_OBJ_AS_STRING(key));
-
-    if (!kv->key) {
-        return -INK_E_OOM;
-    }
-
-    *value = kv->value;
-    return INK_E_OK;
-}
-
-/**
- * Perform an insertion for an object to a table object.
- */
-int ink_table_insert(struct ink_story *story, struct ink_object *obj,
-                     struct ink_object *key, struct ink_object *value)
-{
-    int rc = -1;
-    struct ink_table *const table = INK_OBJ_AS_TABLE(obj);
-    struct ink_string *const key_str = INK_OBJ_AS_STRING(key);
-
-    assert(INK_OBJ_IS_TABLE(obj));
-    assert(INK_OBJ_IS_STRING(key));
-
-    if (ink_table_needs_resize(table)) {
-        rc = ink_table_resize(story, table);
-        if (rc < 0) {
-            return rc;
-        }
-    }
-
-    struct ink_table_kv *const entry =
-        ink_table_find_slot(table->entries, table->capacity, key_str);
-
-    if (!entry->key) {
-        entry->key = key_str;
-        entry->value = value;
-        table->count++;
-        return INK_E_OK;
-    }
-
-    entry->key = key_str;
-    entry->value = value;
-    return 1;
-}
-
-static void ink_gc_own(struct ink_story *story, struct ink_object *obj)
+void ink_gc_own(struct ink_story *story, struct ink_object *obj)
 {
     const struct ink_object_set_key key = {
         .obj = obj,
@@ -895,40 +337,13 @@ static void ink_gc_own(struct ink_story *story, struct ink_object *obj)
     ink_object_set_insert(&story->gc_owned, key, NULL);
 }
 
-static void ink_gc_disown(struct ink_story *story, struct ink_object *obj)
+void ink_gc_disown(struct ink_story *story, struct ink_object *obj)
 {
     const struct ink_object_set_key key = {
         .obj = obj,
     };
 
     ink_object_set_remove(&story->gc_owned, key);
-}
-
-#undef INK_TABLE_CAPACITY_MIN
-#undef INK_TABLE_LOAD_MAX
-#undef INK_TABLE_SCALE_FACTOR
-
-/**
- * Create a content path object.
- */
-struct ink_object *ink_content_path_new(struct ink_story *story,
-                                        struct ink_object *name)
-{
-    struct ink_content_path *const obj = INK_OBJ_AS_CONTENT_PATH(
-        ink_object_new(story, INK_OBJ_CONTENT_PATH, sizeof(*obj)));
-
-    if (!obj) {
-        return NULL;
-    }
-
-    assert(name != NULL);
-
-    obj->name = INK_OBJ_AS_STRING(name);
-    obj->arity = 0;
-    obj->locals_count = 0;
-    ink_byte_vec_init(&obj->code);
-    ink_object_vec_init(&obj->const_pool);
-    return INK_OBJ(obj);
 }
 
 /**

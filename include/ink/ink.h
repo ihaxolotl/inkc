@@ -1,5 +1,5 @@
-#ifndef INK_STORY_H
-#define INK_STORY_H
+#ifndef INK_API_H
+#define INK_API_H
 
 /**
  * @defgroup ink_api API
