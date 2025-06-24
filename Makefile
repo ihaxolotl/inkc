@@ -1,4 +1,4 @@
-.PHONY: all default help tests clean
+.PHONY: all default help docs tests clean
 
 VERBOSE ?= 0
 
@@ -14,6 +14,7 @@ BUILDDIR ?= build
 OPTIONS ?=
 SANITIZER ?=
 BUILD_TYPE ?=
+DOXYGEN_CONFIG ?= docs/Doxyfile
 
 ifneq ($(SANITIZER),)
 	OPTIONS += -DUSE_SANITIZER=$(SANITIZER)
@@ -32,6 +33,10 @@ default:
 tests:
 	$(Q) cmake -B $(BUILDDIR)/coverage -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON -DENABLE_COVERAGE=ON
 	$(Q) make -s -C $(BUILDDIR)/coverage coverage
+
+docs:
+	$(Q) mkdir -p $(BUILDDIR)
+	$(Q) doxygen $(DOXYGEN_CONFIG)
 
 clean:
 	$(Q) rm -rf $(BUILDDIR)
