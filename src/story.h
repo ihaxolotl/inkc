@@ -1,6 +1,10 @@
 #ifndef INK_STORY_H
 #define INK_STORY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 
 #include <ink/ink.h>
@@ -65,14 +69,8 @@ extern void *ink_story_mem_alloc(struct ink_story *story, void *ptr,
  */
 extern void ink_story_mem_free(struct ink_story *story, void *ptr);
 
-/**
- * Record an object as a root, preventing collection.
- */
-extern void ink_gc_own(struct ink_story *story, struct ink_object *obj);
-
-/**
- * Release record for object, if present.
- */
-extern void ink_gc_disown(struct ink_story *story, struct ink_object *obj);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
