@@ -39,9 +39,6 @@ struct ink_call_frame {
     struct ink_object **sp;
 };
 
-/**
- * Ink Story Context
- */
 struct ink_story {
     /* TODO: Could this be added to `flags`? */
     bool is_exited;

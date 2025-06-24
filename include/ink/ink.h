@@ -1,6 +1,15 @@
 #ifndef INK_STORY_H
 #define INK_STORY_H
 
+/**
+ * @defgroup ink_api API
+ *
+ * This module documents the exported functions that form the public API
+ * of libink.
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,8 +32,27 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-struct ink_story;
-struct ink_object;
+/**
+ * @struct ink_story
+ *
+ * @brief Opaque type representing a story context.
+ *
+ * This forward declaration hides the internal structure of an `ink_story`.
+ * Clients of the API should manipulate `ink_story` objects only through the
+ * provided functions.
+ */
+typedef struct ink_story ink_story;
+
+/**
+ * @struct ink_object
+ *
+ * @brief Opaque type representing a runtime object.
+ *
+ * This forward declaration hides the internal structure of an `ink_object`.
+ * Clients of the API should manipulate `ink_object` objects only through the
+ * provided functions.
+ */
+typedef struct ink_object ink_object;
 
 enum ink_flags {
     INK_F_RESERVED_1 = (1 << 0),
@@ -59,26 +87,28 @@ struct ink_load_opts {
 };
 
 /**
- * Open an Ink story context.
+ * @brief Open a story context.
+ *
+ * @returns a new story context
  */
 INK_API struct ink_story *ink_open(void);
 
 /**
- * Close an Ink story context.
+ * Close a story context.
  */
 INK_API void ink_close(struct ink_story *story);
 
 /**
  * Load an Ink story with extended options.
  *
- * Returns a non-zero value on error.
+ * @returns a non-zero value on error.
  */
 INK_API int ink_story_load_opts(struct ink_story *story,
                                 const struct ink_load_opts *opts);
 /**
  * Load an Ink story from a NULL-terminated string of source bytes.
  *
- * Returns a non-zero value on error.
+ * @returns a non-zero value on error.
  */
 INK_API int ink_story_load_string(struct ink_story *story, const char *text,
                                   int flags);
@@ -86,7 +116,7 @@ INK_API int ink_story_load_string(struct ink_story *story, const char *text,
 /**
  * Load an Ink story from the filesystem.
  *
- * Returns a non-zero value on error.
+ * @returns a non-zero value on error.
  */
 INK_API int ink_story_load_file(struct ink_story *story, const char *file_path,
                                 int flags);
@@ -99,33 +129,35 @@ INK_API void ink_story_dump(struct ink_story *story);
 
 /**
  * Determine if the story can continue.
+ *
+ * @returns a boolean value, indicating if the story can continue.
  */
 INK_API bool ink_story_can_continue(struct ink_story *story);
 
 /**
  * Advance the story and output content, if available.
  *
- * Returns a non-zero value on error.
+ * @returns a non-zero value on error.
  */
 INK_API int ink_story_continue(struct ink_story *story, uint8_t **line,
                                size_t *linelen);
 /**
  * Select a choice by its index.
  *
- * Returns a non-zero value on error.
+ * @returns a non-zero value on error.
  */
 INK_API int ink_story_choose(struct ink_story *story, size_t index);
 
 /**
  * Iterator for choices.
  */
-INK_API int ink_story_choice_next(struct ink_story *story,
-                                  struct ink_choice *choice);
+INK_API int ink_story_choice_next(ink_story *story, struct ink_choice *choice);
 
-INK_API struct ink_object *ink_story_get_paths(struct ink_story *);
+INK_API struct ink_object *ink_story_get_paths(struct ink_story *story);
 
 #ifdef __cplusplus
 }
 #endif
 
+/** @} */
 #endif

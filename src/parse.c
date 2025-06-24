@@ -40,9 +40,6 @@ struct ink_stmt_context {
     size_t scratch_top;
 };
 
-/**
- * Ink parsing state.
- */
 struct ink_parser {
     bool panic_mode; /* TODO: Add this to `flags`? */
     int flags;
