@@ -71,92 +71,6 @@ bool ink_object_is_falsey(const struct ink_object *obj)
     return (INK_OBJ_IS_BOOL(obj) && !INK_OBJ_AS_BOOL(obj)->value);
 }
 
-struct ink_object *ink_object_eq(struct ink_story *story,
-                                 const struct ink_object *lhs,
-                                 const struct ink_object *rhs)
-{
-    bool value = false;
-
-    if (lhs->type != rhs->type) {
-        value = false;
-    } else {
-        switch (lhs->type) {
-        case INK_OBJ_BOOL:
-            value = INK_OBJ_AS_BOOL(lhs)->value == INK_OBJ_AS_BOOL(rhs)->value;
-            break;
-        case INK_OBJ_NUMBER:
-            value =
-                INK_OBJ_AS_NUMBER(lhs)->value == INK_OBJ_AS_NUMBER(rhs)->value;
-            break;
-        case INK_OBJ_STRING:
-            value = ink_string_eq(lhs, rhs);
-            break;
-        default:
-            value = false;
-            break;
-        }
-    }
-    return ink_bool_new(story, value);
-}
-
-struct ink_object *ink_object_to_string(struct ink_story *story,
-                                        struct ink_object *obj)
-{
-    /* FIXME: Fixed-size buffer is bad. */
-#define INK_NUMBER_BUFLEN (20u)
-    uint8_t buf[INK_NUMBER_BUFLEN];
-    size_t buflen = 0;
-
-    switch (obj->type) {
-    case INK_OBJ_BOOL:
-        if (INK_OBJ_AS_BOOL(obj)->value) {
-            buflen = 4;
-            memcpy(buf, "true", buflen);
-        } else {
-            buflen = 5;
-            memcpy(buf, "false", buflen);
-        }
-        break;
-    case INK_OBJ_NUMBER: {
-        struct ink_number *nobj = INK_OBJ_AS_NUMBER(obj);
-        buflen = (size_t)snprintf(NULL, 0, "%lf", nobj->value);
-
-        snprintf((char *)buf, INK_NUMBER_BUFLEN, "%lf", nobj->value);
-        break;
-    }
-    case INK_OBJ_STRING:
-        return obj;
-    default:
-        break;
-    }
-
-    obj = ink_string_new(story, buf, buflen);
-    ink_gc_own(story, obj);
-    return obj;
-#undef INK_NUMBER_BUFLEN
-}
-
-struct ink_number *ink_object_to_number(struct ink_story *story,
-                                        struct ink_object *obj)
-{
-    double value = 0.0f;
-
-    switch (obj->type) {
-    case INK_OBJ_BOOL:
-        value = (double)(INK_OBJ_AS_BOOL(obj)->value);
-        break;
-    case INK_OBJ_NUMBER:
-        return INK_OBJ_AS_NUMBER(obj);
-    default:
-        value = 1;
-        break;
-    }
-
-    obj = ink_number_new(story, value);
-    ink_gc_own(story, obj);
-    return INK_OBJ_AS_NUMBER(obj);
-}
-
 void ink_object_print(const struct ink_object *obj)
 {
     if (!obj) {
@@ -177,8 +91,14 @@ void ink_object_print(const struct ink_object *obj)
     case INK_OBJ_NUMBER: {
         struct ink_number *const typed_obj = INK_OBJ_AS_NUMBER(obj);
 
-        fprintf(stderr, "<%s value=%lf, addr=%p>", type_str, typed_obj->value,
-                (void *)obj);
+        if (typed_obj->is_int) {
+            fprintf(stderr, "<%s value=%ld, addr=%p>", type_str,
+                    typed_obj->as.integer, (void *)obj);
+        } else {
+            fprintf(stderr, "<%s value=%lf, addr=%p>", type_str,
+                    typed_obj->as.floating, (void *)obj);
+        }
+
         break;
     }
     case INK_OBJ_STRING: {
@@ -229,15 +149,50 @@ struct ink_object *ink_bool_new(struct ink_story *story, bool value)
     return INK_OBJ(obj);
 }
 
-struct ink_object *ink_number_new(struct ink_story *story, double value)
+bool ink_bool_eq(const struct ink_bool *lhs, const struct ink_bool *rhs)
+{
+    assert(lhs && rhs);
+
+    return lhs->value == rhs->value;
+}
+
+struct ink_object *ink_integer_new(struct ink_story *story, ink_integer value)
 {
     struct ink_number *const obj =
         INK_OBJ_AS_NUMBER(ink_object_new(story, INK_OBJ_NUMBER, sizeof(*obj)));
 
     if (obj) {
-        obj->value = value;
+        obj->is_int = true;
+        obj->as.integer = value;
     }
     return INK_OBJ(obj);
+}
+
+struct ink_object *ink_float_new(struct ink_story *story, ink_float value)
+{
+    struct ink_number *const obj =
+        INK_OBJ_AS_NUMBER(ink_object_new(story, INK_OBJ_NUMBER, sizeof(*obj)));
+
+    if (obj) {
+        obj->is_int = false;
+        obj->as.floating = value;
+    }
+    return INK_OBJ(obj);
+}
+
+bool ink_number_eq(const struct ink_number *lhs, const struct ink_number *rhs)
+{
+    assert(lhs && rhs);
+
+    if (lhs->is_int == rhs->is_int) {
+        return lhs->as.integer == rhs->as.integer;
+    } else if (lhs->is_int) {
+        return (ink_float)lhs->as.integer == rhs->as.floating;
+    } else if (rhs->is_int) {
+        return (ink_float)rhs->as.integer == lhs->as.floating;
+    } else {
+        return false;
+    }
 }
 
 struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
@@ -257,13 +212,10 @@ struct ink_object *ink_string_new(struct ink_story *story, const uint8_t *bytes,
     return INK_OBJ(obj);
 }
 
-bool ink_string_eq(const struct ink_object *lhs, const struct ink_object *rhs)
+bool ink_string_eq(const struct ink_string *lhs, const struct ink_string *rhs)
 {
-    struct ink_string *const str_lhs = INK_OBJ_AS_STRING(lhs);
-    struct ink_string *const str_rhs = INK_OBJ_AS_STRING(rhs);
-
-    return str_lhs->length == str_rhs->length &&
-           memcmp(str_lhs->bytes, str_rhs->bytes, str_lhs->length) == 0;
+    return lhs->length == rhs->length &&
+           memcmp(lhs->bytes, rhs->bytes, lhs->length) == 0;
 }
 
 struct ink_object *ink_string_concat(struct ink_story *story,
@@ -313,8 +265,7 @@ static struct ink_table_kv *ink_table_find_slot(struct ink_table_kv *entries,
     for (;;) {
         struct ink_table_kv *const entry = &entries[index];
 
-        if (entry->key == NULL ||
-            ink_string_eq(INK_OBJ(entry->key), INK_OBJ(key))) {
+        if (entry->key == NULL || ink_string_eq(entry->key, key)) {
             return entry;
         }
 
@@ -448,4 +399,23 @@ struct ink_object *ink_content_path_new(struct ink_story *story,
     ink_byte_vec_init(&obj->code);
     ink_object_vec_init(&obj->const_pool);
     return INK_OBJ(obj);
+}
+
+bool ink_object_eq(const struct ink_object *lhs, const struct ink_object *rhs)
+{
+    assert(lhs && rhs);
+
+    if (lhs->type != rhs->type) {
+        return false;
+    }
+    switch (lhs->type) {
+    case INK_OBJ_BOOL:
+        return ink_bool_eq(INK_OBJ_AS_BOOL(lhs), INK_OBJ_AS_BOOL(rhs));
+    case INK_OBJ_NUMBER:
+        return ink_number_eq(INK_OBJ_AS_NUMBER(lhs), INK_OBJ_AS_NUMBER(rhs));
+    case INK_OBJ_STRING:
+        return ink_string_eq(INK_OBJ_AS_STRING(lhs), INK_OBJ_AS_STRING(rhs));
+    default:
+        return false;
+    }
 }

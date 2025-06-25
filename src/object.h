@@ -29,6 +29,9 @@ enum ink_object_type {
     INK_OBJ_CONTENT_PATH,
 };
 
+typedef long ink_integer;
+typedef double ink_float;
+
 struct ink_object {
     enum ink_object_type type;
     bool is_marked;
@@ -42,7 +45,12 @@ struct ink_bool {
 
 struct ink_number {
     struct ink_object obj;
-    double value;
+    bool is_int;
+
+    union {
+        ink_integer integer;
+        ink_float floating;
+    } as;
 };
 
 struct ink_string {
@@ -102,6 +110,12 @@ ink_object_new(struct ink_story *story, enum ink_object_type type, size_t size);
 extern void ink_object_free(struct ink_story *story, struct ink_object *obj);
 
 /**
+ * Determine the equality of two runtime objects.
+ */
+extern bool ink_object_eq(const struct ink_object *lhs,
+                          const struct ink_object *rhs);
+
+/**
  * Print a runtime object.
  */
 extern void ink_object_print(const struct ink_object *obj);
@@ -117,37 +131,32 @@ extern const char *ink_object_type_strz(enum ink_object_type type);
 extern bool ink_object_is_falsey(const struct ink_object *obj);
 
 /**
- * Determine the equality of two objects.
- */
-extern struct ink_object *ink_object_eq(struct ink_story *story,
-                                        const struct ink_object *lhs,
-                                        const struct ink_object *rhs);
-
-/**
- * Coerce an object to a string.
- *
- * Returns the result as a new object.
- */
-extern struct ink_object *ink_object_to_string(struct ink_story *story,
-                                               struct ink_object *obj);
-
-/**
  * Create a boolean object.
  */
 extern struct ink_object *ink_bool_new(struct ink_story *story, bool value);
 
 /**
- * Create a number object.
+ * Determine the equality of two bool objects.
  */
-extern struct ink_object *ink_number_new(struct ink_story *story, double value);
+extern bool ink_bool_eq(const struct ink_bool *lhs, const struct ink_bool *rhs);
 
 /**
- * Coerce an object to a number.
- *
- * Returns the result as a new object.
+ * Create a runtime integer object.
  */
-extern struct ink_number *ink_object_to_number(struct ink_story *story,
-                                               struct ink_object *obj);
+extern struct ink_object *ink_integer_new(struct ink_story *story,
+                                          ink_integer value);
+
+/**
+ * Create a runtime floating-point number object.
+ */
+extern struct ink_object *ink_float_new(struct ink_story *story,
+                                        ink_float value);
+
+/**
+ * Determine the equality of two number objects.
+ */
+extern bool ink_number_eq(const struct ink_number *lhs,
+                          const struct ink_number *rhs);
 
 /**
  * Create a string object.
@@ -160,8 +169,8 @@ extern struct ink_object *ink_string_new(struct ink_story *story,
 /**
  * Check two strings for equality.
  */
-extern bool ink_string_eq(const struct ink_object *lhs,
-                          const struct ink_object *rhs);
+extern bool ink_string_eq(const struct ink_string *lhs,
+                          const struct ink_string *rhs);
 /**
  * Concatenate two strings.
  *

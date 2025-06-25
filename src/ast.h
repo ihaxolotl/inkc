@@ -50,6 +50,7 @@ struct ink_ast_node;
     T(AST_EQUAL_EXPR, "LogicalEqualityExpr")                                   \
     T(AST_EXPR_STMT, "ExprStmt")                                               \
     T(AST_FALSE, "False")                                                      \
+    T(AST_FLOAT, "NumberLiteral")                                              \
     T(AST_FUNC_DECL, "FunctionDecl")                                           \
     T(AST_FUNC_PROTO, "FunctionProto")                                         \
     T(AST_GATHER_POINT_STMT, "GatherPoint")                                    \
@@ -59,6 +60,7 @@ struct ink_ast_node;
     T(AST_GREATER_EQUAL_EXPR, "LogicalGreaterOrEqualExpr")                     \
     T(AST_IDENTIFIER, "Identifier")                                            \
     T(AST_INLINE_LOGIC, "InlineLogicExpr")                                     \
+    T(AST_INTEGER, "NumberLiteral")                                            \
     T(AST_KNOT_DECL, "KnotDecl")                                               \
     T(AST_KNOT_PROTO, "KnotProto")                                             \
     T(AST_LESS_EQUAL_EXPR, "LogicalLesserOrEqualExpr")                         \
@@ -69,7 +71,6 @@ struct ink_ast_node;
     T(AST_NEGATE_EXPR, "NegateExpr")                                           \
     T(AST_NOT_EQUAL_EXPR, "LogicalInequalityExpr")                             \
     T(AST_NOT_EXPR, "NotExpr")                                                 \
-    T(AST_NUMBER, "NumberLiteral")                                             \
     T(AST_OR_EXPR, "OrExpr")                                                   \
     T(AST_PARAM_DECL, "ParamDecl")                                             \
     T(AST_PARAM_LIST, "ParamList")                                             \

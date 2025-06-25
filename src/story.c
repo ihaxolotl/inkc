@@ -93,79 +93,6 @@ void ink_story_mem_free(struct ink_story *story, void *ptr)
 }
 
 /**
- * Perform a binary arithmetic operation.
- *
- * Returns the result as a new object.
- */
-static struct ink_object *ink_number_bin_op(struct ink_story *story,
-                                            enum ink_vm_opcode op,
-                                            const struct ink_number *lhs,
-                                            const struct ink_number *rhs)
-{
-    double value = 0.0f;
-
-    switch (op) {
-    case INK_OP_ADD:
-        value = lhs->value + rhs->value;
-        break;
-    case INK_OP_SUB:
-        value = lhs->value - rhs->value;
-        break;
-    case INK_OP_MUL:
-        value = lhs->value * rhs->value;
-        break;
-    case INK_OP_DIV:
-        value = lhs->value / rhs->value;
-        break;
-    case INK_OP_MOD:
-        value = fmod(lhs->value, rhs->value);
-        break;
-    default:
-        assert(false);
-        break;
-    }
-
-    ink_gc_disown(story, INK_OBJ(lhs));
-    ink_gc_disown(story, INK_OBJ(rhs));
-    return ink_number_new(story, value);
-}
-
-/**
- * Perform a binary comparison operation.
- *
- * Returns the result as a new object.
- */
-static struct ink_object *ink_number_bool_op(struct ink_story *story,
-                                             enum ink_vm_opcode op,
-                                             const struct ink_number *lhs,
-                                             const struct ink_number *rhs)
-{
-    bool value = false;
-
-    switch (op) {
-    case INK_OP_CMP_EQ:
-        value = lhs->value == rhs->value;
-        break;
-    case INK_OP_CMP_LT:
-        value = lhs->value < rhs->value;
-        break;
-    case INK_OP_CMP_LTE:
-        value = lhs->value <= rhs->value;
-        break;
-    case INK_OP_CMP_GT:
-        value = lhs->value > rhs->value;
-        break;
-    case INK_OP_CMP_GTE:
-        value = lhs->value >= rhs->value;
-        break;
-    default:
-        assert(false);
-        break;
-    }
-    return ink_bool_new(story, value);
-}
-
-/**
  * Disassemble a single byte instruction.
  *
  * Returns the next instruction offset.
@@ -428,6 +355,367 @@ static struct ink_object *ink_story_stack_peek(struct ink_story *story,
     return story->stack[story->stack_top - offset - 1];
 }
 
+static ink_integer ink_vm_int_arith(enum ink_vm_opcode op, ink_integer lhs,
+                                    ink_integer rhs)
+{
+    switch (op) {
+    case INK_OP_ADD:
+        return lhs + rhs;
+    case INK_OP_SUB:
+        return lhs - rhs;
+    case INK_OP_MUL:
+        return lhs * rhs;
+    case INK_OP_DIV:
+        return lhs / rhs;
+    case INK_OP_MOD:
+        return lhs % rhs;
+    default:
+        assert(false);
+        return 0;
+    }
+}
+
+static ink_float ink_vm_float_arith(enum ink_vm_opcode op, ink_float lhs,
+                                    ink_float rhs)
+{
+    switch (op) {
+    case INK_OP_ADD:
+        return lhs + rhs;
+    case INK_OP_SUB:
+        return lhs - rhs;
+    case INK_OP_MUL:
+        return lhs * rhs;
+    case INK_OP_DIV:
+        return lhs / rhs;
+    case INK_OP_MOD:
+        return fmod(lhs, rhs);
+    default:
+        assert(false);
+        return 0;
+    }
+}
+
+static bool ink_vm_int_logic(enum ink_vm_opcode op, ink_integer lhs,
+                             ink_integer rhs)
+{
+    switch (op) {
+    case INK_OP_CMP_EQ:
+        return lhs == rhs;
+    case INK_OP_CMP_LT:
+        return lhs < rhs;
+    case INK_OP_CMP_GT:
+        return lhs > rhs;
+    case INK_OP_CMP_LTE:
+        return lhs <= rhs;
+    case INK_OP_CMP_GTE:
+        return lhs >= rhs;
+    default:
+        assert(false);
+        return false;
+    }
+}
+
+/* TODO: Testing for equality of floating is error-prone and probably needs
+ * something more sophisticated than this.
+ */
+static bool ink_vm_float_logic(enum ink_vm_opcode op, ink_float lhs,
+                               ink_float rhs)
+{
+    switch (op) {
+    case INK_OP_CMP_EQ:
+        return lhs == rhs;
+    case INK_OP_CMP_LT:
+        return lhs < rhs;
+    case INK_OP_CMP_GT:
+        return lhs > rhs;
+    case INK_OP_CMP_LTE:
+        return lhs <= rhs;
+    case INK_OP_CMP_GTE:
+        return lhs >= rhs;
+    default:
+        assert(false);
+        return false;
+    }
+}
+
+static struct ink_object *ink_vm_to_number(struct ink_story *story,
+                                           struct ink_object *obj)
+{
+    ink_integer value = 0;
+
+    assert(obj);
+
+    switch (obj->type) {
+    case INK_OBJ_BOOL:
+        value = (ink_integer)(INK_OBJ_AS_BOOL(obj)->value);
+        break;
+    case INK_OBJ_NUMBER:
+        return obj;
+    default:
+        value = 1;
+        break;
+    }
+
+    obj = ink_integer_new(story, value);
+    ink_gc_own(story, obj);
+    return obj;
+}
+
+static struct ink_object *ink_vm_to_string(struct ink_story *story,
+                                           struct ink_object *obj)
+{
+    /* FIXME: Bad. */
+#define INK_NUMBER_BUFLEN (20u)
+    uint8_t buf[INK_NUMBER_BUFLEN];
+    size_t buflen = 0;
+
+    assert(obj);
+
+    switch (obj->type) {
+    case INK_OBJ_BOOL: {
+        if (INK_OBJ_AS_BOOL(obj)->value) {
+            buflen = strlen("true");
+            memcpy(buf, "true", buflen);
+        } else {
+            buflen = strlen("false");
+            memcpy(buf, "false", buflen);
+        }
+        break;
+    }
+    case INK_OBJ_NUMBER: {
+        /* TODO: Check the behavior of snprintf here. The current code MAY cause
+         * an overflow. */
+        struct ink_number *nval = INK_OBJ_AS_NUMBER(obj);
+
+        if (nval->is_int) {
+            buflen = (size_t)snprintf(NULL, 0, "%ld", nval->as.integer);
+            snprintf((char *)buf, INK_NUMBER_BUFLEN, "%ld", nval->as.integer);
+        } else {
+            buflen = (size_t)snprintf(NULL, 0, "%lf", nval->as.floating);
+            snprintf((char *)buf, INK_NUMBER_BUFLEN, "%lf", nval->as.floating);
+        }
+        break;
+    }
+    case INK_OBJ_STRING: {
+        return obj;
+    }
+    default:
+        buflen = strlen("<object>");
+        memcpy(buf, "<object>", buflen);
+        break;
+    }
+
+    obj = ink_string_new(story, buf, buflen);
+    ink_gc_own(story, obj);
+    return obj;
+#undef INK_NUMBER_BUFLEN
+}
+
+static inline ink_float ink_vm_to_float(const struct ink_object *value)
+{
+    assert(value && (INK_OBJ_IS_BOOL(value) || INK_OBJ_IS_NUMBER(value)));
+
+    if (INK_OBJ_IS_NUMBER(value)) {
+        if (INK_OBJ_AS_NUMBER(value)->is_int) {
+            return (ink_float)(INK_OBJ_AS_NUMBER(value)->as.integer);
+        } else {
+            return (INK_OBJ_AS_NUMBER(value)->as.floating);
+        }
+    } else {
+        return (ink_float)(INK_OBJ_AS_BOOL(value)->value);
+    }
+}
+
+static struct ink_object *ink_vm_number_arith(struct ink_story *story,
+                                              enum ink_vm_opcode op,
+                                              struct ink_object *lhs,
+                                              struct ink_object *rhs)
+{
+    if (INK_OBJ_AS_NUMBER(lhs)->is_int && INK_OBJ_AS_NUMBER(rhs)->is_int) {
+        return ink_integer_new(
+            story, ink_vm_int_arith(op, INK_OBJ_AS_NUMBER(lhs)->as.integer,
+                                    INK_OBJ_AS_NUMBER(rhs)->as.integer));
+    }
+    return ink_float_new(story, ink_vm_float_arith(op, ink_vm_to_float(lhs),
+                                                   ink_vm_to_float(rhs)));
+}
+
+static bool ink_vm_number_logic(enum ink_vm_opcode op, struct ink_object *lhs,
+                                struct ink_object *rhs)
+{
+    if (INK_OBJ_AS_NUMBER(lhs)->is_int && INK_OBJ_AS_NUMBER(rhs)->is_int) {
+        return ink_vm_int_logic(op, INK_OBJ_AS_NUMBER(lhs)->as.integer,
+                                INK_OBJ_AS_NUMBER(rhs)->as.integer);
+    }
+    return ink_vm_float_logic(op, ink_vm_to_float(lhs), ink_vm_to_float(rhs));
+}
+
+static int ink_vm_arith(struct ink_story *story, enum ink_vm_opcode op)
+{
+    struct ink_object *v = NULL;
+    struct ink_object *lhs = ink_story_stack_peek(story, 1);
+    struct ink_object *rhs = ink_story_stack_peek(story, 0);
+
+    if (!lhs || !rhs) {
+        return -INK_E_INVALID_ARG;
+    }
+
+    assert(INK_OBJ_IS_NUMBER(lhs) || INK_OBJ_IS_BOOL(lhs));
+    assert(INK_OBJ_IS_NUMBER(rhs) || INK_OBJ_IS_BOOL(rhs));
+
+    if (INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs)) {
+        v = ink_vm_number_arith(story, op, lhs, rhs);
+    } else if (INK_OBJ_IS_NUMBER(lhs)) {
+        v = ink_vm_number_arith(story, op, lhs, ink_vm_to_number(story, rhs));
+    } else if (INK_OBJ_IS_NUMBER(rhs)) {
+        v = ink_vm_number_arith(story, op, ink_vm_to_number(story, lhs), rhs);
+    }
+    if (!v) {
+        return -INK_E_OOM;
+    }
+
+    ink_story_stack_pop(story);
+    ink_story_stack_pop(story);
+
+    if (ink_story_stack_push(story, v) < 0) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+    return INK_E_OK;
+}
+
+static int ink_vm_add(struct ink_story *story)
+{
+    struct ink_object *v = NULL;
+    struct ink_object *lhs = ink_story_stack_peek(story, 1);
+    struct ink_object *rhs = ink_story_stack_peek(story, 0);
+
+    if (!lhs || !rhs) {
+        return -INK_E_INVALID_ARG;
+    }
+    if (INK_OBJ_IS_STRING(lhs) && INK_OBJ_IS_STRING(rhs)) {
+        v = ink_string_concat(story, lhs, rhs);
+    } else if (INK_OBJ_IS_STRING(lhs)) {
+        v = ink_string_concat(story, lhs, ink_vm_to_string(story, rhs));
+    } else if (INK_OBJ_IS_STRING(rhs)) {
+        v = ink_string_concat(story, ink_vm_to_string(story, lhs), rhs);
+    } else if (INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs)) {
+        v = ink_vm_number_arith(story, INK_OP_ADD, lhs, rhs);
+    } else if (INK_OBJ_IS_NUMBER(lhs)) {
+        v = ink_vm_number_arith(story, INK_OP_ADD, lhs,
+                                ink_vm_to_number(story, rhs));
+    } else if (INK_OBJ_IS_NUMBER(rhs)) {
+        v = ink_vm_number_arith(story, INK_OP_ADD, ink_vm_to_number(story, lhs),
+                                rhs);
+    } else {
+        return -INK_E_INVALID_ARG;
+    }
+    if (!v) {
+        return -INK_E_OOM;
+    }
+
+    ink_story_stack_pop(story);
+    ink_story_stack_pop(story);
+
+    if (ink_story_stack_push(story, v) < 0) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+    return INK_E_OK;
+}
+
+static int ink_vm_cmp(struct ink_story *story, enum ink_vm_opcode op)
+{
+    bool cond = false;
+    struct ink_object *v = NULL;
+    struct ink_object *lhs = ink_story_stack_peek(story, 1);
+    struct ink_object *rhs = ink_story_stack_peek(story, 0);
+
+    if (!lhs || !rhs) {
+        return -INK_E_INVALID_ARG;
+    }
+    if (op == INK_OP_CMP_EQ) {
+        cond = ink_object_eq(lhs, rhs);
+    } else {
+        assert(INK_OBJ_IS_NUMBER(lhs) || INK_OBJ_IS_BOOL(lhs));
+        assert(INK_OBJ_IS_NUMBER(rhs) || INK_OBJ_IS_BOOL(rhs));
+
+        if (INK_OBJ_IS_NUMBER(lhs) && INK_OBJ_IS_NUMBER(rhs)) {
+            cond = ink_vm_number_logic(op, lhs, rhs);
+        } else if (INK_OBJ_IS_NUMBER(lhs)) {
+            cond = ink_vm_number_logic(op, lhs, ink_vm_to_number(story, rhs));
+        } else if (INK_OBJ_IS_NUMBER(rhs)) {
+            cond = ink_vm_number_logic(op, ink_vm_to_number(story, lhs), rhs);
+        } else {
+            return -INK_E_INVALID_ARG;
+        }
+    }
+
+    v = ink_bool_new(story, cond);
+    if (!v) {
+        return -INK_E_OOM;
+    }
+
+    ink_story_stack_pop(story);
+    ink_story_stack_pop(story);
+
+    if (ink_story_stack_push(story, v) < 0) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+    return INK_E_OK;
+}
+
+static int ink_vm_neg(struct ink_story *story)
+{
+    struct ink_number *v = NULL;
+    struct ink_object *arg = ink_story_stack_peek(story, 0);
+
+    if (!arg) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+
+    assert(arg->type == INK_OBJ_NUMBER);
+    v = INK_OBJ_AS_NUMBER(arg);
+
+    if (v->is_int) {
+        v->as.integer = -v->as.integer;
+    } else {
+        v->as.floating = -v->as.floating;
+    }
+    return INK_E_OK;
+}
+
+static int ink_vm_not(struct ink_story *story)
+{
+    struct ink_object *v = NULL;
+    struct ink_object *arg = ink_story_stack_peek(story, 0);
+
+    if (!arg) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+
+    v = ink_bool_new(story, ink_object_is_falsey(arg));
+    if (!v) {
+        return -INK_E_OOM;
+    }
+
+    ink_story_stack_pop(story);
+    ink_story_stack_push(story, v);
+    return INK_E_OK;
+}
+
+static int ink_vm_load_const(struct ink_story *story,
+                             struct ink_call_frame *frame, uint8_t offset)
+{
+    struct ink_object_vec *const const_pool = &frame->callee->const_pool;
+
+    if (offset > const_pool->count) {
+        return -INK_E_INVALID_ARG;
+    }
+    if (ink_story_stack_push(story, const_pool->entries[offset]) < 0) {
+        return -INK_E_STACK_OVERFLOW;
+    }
+    return INK_E_OK;
+}
+
 /**
  * Main interpreter loop.
  *
@@ -494,58 +782,27 @@ static int ink_story_exec(struct ink_story *story)
             break;
         }
         case INK_OP_TRUE: {
-            struct ink_object *const value = ink_bool_new(story, true);
-
-            rc = ink_story_stack_push(story, value);
-            if (rc < 0) {
+            if (ink_story_stack_push(story, ink_bool_new(story, true)) < 0) {
+                rc = -INK_E_STACK_OVERFLOW;
                 goto exit_loop;
             }
             break;
         }
         case INK_OP_FALSE: {
-            struct ink_object *const value = ink_bool_new(story, false);
-
-            rc = ink_story_stack_push(story, value);
-            if (rc < 0) {
+            if (ink_story_stack_push(story, ink_bool_new(story, false)) < 0) {
+                rc = -INK_E_STACK_OVERFLOW;
                 goto exit_loop;
             }
             break;
         }
         case INK_OP_CONST: {
-            const uint8_t offset = INK_READ_BYTE();
-
-            if (offset > const_pool->count) {
-                rc = -INK_E_INVALID_ARG;
-                goto exit_loop;
-            }
-
-            rc = ink_story_stack_push(story, const_pool->entries[offset]);
-            if (rc < 0) {
+            if ((rc = ink_vm_load_const(story, frame, INK_READ_BYTE())) < 0) {
                 goto exit_loop;
             }
             break;
         }
         case INK_OP_ADD: {
-            struct ink_object *const arg2 = ink_story_stack_peek(story, 0);
-            struct ink_object *const arg1 = ink_story_stack_peek(story, 1);
-            struct ink_object *value = NULL;
-
-            if (INK_OBJ_IS_STRING(arg1) || INK_OBJ_IS_STRING(arg2)) {
-                value =
-                    ink_string_concat(story, ink_object_to_string(story, arg1),
-                                      ink_object_to_string(story, arg2));
-
-            } else {
-                value = ink_number_bin_op(story, op,
-                                          ink_object_to_number(story, arg1),
-                                          ink_object_to_number(story, arg2));
-            }
-            if (!value) {
-                rc = -INK_E_OOM;
-                goto exit_loop;
-            }
-
-            rc = ink_story_stack_push(story, value);
+            rc = ink_vm_add(story);
             if (rc < 0) {
                 goto exit_loop;
             }
@@ -555,81 +812,35 @@ static int ink_story_exec(struct ink_story *story)
         case INK_OP_MUL:
         case INK_OP_DIV:
         case INK_OP_MOD: {
-            struct ink_object *const arg2 = ink_story_stack_peek(story, 0);
-            struct ink_object *const arg1 = ink_story_stack_peek(story, 1);
-            struct ink_object *const value =
-                ink_number_bin_op(story, op, ink_object_to_number(story, arg1),
-                                  ink_object_to_number(story, arg2));
-
-            if (!value) {
-                rc = -INK_E_OOM;
-                goto exit_loop;
-            }
-
-            ink_story_stack_pop(story);
-            ink_story_stack_pop(story);
-
-            rc = ink_story_stack_push(story, value);
+            rc = ink_vm_arith(story, op);
             if (rc < 0) {
                 goto exit_loop;
             }
             break;
         }
-        case INK_OP_CMP_EQ: {
-            struct ink_object *const arg2 = ink_story_stack_peek(story, 0);
-            struct ink_object *const arg1 = ink_story_stack_peek(story, 1);
-            struct ink_object *value = NULL;
-
-            if (!arg1 || !arg2) {
-                rc = -INK_E_INVALID_ARG;
-                goto exit_loop;
-            }
-
-            value = ink_object_eq(story, arg1, arg2);
-            ink_story_stack_pop(story);
-            ink_story_stack_pop(story);
-            ink_story_stack_push(story, value);
-            break;
-        }
+        case INK_OP_CMP_EQ:
         case INK_OP_CMP_LT:
         case INK_OP_CMP_GT:
         case INK_OP_CMP_LTE:
         case INK_OP_CMP_GTE: {
-            struct ink_object *const arg2 = ink_story_stack_peek(story, 0);
-            struct ink_object *const arg1 = ink_story_stack_peek(story, 1);
-            struct ink_object *value =
-                ink_number_bool_op(story, op, ink_object_to_number(story, arg1),
-                                   ink_object_to_number(story, arg2));
-            if (!value) {
-                rc = -INK_E_OOM;
-                goto exit_loop;
-            }
-
-            ink_story_stack_pop(story);
-            ink_story_stack_pop(story);
-
-            rc = ink_story_stack_push(story, value);
+            rc = ink_vm_cmp(story, op);
             if (rc < 0) {
                 goto exit_loop;
             }
             break;
         }
         case INK_OP_NEG: {
-            struct ink_object *const arg = ink_story_stack_peek(story, 0);
-            struct ink_object *const value =
-                ink_number_new(story, -INK_OBJ_AS_NUMBER(arg)->value);
-
-            ink_story_stack_pop(story);
-            ink_story_stack_push(story, value);
+            rc = ink_vm_neg(story);
+            if (rc < 0) {
+                goto exit_loop;
+            }
             break;
         }
         case INK_OP_NOT: {
-            struct ink_object *const arg = ink_story_stack_peek(story, 0);
-            struct ink_object *const value =
-                ink_bool_new(story, ink_object_is_falsey(arg));
-
-            ink_story_stack_pop(story);
-            ink_story_stack_push(story, value);
+            rc = ink_vm_not(story);
+            if (rc < 0) {
+                goto exit_loop;
+            }
             break;
         }
         case INK_OP_JMP: {
@@ -742,7 +953,7 @@ static int ink_story_exec(struct ink_story *story)
         }
         case INK_OP_CONTENT: {
             struct ink_object *const arg = ink_story_stack_pop(story);
-            struct ink_object *const str_arg = ink_object_to_string(story, arg);
+            struct ink_object *const str_arg = ink_vm_to_string(story, arg);
             struct ink_string *const str = INK_OBJ_AS_STRING(str_arg);
 
             ink_stream_write(&story->stream, str->bytes, str->length);

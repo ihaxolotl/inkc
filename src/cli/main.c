@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
                 goto out;
             }
             if (line) {
-                printf("%.*s\n", (int)linelen, line);
+                printf("%.*s", (int)linelen, line);
             }
             while (ink_story_choice_next(story, &choice) >= 0) {
                 printf("%zu: %.*s\n", ++choice_index, (int)choice.length,

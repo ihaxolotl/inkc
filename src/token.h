@@ -51,7 +51,8 @@ extern "C" {
     T(TT_MINUS, "Minus")                                                       \
     T(TT_MINUS_EQUAL, "MinusEqual")                                            \
     T(TT_MINUS_MINUS, "MinusMinus")                                            \
-    T(TT_NUMBER, "Number")                                                     \
+    T(TT_INTEGER, "Integer")                                                   \
+    T(TT_FLOATING, "FloatingPointNumber")                                      \
     T(TT_PERCENT, "Percentage")                                                \
     T(TT_PIPE, "Pipe")                                                         \
     T(TT_PIPE_PIPE, "PipePipe")                                                \

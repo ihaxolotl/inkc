@@ -617,14 +617,34 @@ static void ink_astgen_false(struct ink_astgen *scope)
     ink_astgen_emit_byte(scope, INK_OP_FALSE);
 }
 
-static void ink_astgen_number(struct ink_astgen *scope,
-                              const struct ink_ast_node *expr)
+static void ink_astgen_integer(struct ink_astgen *scope,
+                               const struct ink_ast_node *expr)
 {
+    /* TODO: Error-handling. */
     const struct ink_string_ref str = ink_string_from_node(scope, expr);
     const size_t str_index = ink_astgen_add_str(scope, str.bytes, str.length);
     const uint8_t *const str_bytes = ink_astgen_str_bytes(scope, str_index);
-    const double value = strtod((char *)str_bytes, NULL);
-    struct ink_object *const obj = ink_number_new(scope->global->story, value);
+    const ink_integer v = strtol((char *)str_bytes, NULL, 10);
+    struct ink_object *const obj = ink_integer_new(scope->global->story, v);
+
+    if (!obj) {
+        ink_astgen_fail(scope, "Could not create runtime object for number.");
+        return;
+    }
+
+    ink_astgen_emit_const(scope, INK_OP_CONST,
+                          (uint8_t)ink_astgen_add_const(scope, obj));
+}
+
+static void ink_astgen_float(struct ink_astgen *scope,
+                             const struct ink_ast_node *expr)
+{
+    /* TODO: Error-handling. */
+    const struct ink_string_ref str = ink_string_from_node(scope, expr);
+    const size_t str_index = ink_astgen_add_str(scope, str.bytes, str.length);
+    const uint8_t *const str_bytes = ink_astgen_str_bytes(scope, str_index);
+    const ink_float v = strtod((char *)str_bytes, NULL);
+    struct ink_object *const obj = ink_float_new(scope->global->story, v);
 
     if (!obj) {
         ink_astgen_fail(scope, "Could not create runtime object for number.");
@@ -778,8 +798,11 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
     case INK_AST_FALSE:
         ink_astgen_false(astgen);
         break;
-    case INK_AST_NUMBER:
-        ink_astgen_number(astgen, node);
+    case INK_AST_INTEGER:
+        ink_astgen_integer(astgen, node);
+        break;
+    case INK_AST_FLOAT:
+        ink_astgen_float(astgen, node);
         break;
     case INK_AST_IDENTIFIER:
         ink_astgen_identifier(astgen, node);
@@ -983,7 +1006,8 @@ static void ink_astgen_switch_stmt(struct ink_astgen *scope,
             lhs = br->data.bin.lhs;
 
             switch (lhs->type) {
-            case INK_AST_NUMBER:
+            case INK_AST_FLOAT:
+            case INK_AST_INTEGER:
             case INK_AST_TRUE:
             case INK_AST_FALSE:
                 break;
@@ -1331,7 +1355,7 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
         assert(br_stmt->type == INK_AST_CHOICE_STAR_STMT ||
                br_stmt->type == INK_AST_CHOICE_PLUS_STMT);
 
-        choice->id = ink_number_new(scope->global->story, (double)i);
+        choice->id = ink_integer_new(scope->global->story, (ink_integer)i);
         if (!choice->id) {
             /* TODO: Probably panic and report an error here. */
             return;

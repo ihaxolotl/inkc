@@ -313,7 +313,8 @@ static void ink_ast_node_print_nocolors(const struct ink_ast_node *node,
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
     case INK_AST_IDENTIFIER:
-    case INK_AST_NUMBER:
+    case INK_AST_INTEGER:
+    case INK_AST_FLOAT:
     case INK_AST_PARAM_DECL:
     case INK_AST_REF_PARAM_DECL:
     case INK_AST_STRING:
@@ -377,7 +378,8 @@ static void ink_ast_node_print_colors(const struct ink_ast_node *node,
     case INK_AST_CHOICE_OPTION_EXPR:
     case INK_AST_CHOICE_INNER_EXPR:
     case INK_AST_IDENTIFIER:
-    case INK_AST_NUMBER:
+    case INK_AST_INTEGER:
+    case INK_AST_FLOAT:
     case INK_AST_PARAM_DECL:
     case INK_AST_REF_PARAM_DECL:
     case INK_AST_STRING_EXPR:

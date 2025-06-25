@@ -28,7 +28,9 @@ struct test_stream {
 
 static const char *TEST_FILES[] = {
     "runtime/content/hello-world",
-    "runtimej/content/glue",
+    "runtime/content/glue",
+    "runtime/expressions/binary-expressions",
+    "runtime/expressions/mixed-expressions",
     "runtime/choices/monsieur-fogg",
     "runtime/gathers/monsieur-fogg",
 };

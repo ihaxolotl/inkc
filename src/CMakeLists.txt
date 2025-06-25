@@ -4,6 +4,7 @@ set(ink_sources
     astgen.c
     common.c
     compile.c
+    gc.c
     logging.c
     memory.c
     object.c

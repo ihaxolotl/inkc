@@ -454,7 +454,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
                 if (ink_is_alpha(ch) || ch == '_') {
                     state = INK_LEX_IDENTIFIER;
                 } else if (!ink_is_digit(ch)) {
-                    token->type = INK_TT_NUMBER;
+                    token->type = INK_TT_INTEGER;
                     goto exit_loop;
                 }
             }
@@ -471,7 +471,7 @@ void ink_scanner_next(struct ink_scanner *scanner, struct ink_token *token)
         }
         case INK_LEX_NUMBER_DECIMAL: {
             if (!ink_is_digit(ch)) {
-                token->type = INK_TT_NUMBER;
+                token->type = INK_TT_FLOATING;
                 goto exit_loop;
             }
             break;

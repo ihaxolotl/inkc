@@ -911,21 +911,6 @@ static struct ink_ast_node *ink_parse_atom(struct ink_parser *parser,
     return n;
 }
 
-static struct ink_ast_node *ink_parse_true(struct ink_parser *p)
-{
-    return ink_parse_atom(p, INK_AST_TRUE);
-}
-
-static struct ink_ast_node *ink_parse_false(struct ink_parser *p)
-{
-    return ink_parse_atom(p, INK_AST_FALSE);
-}
-
-static struct ink_ast_node *ink_parse_number(struct ink_parser *p)
-{
-    return ink_parse_atom(p, INK_AST_NUMBER);
-}
-
 static struct ink_ast_node *ink_parse_identifier(struct ink_parser *p)
 {
     return ink_parse_atom(p, INK_AST_IDENTIFIER);
@@ -1070,12 +1055,14 @@ static struct ink_ast_node *ink_parse_primary_expr(struct ink_parser *p)
     struct ink_ast_node *n = NULL;
 
     switch (p->token.type) {
-    case INK_TT_NUMBER:
-        return ink_parse_number(p);
+    case INK_TT_INTEGER:
+        return ink_parse_atom(p, INK_AST_INTEGER);
+    case INK_TT_FLOATING:
+        return ink_parse_atom(p, INK_AST_FLOAT);
     case INK_TT_KEYWORD_TRUE:
-        return ink_parse_true(p);
+        return ink_parse_atom(p, INK_AST_TRUE);
     case INK_TT_KEYWORD_FALSE:
-        return ink_parse_false(p);
+        return ink_parse_atom(p, INK_AST_FALSE);
     case INK_TT_IDENTIFIER:
         return ink_parse_identifier_expr(p);
     case INK_TT_DOUBLE_QUOTE:
