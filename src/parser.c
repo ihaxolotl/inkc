@@ -8,7 +8,7 @@
 #include "arena.h"
 #include "ast.h"
 #include "common.h"
-#include "parse.h"
+#include "parser.h"
 #include "scanner.h"
 #include "token.h"
 #include "vec.h"

@@ -8,7 +8,7 @@ set(ink_sources
     logging.c
     memory.c
     object.c
-    parse.c
+    parser.c
     scanner.c
     source.c
     story.c

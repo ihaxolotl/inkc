@@ -8,7 +8,7 @@
 #include "ast.h"
 #include "astgen.h"
 #include "compile.h"
-#include "parse.h"
+#include "parser.h"
 
 #define INK_ARENA_ALIGNMENT (8u)
 #define INK_ARENA_BLOCK_SIZE (8192u)
