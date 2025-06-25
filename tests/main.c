@@ -251,6 +251,18 @@ static int t_teardown(void **state)
 INK_VEC_T(tvec, int)
 INK_HASHMAP_T(tht, int, int)
 
+static uint32_t test_fnv32a(const uint8_t *data, size_t length)
+{
+    const uint32_t fnv_prime = 0x01000193;
+    uint32_t hash = 0x811c9dc5;
+
+    for (size_t i = 0; i < length; i++) {
+        hash = hash ^ data[i];
+        hash = hash * fnv_prime;
+    }
+    return hash;
+}
+
 static void test_vec_oom(void **state)
 {
     struct tvec v;
@@ -303,7 +315,7 @@ static void test_vec_reserve(void **state)
 
 static uint32_t tht_hash(const void *key, size_t length)
 {
-    return ink_fnv32a((uint8_t *)key, length);
+    return test_fnv32a((uint8_t *)key, length);
 }
 
 static bool tht_cmp(const void *lhs, const void *rhs)
