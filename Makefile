@@ -1,4 +1,4 @@
-.PHONY: all default help docs tests clean
+.PHONY: all default help debug release docs tests clean
 
 VERBOSE ?= 0
 
@@ -25,10 +25,15 @@ ifneq ($(BUILD_TYPE),)
 endif
 
 all: default
+default: release
 
-default:
-	$(Q) cmake -B $(BUILDDIR) $(OPTIONS)
-	$(Q) make -s -C $(BUILDDIR)
+debug:
+	$(Q) cmake -B $(BUILDDIR)/debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED=OFF
+	$(Q) make -s -C $(BUILDDIR)/debug
+
+release:
+	$(Q) cmake -B $(BUILDDIR)/release -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	$(Q) make -s -C $(BUILDDIR)/release
 
 tests:
 	$(Q) cmake -B $(BUILDDIR)/coverage -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON -DENABLE_COVERAGE=ON

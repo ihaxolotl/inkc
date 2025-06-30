@@ -43,8 +43,6 @@ endif()
 
 add_subdirectory(src)
 
-option(BUILD_SHARED "Build shared library" ON)
-
 if(ENABLE_TESTING)
     include(cmake/cmocka.cmake)
     add_executable(ink_tests)

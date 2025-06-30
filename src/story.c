@@ -765,12 +765,10 @@ static int ink_story_exec(struct ink_story *story)
 
             story->stack_top = (size_t)(frame->sp - story->stack);
 
-            /* FIXME: This probably isn't a good way to handle this case. */
-            if (!value) {
-                value = ink_bool_new(story, false);
+            if (value) {
+                ink_story_stack_push(story, value);
             }
 
-            ink_story_stack_push(story, value);
             frame = &story->call_stack[story->call_stack_top - 1];
             break;
         }
@@ -953,10 +951,13 @@ static int ink_story_exec(struct ink_story *story)
         }
         case INK_OP_CONTENT: {
             struct ink_object *const arg = ink_story_stack_pop(story);
-            struct ink_object *const str_arg = ink_vm_to_string(story, arg);
-            struct ink_string *const str = INK_OBJ_AS_STRING(str_arg);
 
-            ink_stream_write(&story->stream, str->bytes, str->length);
+            if (arg) {
+                struct ink_object *const str_arg = ink_vm_to_string(story, arg);
+                struct ink_string *const str = INK_OBJ_AS_STRING(str_arg);
+
+                ink_stream_write(&story->stream, str->bytes, str->length);
+            }
             break;
         }
         case INK_OP_LINE: {
