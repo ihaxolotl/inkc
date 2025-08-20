@@ -7,6 +7,9 @@
 dist/
 build/
 __pycache__/
+.zig-cache/
+zig-out/
+kcov-output/
 
 # Temporary Files / Logs
 *.log
