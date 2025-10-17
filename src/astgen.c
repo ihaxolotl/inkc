@@ -23,18 +23,22 @@
  * TODO: Stitches could be allowed to be functions. Might help with code
  * organization.
  */
-
 #define INK_STRINGSET_LOAD_MAX (80u)
 
-#define INK_ASTGEN_TODO(msg)                                                   \
+#define INK_ASTGEN_TODO(__msg)                                                 \
     do {                                                                       \
-        fprintf(stderr, "TODO(astgen): %s\n", (msg));                          \
+        fprintf(stderr, "TODO(astgen): %s\n", (__msg));                        \
     } while (0)
 
-#define INK_ASTGEN_BUG(node)                                                   \
+#define INK_ASTGEN_BUG(__node)                                                 \
     do {                                                                       \
         fprintf(stderr, "BUG(astgen): %s in %s\n",                             \
-                ink_ast_node_type_strz((node)->type), __func__);               \
+                ink_ast_node_type_strz((__node)->type), __func__);             \
+    } while (0)
+
+#define INK_ASTGEN_FAIL(__astgen, __msg)                                       \
+    do {                                                                       \
+        ink_astgen_fail(__astgen, __FILE__, __LINE__, __msg);                  \
     } while (0)
 
 /**
@@ -87,6 +91,16 @@ struct ink_astgen_global {
     jmp_buf jmpbuf;
 };
 
+struct ink_astgen {
+    struct ink_astgen *parent;
+    struct ink_astgen_global *global;
+    struct ink_symtab *symbol_table;
+    size_t jumps_top;
+    size_t labels_top;
+    size_t exit_label;
+    size_t namespace_index;
+};
+
 static void ink_astgen_global_init(struct ink_astgen_global *g,
                                    struct ink_ast *tree,
                                    struct ink_story *story)
@@ -112,15 +126,12 @@ static void ink_astgen_global_deinit(struct ink_astgen_global *g)
     ink_astgen_jump_vec_deinit(&g->branches);
 }
 
-struct ink_astgen {
-    struct ink_astgen *parent;
-    struct ink_astgen_global *global;
-    struct ink_symtab *symbol_table;
-    size_t jumps_top;
-    size_t labels_top;
-    size_t exit_label;
-    size_t namespace_index;
-};
+static void ink_astgen_fail(struct ink_astgen *astgen, const char *filename,
+                            int line, const char *msg)
+{
+    fprintf(stderr, "%s:%d: %s", filename, line, msg);
+    longjmp(astgen->global->jmpbuf, 1);
+}
 
 static int ink_astgen_make(struct ink_astgen *scope,
                            struct ink_astgen *parent_scope,
@@ -155,13 +166,6 @@ static void ink_astgen_deinit(struct ink_astgen *scope)
     scope->symbol_table = NULL;
 }
 
-static void ink_astgen_fail(struct ink_astgen *astgen, const char *filename,
-                            int line, const char *msg)
-{
-    fprintf(stderr, "%s:%d: %s", filename, line, msg);
-    exit(EXIT_FAILURE);
-}
-
 static void ink_astgen_error(struct ink_astgen *astgen,
                              enum ink_ast_error_type type,
                              const struct ink_ast_node *node)
@@ -174,11 +178,6 @@ static void ink_astgen_error(struct ink_astgen *astgen,
     };
 
     ink_ast_error_vec_push(&g->tree->errors, err);
-}
-
-static void ink_astgen_global_panic(struct ink_astgen_global *g)
-{
-    longjmp(g->jmpbuf, 1);
 }
 
 /**
@@ -356,7 +355,7 @@ static void ink_astgen_emit_const(struct ink_astgen *astgen,
         ink_astgen_emit_byte(astgen, (uint8_t)op);
         ink_astgen_emit_byte(astgen, (uint8_t)arg);
     } else {
-        ink_astgen_global_panic(astgen->global);
+        INK_ASTGEN_FAIL(astgen, "const index exceeds max value");
     }
 }
 
@@ -523,8 +522,7 @@ static void ink_astgen_patch_jump(struct ink_astgen *astgen, size_t offset)
     const size_t jump = code->count - offset - 2;
 
     if (jump > UINT16_MAX) {
-        ink_astgen_fail(astgen, __FILE__, __LINE__,
-                        "Too much code to jump over.");
+        INK_ASTGEN_FAIL(astgen, "Too much code to jump over.");
         return;
     }
 
@@ -548,8 +546,7 @@ static void ink_astgen_backpatch(struct ink_astgen *scope, size_t start_offset,
         const size_t test = label->code_offset - jump->code_offset - 2;
 
         if (test > UINT16_MAX) {
-            ink_astgen_fail(scope, __FILE__, __LINE__,
-                            "Too much code to jump over.");
+            INK_ASTGEN_FAIL(scope, "Too much code to jump over.");
             return;
         }
 
@@ -628,8 +625,7 @@ static void ink_astgen_integer(struct ink_astgen *scope,
     struct ink_object *const obj = ink_integer_new(scope->global->story, v);
 
     if (!obj) {
-        ink_astgen_fail(scope, __FILE__, __LINE__,
-                        "Could not create runtime object for number.");
+        INK_ASTGEN_FAIL(scope, "Could not create runtime object for number.");
         return;
     }
 
@@ -648,8 +644,7 @@ static void ink_astgen_float(struct ink_astgen *scope,
     struct ink_object *const obj = ink_float_new(scope->global->story, v);
 
     if (!obj) {
-        ink_astgen_fail(scope, __FILE__, __LINE__,
-                        "Could not create runtime object for number.");
+        INK_ASTGEN_FAIL(scope, "Could not create runtime object for number.");
         return;
     }
 
@@ -668,8 +663,7 @@ static void ink_astgen_string(struct ink_astgen *scope,
     (void)str_index;
 
     if (!obj) {
-        ink_astgen_fail(scope, __FILE__, __LINE__,
-                        "Could not create runtime object for string.");
+        INK_ASTGEN_FAIL(scope, "Could not create runtime object for string.");
         return;
     }
 
