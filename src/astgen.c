@@ -242,7 +242,7 @@ static int ink_astgen_lookup_name(struct ink_astgen *scope,
                                   const struct ink_ast_node *node,
                                   struct ink_symbol *sym)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     const struct ink_string_ref key = ink_string_from_node(scope, node);
 
     while (scope) {
@@ -260,12 +260,9 @@ static int ink_astgen_update_name(struct ink_astgen *scope,
                                   const struct ink_ast_node *node,
                                   const struct ink_symbol *sym)
 {
-    int rc = ink_astgen_insert_name(scope, node, sym);
+    const int rc = ink_astgen_insert_name(scope, node, sym);
 
-    if (rc == -INK_E_OVERWRITE) {
-        return 0;
-    }
-    return rc;
+    return rc == -INK_E_OVERWRITE ? INK_E_OK : rc;
 }
 
 /**
@@ -277,7 +274,7 @@ static int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
                                     struct ink_symbol *sym)
 
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
 
     if (!lhs) {
         return rc;
@@ -285,7 +282,7 @@ static int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
     if (lhs->type == INK_AST_SELECTOR_EXPR) {
         rc = ink_astgen_lookup_expr_r(scope, lhs->data.bin.lhs,
                                       lhs->data.bin.rhs, sym);
-        if (rc < 0) {
+        if (rc != INK_E_OK) {
             return rc;
         }
 
@@ -294,7 +291,7 @@ static int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
         const struct ink_string_ref lhs_key = ink_string_from_node(scope, lhs);
 
         rc = ink_symtab_lookup(scope->symbol_table, lhs_key, sym);
-        if (rc < 0) {
+        if (rc != INK_E_OK) {
             return rc;
         }
         if (sym->as.knot.local_names) {
@@ -303,7 +300,7 @@ static int ink_astgen_lookup_expr_r(struct ink_astgen *scope,
 
             return ink_symtab_lookup(sym->as.knot.local_names, rhs_key, sym);
         }
-        rc = INK_E_FAIL;
+        rc = -INK_E_FAIL;
     }
     return rc;
 }
@@ -318,7 +315,7 @@ static int ink_astgen_lookup_qualified(struct ink_astgen *scope,
                                        const struct ink_ast_node *node,
                                        struct ink_symbol *sym)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     struct ink_ast_node *lhs = NULL;
     struct ink_ast_node *rhs = NULL;
 
@@ -329,7 +326,7 @@ static int ink_astgen_lookup_qualified(struct ink_astgen *scope,
         lhs = node->data.bin.lhs;
         rhs = node->data.bin.rhs;
         rc = ink_astgen_lookup_expr_r(scope, lhs, rhs, sym);
-        if (rc < 0) {
+        if (rc != INK_E_OK) {
             scope = scope->parent;
         } else {
             return rc;
@@ -438,7 +435,7 @@ static size_t ink_astgen_add_const(struct ink_astgen *astgen,
 static size_t ink_astgen_add_str(struct ink_astgen *astgen,
                                  const uint8_t *chars, size_t length)
 {
-    int rc;
+    int rc = -INK_E_FAIL;
     struct ink_astgen_global *const g = astgen->global;
     struct ink_stringset *const s_tab = &g->string_table;
     struct ink_byte_vec *const bv = &g->string_bytes;
@@ -718,15 +715,15 @@ static int ink_astgen_check_args_count(struct ink_astgen *scope,
                                        struct ink_ast_node_list *args,
                                        struct ink_symbol *symbol)
 {
-    int rc = -1;
+    int rc = -INK_E_FAIL;
     const size_t knot_arity = symbol->as.knot.arity;
 
     if (!args) {
         if (knot_arity != 0) {
             ink_astgen_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
-            rc = -1;
+            rc = -INK_E_FAIL;
         } else {
-            rc = 0;
+            rc = INK_E_OK;
         }
     } else {
         if (args->count != knot_arity) {
@@ -735,9 +732,9 @@ static int ink_astgen_check_args_count(struct ink_astgen *scope,
             } else {
                 ink_astgen_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
             }
-            rc = -1;
+            rc = -INK_E_FAIL;
         } else {
-            rc = 0;
+            rc = INK_E_OK;
         }
     }
     return rc;
@@ -751,7 +748,7 @@ static void ink_astgen_call_expr(struct ink_astgen *scope,
                                  const struct ink_ast_node *expr,
                                  enum ink_vm_opcode op)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     struct ink_symbol sym;
     struct ink_astgen_global *g = scope->global;
     struct ink_ast_node *const lhs = expr->data.bin.lhs;
@@ -1320,13 +1317,13 @@ static void ink_astgen_expr_stmt(struct ink_astgen *scope,
 static void ink_astgen_assign_stmt(struct ink_astgen *scope,
                                    const struct ink_ast_node *stmt)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     struct ink_symbol sym;
     struct ink_ast_node *const lhs = stmt->data.bin.lhs;
     struct ink_ast_node *const rhs = stmt->data.bin.rhs;
 
     rc = ink_astgen_lookup_name(scope, lhs, &sym);
-    if (rc < 0) {
+    if (rc != INK_E_OK) {
         ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
         return;
     }
@@ -1528,7 +1525,7 @@ static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
                                   const struct ink_ast_node *proto,
                                   const struct ink_symbol *sym)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     struct ink_symbol param_sym;
     struct ink_astgen_global *const g = parent_scope->global;
     struct ink_ast_node *const rhs = proto->data.bin.rhs;
@@ -1544,7 +1541,7 @@ static void ink_astgen_knot_proto(struct ink_astgen *parent_scope,
                 struct ink_ast_node *const param = args->nodes[i];
 
                 rc = ink_astgen_lookup_name(parent_scope, param, &param_sym);
-                if (rc < 0) {
+                if (rc != INK_E_OK) {
                     return;
                 }
 
@@ -1667,7 +1664,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
                                    const struct ink_ast_node *proto,
                                    struct ink_astgen *child_scope)
 {
-    int rc = INK_E_FAIL;
+    int rc = -INK_E_FAIL;
     struct ink_astgen_global *const g = parent_scope->global;
     struct ink_symtab_pool *const st_pool = &g->symtab_pool;
     struct ink_ast_node *const lhs = proto->data.bin.lhs;
@@ -1693,7 +1690,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
     };
 
     rc = ink_astgen_insert_name(parent_scope, lhs, &proto_sym);
-    if (rc < 0) {
+    if (rc != INK_E_OK) {
         ink_astgen_error(parent_scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
         return rc;
     }
@@ -1714,7 +1711,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
                 };
 
                 rc = ink_astgen_insert_name(child_scope, param, &param_sym);
-                if (rc < 0) {
+                if (rc != INK_E_OK) {
                     ink_astgen_error(child_scope,
                                      INK_AST_E_REDEFINED_IDENTIFIER, param);
                     return rc;
@@ -1725,7 +1722,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
         }
 
         rc = ink_astgen_update_name(parent_scope, lhs, &proto_sym);
-        if (rc < 0) {
+        if (rc != INK_E_OK) {
             return rc;
         }
     }
@@ -1750,13 +1747,13 @@ static int ink_astgen_intern_stitch(struct ink_astgen *parent_scope,
 static int ink_astgen_intern_knot(struct ink_astgen *parent_scope,
                                   const struct ink_ast_node *decl)
 {
-    int rc;
+    int rc = -INK_E_FAIL;
     struct ink_astgen knot_scope;
     struct ink_ast_node *const proto = decl->data.knot_decl.proto;
     struct ink_ast_node_list *const l = decl->data.knot_decl.children;
 
     rc = ink_astgen_record_proto(parent_scope, proto, &knot_scope);
-    if (rc < 0) {
+    if (rc != INK_E_OK) {
         return rc;
     }
     if (!l) {
@@ -1767,7 +1764,7 @@ static int ink_astgen_intern_knot(struct ink_astgen *parent_scope,
 
         if (child->type == INK_AST_STITCH_DECL) {
             rc = ink_astgen_intern_stitch(&knot_scope, child);
-            if (rc < 0) {
+            if (rc != INK_E_OK) {
                 break;
             }
         }
@@ -1792,7 +1789,7 @@ static int ink_astgen_intern_func(struct ink_astgen *parent_scope,
 static int ink_astgen_intern_paths(struct ink_astgen *parent_scope,
                                    const struct ink_ast_node *root)
 {
-    int rc = 0;
+    int rc = INK_E_OK;
     struct ink_ast_node_list *const l = root->data.many.list;
 
     if (!l) {
@@ -1815,7 +1812,7 @@ static int ink_astgen_intern_paths(struct ink_astgen *parent_scope,
             assert(decl->type == INK_AST_BLOCK);
             break;
         }
-        if (rc < 0) {
+        if (rc != INK_E_OK) {
             break;
         }
     }
