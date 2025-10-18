@@ -734,21 +734,15 @@ static bool ink_astgen_check_args_count(struct ink_astgen *scope,
         if (knot_arity != 0) {
             ink_semantic_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
             return false;
-        } else {
-            return true;
         }
-    } else {
-        if (args->count != knot_arity) {
-            if (args->count > knot_arity) {
-                ink_semantic_error(scope, INK_AST_E_TOO_MANY_ARGS, node);
-            } else {
-                ink_semantic_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
-            }
-            return false;
-        } else {
-            return true;
-        }
+    } else if (args->count != knot_arity) {
+        ink_semantic_error(scope,
+                           args->count > knot_arity ? INK_AST_E_TOO_MANY_ARGS
+                                                    : INK_AST_E_TOO_FEW_ARGS,
+                           node);
+        return false;
     }
+    return true;
 }
 
 /*
