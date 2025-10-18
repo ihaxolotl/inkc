@@ -86,8 +86,8 @@ struct ink_astgen_global {
     struct ink_symtab_pool symtab_pool;
     struct ink_stringset string_table;
     struct ink_byte_vec string_bytes;
-    struct ink_astgen_label_vec labels;
-    struct ink_astgen_jump_vec branches;
+    struct ink_astgen_label_vec label_stack;
+    struct ink_astgen_jump_vec jump_stack;
     jmp_buf jmpbuf;
 };
 
@@ -95,8 +95,8 @@ struct ink_astgen {
     struct ink_astgen *parent;
     struct ink_astgen_global *global;
     struct ink_symtab *symbol_table;
-    size_t jumps_top;
-    size_t labels_top;
+    size_t jump_stack_top;
+    size_t label_stack_top;
     size_t exit_label;
     size_t namespace_index;
 };
@@ -133,8 +133,8 @@ static void ink_astgen_global_init(struct ink_astgen_global *g,
     ink_stringset_init(&g->string_table, INK_STRINGSET_LOAD_MAX,
                        ink_stringset_hasher, ink_stringset_cmp);
     ink_byte_vec_init(&g->string_bytes);
-    ink_astgen_label_vec_init(&g->labels);
-    ink_astgen_jump_vec_init(&g->branches);
+    ink_astgen_label_vec_init(&g->label_stack);
+    ink_astgen_jump_vec_init(&g->jump_stack);
 }
 
 static void ink_astgen_global_deinit(struct ink_astgen_global *g)
@@ -142,8 +142,8 @@ static void ink_astgen_global_deinit(struct ink_astgen_global *g)
     ink_symtab_pool_deinit(&g->symtab_pool);
     ink_stringset_deinit(&g->string_table);
     ink_byte_vec_deinit(&g->string_bytes);
-    ink_astgen_label_vec_deinit(&g->labels);
-    ink_astgen_jump_vec_deinit(&g->branches);
+    ink_astgen_label_vec_deinit(&g->label_stack);
+    ink_astgen_jump_vec_deinit(&g->jump_stack);
 }
 
 /**
@@ -176,8 +176,8 @@ static int ink_astgen_make(struct ink_astgen *scope,
     scope->parent = parent_scope;
     scope->global = g;
     scope->symbol_table = symbol_table;
-    scope->jumps_top = g->branches.count;
-    scope->labels_top = g->labels.count;
+    scope->jump_stack_top = g->jump_stack.count;
+    scope->label_stack_top = g->label_stack.count;
     scope->exit_label = parent_scope->exit_label;
     scope->namespace_index = parent_scope->namespace_index;
     return INK_E_OK;
@@ -400,35 +400,34 @@ static size_t ink_astgen_add_jump(struct ink_astgen *astgen, size_t label_index,
                                   size_t code_offset)
 {
     struct ink_astgen_global *const g = astgen->global;
-    const size_t index = g->branches.count;
+    const size_t index = g->jump_stack.count;
     const struct ink_astgen_jump jump = {
         .label = label_index,
         .code_offset = code_offset,
     };
 
-    ink_astgen_jump_vec_push(&g->branches, jump);
+    ink_astgen_jump_vec_push(&g->jump_stack, jump);
     return index;
 }
 
 static size_t ink_astgen_add_label(struct ink_astgen *astgen)
 {
     struct ink_astgen_global *const g = astgen->global;
-    const size_t index = g->labels.count;
+    const size_t index = g->label_stack.count;
     const struct ink_astgen_label label = {
         .code_offset = 0xffffffff,
     };
 
-    ink_astgen_label_vec_push(&g->labels, label);
+    ink_astgen_label_vec_push(&g->label_stack, label);
     return index;
 }
 
 static void ink_astgen_set_label(struct ink_astgen *astgen, size_t label_index)
 {
     struct ink_astgen_global *const g = astgen->global;
-    struct ink_astgen_label_vec *const labels = &g->labels;
     struct ink_byte_vec *const code = &g->current_path->code;
 
-    labels->entries[label_index].code_offset = code->count;
+    g->label_stack.entries[label_index].code_offset = code->count;
 }
 
 /**
@@ -554,15 +553,14 @@ static void ink_astgen_backpatch(struct ink_astgen *scope, size_t start_offset,
                                  size_t end_offset)
 {
     struct ink_astgen_global *const g = scope->global;
-    struct ink_astgen_jump_vec *const jump_vec = &g->branches;
-    struct ink_astgen_label_vec *const label_vec = &g->labels;
     struct ink_byte_vec *const code = &g->current_path->code;
 
     assert(start_offset <= end_offset);
 
     for (size_t i = start_offset; i < end_offset; i++) {
-        struct ink_astgen_jump *const jump = &jump_vec->entries[i];
-        struct ink_astgen_label *const label = &label_vec->entries[jump->label];
+        struct ink_astgen_jump *const jump = &g->jump_stack.entries[i];
+        struct ink_astgen_label *const label =
+            &g->label_stack.entries[jump->label];
         const size_t test = label->code_offset - jump->code_offset - 2;
 
         if (test > UINT16_MAX) {
@@ -575,8 +573,8 @@ static void ink_astgen_backpatch(struct ink_astgen *scope, size_t start_offset,
         code->entries[jump->code_offset + 1] = test & 0xff;
     }
 
-    ink_astgen_jump_vec_shrink(jump_vec, 0);
-    ink_astgen_label_vec_shrink(label_vec, 0);
+    ink_astgen_jump_vec_shrink(&g->jump_stack, 0);
+    ink_astgen_label_vec_shrink(&g->label_stack, 0);
 }
 
 static const uint8_t *ink_astgen_str_bytes(const struct ink_astgen *astgen,
@@ -973,7 +971,7 @@ static void ink_astgen_multi_if_block(struct ink_astgen *parent_scope,
     ink_astgen_make(&scope, parent_scope, NULL);
     scope.exit_label = ink_astgen_add_label(&scope);
 
-    const size_t label_top = g->labels.count;
+    const size_t label_top = g->label_stack.count;
 
     for (size_t i = 0; i < cases->count; i++) {
         struct ink_ast_node *const br = cases->nodes[i];
@@ -1030,7 +1028,7 @@ static void ink_astgen_switch_stmt(struct ink_astgen *parent_scope,
     ink_astgen_make(&scope, parent_scope, NULL);
     scope.exit_label = ink_astgen_add_label(&scope);
 
-    const size_t label_top = g->labels.count;
+    const size_t label_top = g->label_stack.count;
 
     ink_astgen_expr(&scope, cond_expr);
     ink_astgen_emit_const(&scope, INK_OP_STORE, (uint8_t)stack_slot);
@@ -1590,7 +1588,8 @@ static void ink_astgen_func_decl(struct ink_astgen *parent_scope,
     ink_astgen_block_stmt(&scope, body);
     ink_astgen_set_label(parent_scope, parent_scope->exit_label);
     ink_astgen_emit_byte(&scope, INK_OP_RET);
-    ink_astgen_backpatch(&scope, scope.jumps_top, scope.global->branches.count);
+    ink_astgen_backpatch(&scope, scope.jump_stack_top,
+                         scope.global->jump_stack.count);
 }
 
 static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
@@ -1615,7 +1614,8 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     ink_astgen_block_stmt(&scope, body);
     ink_astgen_set_label(&scope, scope.exit_label);
     ink_astgen_emit_byte(&scope, INK_OP_EXIT);
-    ink_astgen_backpatch(&scope, scope.jumps_top, scope.global->branches.count);
+    ink_astgen_backpatch(&scope, scope.jump_stack_top,
+                         scope.global->jump_stack.count);
 }
 
 static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
@@ -1652,7 +1652,8 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
 
     ink_astgen_set_label(&scope, scope.exit_label);
     ink_astgen_emit_byte(&scope, INK_OP_EXIT);
-    ink_astgen_backpatch(&scope, scope.jumps_top, scope.global->branches.count);
+    ink_astgen_backpatch(&scope, scope.jump_stack_top,
+                         scope.global->jump_stack.count);
 
     for (; i < l->count; i++) {
         struct ink_ast_node *const child = l->nodes[i];
@@ -1849,8 +1850,8 @@ static void ink_astgen_file(struct ink_astgen_global *g,
 
     if (!l) {
         ink_astgen_default_body(&file_scope, NULL);
-        ink_astgen_backpatch(&file_scope, file_scope.jumps_top,
-                             g->branches.count);
+        ink_astgen_backpatch(&file_scope, file_scope.jump_stack_top,
+                             g->jump_stack.count);
         return;
     }
     if (l->count > 0) {
@@ -1861,8 +1862,8 @@ static void ink_astgen_file(struct ink_astgen_global *g,
 
         if (first->type == INK_AST_BLOCK) {
             ink_astgen_default_body(&file_scope, first);
-            ink_astgen_backpatch(&file_scope, file_scope.jumps_top,
-                                 g->branches.count);
+            ink_astgen_backpatch(&file_scope, file_scope.jump_stack_top,
+                                 g->jump_stack.count);
             i++;
         }
         for (; i < l->count; i++) {
