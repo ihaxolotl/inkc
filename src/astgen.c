@@ -36,9 +36,9 @@
                 ink_ast_node_type_strz((__node)->type), __func__);             \
     } while (0)
 
-#define INK_ASTGEN_FAIL(__astgen, __msg)                                       \
+#define INK_ASTGEN_FATAL(__astgen, __msg)                                      \
     do {                                                                       \
-        ink_astgen_fail(__astgen, __FILE__, __LINE__, __msg);                  \
+        ink_astgen_fatal(__astgen, __FILE__, __LINE__, __msg);                 \
     } while (0)
 
 /**
@@ -101,6 +101,26 @@ struct ink_astgen {
     size_t namespace_index;
 };
 
+/**
+ * Report a semantic error.
+ *
+ * Currently, both syntax and semantic errors are stored on the AST of the
+ * current translation unit.
+ */
+static void ink_semantic_error(struct ink_astgen *astgen,
+                               enum ink_ast_error_type type,
+                               const struct ink_ast_node *node)
+{
+    struct ink_astgen_global *const g = astgen->global;
+    const struct ink_ast_error err = {
+        .type = type,
+        .source_start = node->bytes_start,
+        .source_end = node->bytes_end,
+    };
+
+    ink_ast_error_vec_push(&g->tree->errors, err);
+}
+
 static void ink_astgen_global_init(struct ink_astgen_global *g,
                                    struct ink_ast *tree,
                                    struct ink_story *story)
@@ -126,9 +146,13 @@ static void ink_astgen_global_deinit(struct ink_astgen_global *g)
     ink_astgen_jump_vec_deinit(&g->branches);
 }
 
-static void ink_astgen_fail(struct ink_astgen *astgen, const char *filename,
-                            int line, const char *msg)
+/**
+ * Report an unrecoverable error and unwind the call stack.
+ */
+static void ink_astgen_fatal(struct ink_astgen *astgen, const char *filename,
+                             int line, const char *msg)
 {
+    // NOTE: _NoReturn would be nice, but we are targeting C99. :(
     fprintf(stderr, "%s:%d: %s", filename, line, msg);
     longjmp(astgen->global->jmpbuf, 1);
 }
@@ -164,20 +188,6 @@ static void ink_astgen_deinit(struct ink_astgen *scope)
     scope->parent = NULL;
     scope->global = NULL;
     scope->symbol_table = NULL;
-}
-
-static void ink_astgen_error(struct ink_astgen *astgen,
-                             enum ink_ast_error_type type,
-                             const struct ink_ast_node *node)
-{
-    struct ink_astgen_global *const g = astgen->global;
-    const struct ink_ast_error err = {
-        .type = type,
-        .source_start = node->bytes_start,
-        .source_end = node->bytes_end,
-    };
-
-    ink_ast_error_vec_push(&g->tree->errors, err);
 }
 
 /**
@@ -347,16 +357,21 @@ static void ink_astgen_emit_byte(struct ink_astgen *astgen, uint8_t byte)
 
 /**
  * Emit a two-byte constant instruction to the current chunk.
+ *
+ * Will panic if the constant index exceeds its maximum allowed value.
  */
 static void ink_astgen_emit_const(struct ink_astgen *astgen,
                                   enum ink_vm_opcode op, size_t arg)
 {
-    if (arg < UINT8_MAX) {
-        ink_astgen_emit_byte(astgen, (uint8_t)op);
-        ink_astgen_emit_byte(astgen, (uint8_t)arg);
-    } else {
-        INK_ASTGEN_FAIL(astgen, "const index exceeds max value");
+    if (arg >= UINT8_MAX) {
+        INK_ASTGEN_FATAL(astgen, "const index exceeds max value");
+        return;
     }
+
+    // TODO(Brett): Ensure that enough space is available and avoid resizing
+    // multiple times.
+    ink_astgen_emit_byte(astgen, (uint8_t)op);
+    ink_astgen_emit_byte(astgen, (uint8_t)arg);
 }
 
 /**
@@ -373,6 +388,8 @@ static size_t ink_astgen_emit_jump(struct ink_astgen *astgen,
     struct ink_astgen_global *const g = astgen->global;
     struct ink_byte_vec *const code = &g->current_path->code;
 
+    // TODO(Brett): Ensure that enough space is available and avoid resizing
+    // multiple times.
     ink_byte_vec_push(code, (uint8_t)op);
     ink_byte_vec_push(code, 0xff);
     ink_byte_vec_push(code, 0xff);
@@ -502,12 +519,14 @@ static void ink_astgen_add_knot(struct ink_astgen *astgen, size_t str_index)
         ink_string_new(g->story, str, strlen((char *)str));
 
     if (!path_name) {
+        INK_ASTGEN_FATAL(astgen, "Out of memory");
         return;
     }
 
     struct ink_object *const path_obj =
         ink_content_path_new(g->story, path_name);
     if (!path_obj) {
+        INK_ASTGEN_FATAL(astgen, "Out of memory");
         return;
     }
 
@@ -521,11 +540,12 @@ static void ink_astgen_patch_jump(struct ink_astgen *astgen, size_t offset)
     struct ink_byte_vec *const code = &g->current_path->code;
     const size_t jump = code->count - offset - 2;
 
-    if (jump > UINT16_MAX) {
-        INK_ASTGEN_FAIL(astgen, "Too much code to jump over.");
+    if (jump >= UINT16_MAX) {
+        INK_ASTGEN_FATAL(astgen, "Too much code to jump over.");
         return;
     }
 
+    assert(code->capacity >= offset + 2);
     code->entries[offset] = (jump >> 8) & 0xff;
     code->entries[offset + 1] = jump & 0xff;
 }
@@ -546,10 +566,11 @@ static void ink_astgen_backpatch(struct ink_astgen *scope, size_t start_offset,
         const size_t test = label->code_offset - jump->code_offset - 2;
 
         if (test > UINT16_MAX) {
-            INK_ASTGEN_FAIL(scope, "Too much code to jump over.");
+            INK_ASTGEN_FATAL(scope, "Too much code to jump over.");
             return;
         }
 
+        assert(code->capacity >= jump->code_offset + 2);
         code->entries[jump->code_offset] = (test >> 8) & 0xff;
         code->entries[jump->code_offset + 1] = test & 0xff;
     }
@@ -625,7 +646,7 @@ static void ink_astgen_integer(struct ink_astgen *scope,
     struct ink_object *const obj = ink_integer_new(scope->global->story, v);
 
     if (!obj) {
-        INK_ASTGEN_FAIL(scope, "Could not create runtime object for number.");
+        INK_ASTGEN_FATAL(scope, "Could not create runtime object for number.");
         return;
     }
 
@@ -644,7 +665,7 @@ static void ink_astgen_float(struct ink_astgen *scope,
     struct ink_object *const obj = ink_float_new(scope->global->story, v);
 
     if (!obj) {
-        INK_ASTGEN_FAIL(scope, "Could not create runtime object for number.");
+        INK_ASTGEN_FATAL(scope, "Could not create runtime object for number.");
         return;
     }
 
@@ -663,7 +684,7 @@ static void ink_astgen_string(struct ink_astgen *scope,
     (void)str_index;
 
     if (!obj) {
-        INK_ASTGEN_FAIL(scope, "Could not create runtime object for string.");
+        INK_ASTGEN_FATAL(scope, "Could not create runtime object for string.");
         return;
     }
 
@@ -685,7 +706,7 @@ static void ink_astgen_identifier(struct ink_astgen *scope,
     struct ink_symbol sym;
 
     if (ink_astgen_lookup_name(scope, expr, &sym) < 0) {
-        ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, expr);
+        ink_semantic_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, expr);
         return;
     }
     switch (sym.type) {
@@ -699,39 +720,37 @@ static void ink_astgen_identifier(struct ink_astgen *scope,
                               (uint8_t)sym.as.var.stack_slot);
         break;
     default:
-        ink_astgen_error(scope, INK_AST_E_INVALID_EXPR, expr);
+        ink_semantic_error(scope, INK_AST_E_INVALID_EXPR, expr);
         break;
     }
 }
 
-static int ink_astgen_check_args_count(struct ink_astgen *scope,
-                                       const struct ink_ast_node *node,
-                                       struct ink_ast_node_list *args,
-                                       struct ink_symbol *symbol)
+static bool ink_astgen_check_args_count(struct ink_astgen *scope,
+                                        const struct ink_ast_node *node,
+                                        struct ink_ast_node_list *args,
+                                        struct ink_symbol *symbol)
 {
-    int rc = -INK_E_FAIL;
     const size_t knot_arity = symbol->as.knot.arity;
 
     if (!args) {
         if (knot_arity != 0) {
-            ink_astgen_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
-            rc = -INK_E_FAIL;
+            ink_semantic_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
+            return false;
         } else {
-            rc = INK_E_OK;
+            return true;
         }
     } else {
         if (args->count != knot_arity) {
             if (args->count > knot_arity) {
-                ink_astgen_error(scope, INK_AST_E_TOO_MANY_ARGS, node);
+                ink_semantic_error(scope, INK_AST_E_TOO_MANY_ARGS, node);
             } else {
-                ink_astgen_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
+                ink_semantic_error(scope, INK_AST_E_TOO_FEW_ARGS, node);
             }
-            rc = -INK_E_FAIL;
+            return false;
         } else {
-            rc = INK_E_OK;
+            return true;
         }
     }
-    return rc;
 }
 
 /*
@@ -755,15 +774,14 @@ static void ink_astgen_call_expr(struct ink_astgen *scope,
     } else {
         assert(false);
     }
-    if (rc < 0) {
-        ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
+    if (rc != INK_E_OK) {
+        ink_semantic_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
         return;
     }
     if (rhs) {
         struct ink_ast_node_list *const l = rhs->data.many.list;
 
-        rc = ink_astgen_check_args_count(scope, lhs, l, &sym);
-        if (rc < 0) {
+        if (!ink_astgen_check_args_count(scope, lhs, l, &sym)) {
             return;
         }
         if (l) {
@@ -778,6 +796,11 @@ static void ink_astgen_call_expr(struct ink_astgen *scope,
     const struct ink_string_ref str = ink_string_from_node(scope, lhs);
     struct ink_object *const obj =
         ink_string_new(g->story, str.bytes, str.length);
+
+    if (!obj) {
+        INK_ASTGEN_FATAL(scope, "Out of memory");
+        return;
+    }
 
     ink_astgen_emit_const(scope, op, (uint8_t)ink_astgen_add_const(scope, obj));
 }
@@ -1028,7 +1051,7 @@ static void ink_astgen_switch_stmt(struct ink_astgen *parent_scope,
             case INK_AST_FALSE:
                 break;
             default:
-                ink_astgen_error(&scope, INK_AST_E_SWITCH_EXPR, stmt);
+                ink_semantic_error(&scope, INK_AST_E_SWITCH_EXPR, stmt);
                 return;
             }
 
@@ -1076,7 +1099,7 @@ static void ink_astgen_conditional(struct ink_astgen *scope,
     struct ink_ast_node_list *const l = stmt->data.switch_stmt.cases;
 
     if (!l || l->count == 0) {
-        ink_astgen_error(scope, INK_AST_E_CONDITIONAL_EMPTY, stmt);
+        ink_semantic_error(scope, INK_AST_E_CONDITIONAL_EMPTY, stmt);
         return;
     }
 
@@ -1093,18 +1116,18 @@ static void ink_astgen_conditional(struct ink_astgen *scope,
         case INK_AST_SWITCH_CASE:
         case INK_AST_IF_BRANCH:
             if (has_block) {
-                ink_astgen_error(scope, INK_AST_E_ELSE_EXPECTED, child);
+                ink_semantic_error(scope, INK_AST_E_ELSE_EXPECTED, child);
                 return;
             }
             break;
         case INK_AST_ELSE_BRANCH:
             /* Only the last branch can be an else. */
             if (child != last) {
-                ink_astgen_error(scope, INK_AST_E_ELSE_FINAL, child);
+                ink_semantic_error(scope, INK_AST_E_ELSE_FINAL, child);
                 return;
             }
             if (has_else) {
-                ink_astgen_error(scope, INK_AST_E_ELSE_MULTIPLE, child);
+                ink_semantic_error(scope, INK_AST_E_ELSE_MULTIPLE, child);
                 return;
             }
 
@@ -1118,7 +1141,7 @@ static void ink_astgen_conditional(struct ink_astgen *scope,
     switch (stmt->type) {
     case INK_AST_IF_STMT:
         if (!expr) {
-            ink_astgen_error(scope, INK_AST_E_EXPECTED_EXPR, stmt);
+            ink_semantic_error(scope, INK_AST_E_EXPECTED_EXPR, stmt);
             return;
         }
         ink_astgen_if_stmt(scope, expr, first, first == last ? NULL : last);
@@ -1199,7 +1222,7 @@ static void ink_astgen_var_decl(struct ink_astgen *scope,
         };
 
         if (ink_astgen_insert_name(scope, lhs, &sym) < 0) {
-            ink_astgen_error(scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
+            ink_semantic_error(scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
             return;
         }
 
@@ -1217,7 +1240,7 @@ static void ink_astgen_var_decl(struct ink_astgen *scope,
         };
 
         if (ink_astgen_insert_name(scope, lhs, &sym) < 0) {
-            ink_astgen_error(scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
+            ink_semantic_error(scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
             return;
         }
 
@@ -1240,7 +1263,7 @@ static void ink_astgen_divert_expr(struct ink_astgen *scope,
     switch (lhs->type) {
     case INK_AST_SELECTOR_EXPR:
         if (ink_astgen_lookup_qualified(scope, lhs, &sym) < 0) {
-            ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
+            ink_semantic_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
             return;
         }
         break;
@@ -1264,7 +1287,7 @@ static void ink_astgen_divert_expr(struct ink_astgen *scope,
             break;
         }
         if (ink_astgen_lookup_name(scope, lhs, &sym) < 0) {
-            ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
+            ink_semantic_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
             return;
         }
         break;
@@ -1318,11 +1341,11 @@ static void ink_astgen_assign_stmt(struct ink_astgen *scope,
 
     rc = ink_astgen_lookup_name(scope, lhs, &sym);
     if (rc != INK_E_OK) {
-        ink_astgen_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
+        ink_semantic_error(scope, INK_AST_E_UNKNOWN_IDENTIFIER, lhs);
         return;
     }
     if (sym.as.var.is_const) {
-        ink_astgen_error(scope, INK_AST_E_CONST_ASSIGN, lhs);
+        ink_semantic_error(scope, INK_AST_E_CONST_ASSIGN, lhs);
         return;
     }
 
@@ -1341,7 +1364,7 @@ static void ink_astgen_assign_stmt(struct ink_astgen *scope,
         break;
     default:
         /* TODO: Give a more informative error message here. */
-        ink_astgen_error(scope, INK_AST_E_INVALID_EXPR, lhs);
+        ink_semantic_error(scope, INK_AST_E_INVALID_EXPR, lhs);
         break;
     }
 }
@@ -1557,7 +1580,7 @@ static void ink_astgen_func_decl(struct ink_astgen *parent_scope,
     assert(name != NULL);
 
     if (ink_astgen_lookup_name(parent_scope, name, &sym) < 0) {
-        ink_astgen_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
+        ink_semantic_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
         return;
     }
 
@@ -1582,7 +1605,7 @@ static void ink_astgen_stitch_decl(struct ink_astgen *parent_scope,
     assert(name != NULL);
 
     if (ink_astgen_lookup_name(parent_scope, name, &sym) < 0) {
-        ink_astgen_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
+        ink_semantic_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
         return;
     }
 
@@ -1606,7 +1629,7 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
     struct ink_ast_node *const name = proto->data.bin.lhs;
 
     if (ink_astgen_lookup_name(parent_scope, name, &sym) < 0) {
-        ink_astgen_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
+        ink_semantic_error(parent_scope, INK_AST_E_UNKNOWN_IDENTIFIER, name);
         return;
     }
 
@@ -1685,7 +1708,7 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
 
     rc = ink_astgen_insert_name(parent_scope, lhs, &proto_sym);
     if (rc != INK_E_OK) {
-        ink_astgen_error(parent_scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
+        ink_semantic_error(parent_scope, INK_AST_E_REDEFINED_IDENTIFIER, lhs);
         return rc;
     }
     if (rhs) {
@@ -1706,8 +1729,8 @@ static int ink_astgen_record_proto(struct ink_astgen *parent_scope,
 
                 rc = ink_astgen_insert_name(child_scope, param, &param_sym);
                 if (rc != INK_E_OK) {
-                    ink_astgen_error(child_scope,
-                                     INK_AST_E_REDEFINED_IDENTIFIER, param);
+                    ink_semantic_error(child_scope,
+                                       INK_AST_E_REDEFINED_IDENTIFIER, param);
                     return rc;
                 }
             }
