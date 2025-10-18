@@ -1390,9 +1390,11 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
 
     assert(l != NULL);
 
-    /* FIXME: This leaks on panic. */
+    /* FIXME: This leaks on panic.
+     * We might want to allocate this to an arena. */
     data = ink_malloc(l->count * sizeof(*data));
     if (!data) {
+        INK_ASTGEN_FATAL(scope, "Out of memory");
         return;
     }
 
@@ -1407,7 +1409,7 @@ static void ink_astgen_choice_stmt(struct ink_astgen *scope,
 
         choice->id = ink_integer_new(scope->global->story, (ink_integer)i);
         if (!choice->id) {
-            /* TODO: Probably panic and report an error here. */
+            INK_ASTGEN_FATAL(scope, "Out of memory");
             return;
         }
 
