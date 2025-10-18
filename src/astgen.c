@@ -568,7 +568,7 @@ static void ink_astgen_backpatch(struct ink_astgen *scope, size_t start_offset,
             &g->label_stack.entries[jump->label];
         const size_t test = label->code_offset - jump->code_offset - 2;
 
-        if (test > UINT16_MAX) {
+        if (test >= UINT16_MAX) {
             INK_ASTGEN_FATAL(scope, "Too much code to jump over.");
             return;
         }
@@ -921,6 +921,8 @@ static void ink_astgen_block_stmt(struct ink_astgen *parent_scope,
     struct ink_ast_node_list *l = NULL;
 
     if (!stmt) {
+        ink_astgen_add_jump(parent_scope, parent_scope->exit_label,
+                            ink_astgen_emit_jump(parent_scope, INK_OP_JMP));
         return;
     }
 
@@ -1667,13 +1669,14 @@ static void ink_astgen_knot_decl(struct ink_astgen *parent_scope,
 static void ink_astgen_default_body(struct ink_astgen *parent_scope,
                                     const struct ink_ast_node *body)
 {
-    const uint8_t *const b = (uint8_t *)INK_DEFAULT_PATH;
-    const size_t bl = strlen(INK_DEFAULT_PATH);
-    const size_t i = ink_astgen_add_str(parent_scope, b, bl);
+    const uint8_t *const path_str = (uint8_t *)INK_DEFAULT_PATH;
+    const size_t path_strlen = strlen(INK_DEFAULT_PATH);
+    const size_t path_stridx =
+        ink_astgen_add_str(parent_scope, path_str, path_strlen);
 
     parent_scope->exit_label = ink_astgen_add_label(parent_scope);
 
-    ink_astgen_add_knot(parent_scope, i);
+    ink_astgen_add_knot(parent_scope, path_stridx);
     ink_astgen_block_stmt(parent_scope, body);
     ink_astgen_set_label(parent_scope, parent_scope->exit_label);
     ink_astgen_emit_byte(parent_scope, INK_OP_EXIT);

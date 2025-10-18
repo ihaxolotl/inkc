@@ -28,11 +28,11 @@ all: default
 default: release
 
 debug:
-	$(Q) cmake -B $(BUILDDIR)/debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED=OFF
+	$(Q) cmake -B $(BUILDDIR)/debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED=OFF $(OPTIONS)
 	$(Q) make -s -C $(BUILDDIR)/debug
 
 release:
-	$(Q) cmake -B $(BUILDDIR)/release -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	$(Q) cmake -B $(BUILDDIR)/release -DCMAKE_BUILD_TYPE=RelWithDebInfo $(OPTIONS)
 	$(Q) make -s -C $(BUILDDIR)/release
 
 tests:
