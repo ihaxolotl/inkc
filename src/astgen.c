@@ -25,15 +25,20 @@
  */
 #define INK_STRINGSET_LOAD_MAX (80u)
 
-#define INK_ASTGEN_TODO(__msg)                                                 \
+#define INK_ASTGEN_TODO(__astgen, __msg)                                       \
     do {                                                                       \
         fprintf(stderr, "TODO(astgen): %s\n", (__msg));                        \
+        ink_astgen_fatal(                                                      \
+            __astgen, __FILE__, __LINE__,                                      \
+            "Not implemented yet! Please report to the maintainer!");          \
     } while (0)
 
-#define INK_ASTGEN_BUG(__node)                                                 \
+#define INK_ASTGEN_BUG(__astgen, __node)                                       \
     do {                                                                       \
         fprintf(stderr, "BUG(astgen): %s in %s\n",                             \
                 ink_ast_node_type_strz((__node)->type), __func__);             \
+        ink_astgen_fatal(__astgen, __FILE__, __LINE__,                         \
+                         "Bug detected! Please report to the maintainer!");    \
     } while (0)
 
 #define INK_ASTGEN_FATAL(__astgen, __msg)                                      \
@@ -876,10 +881,10 @@ static void ink_astgen_expr(struct ink_astgen *astgen,
         ink_astgen_call_expr(astgen, node, INK_OP_CALL);
         break;
     case INK_AST_CONTAINS_EXPR:
-        INK_ASTGEN_TODO("ContainsExpr");
+        INK_ASTGEN_TODO(astgen, "ContainsExpr");
         break;
     default:
-        INK_ASTGEN_BUG(node);
+        INK_ASTGEN_BUG(astgen, node);
         break;
     }
 }
@@ -1126,7 +1131,7 @@ static void ink_astgen_conditional(struct ink_astgen *scope,
             has_else = true;
             break;
         default:
-            INK_ASTGEN_BUG(child);
+            INK_ASTGEN_BUG(scope, child);
             break;
         }
     }
@@ -1149,7 +1154,7 @@ static void ink_astgen_conditional(struct ink_astgen *scope,
     }
 }
 
-static void ink_astgen_content_expr(struct ink_astgen *astgen,
+static void ink_astgen_content_expr(struct ink_astgen *scope,
                                     const struct ink_ast_node *node)
 {
     struct ink_ast_node_list *const l = node->data.many.list;
@@ -1163,32 +1168,32 @@ static void ink_astgen_content_expr(struct ink_astgen *astgen,
 
         switch (expr->type) {
         case INK_AST_STRING:
-            ink_astgen_string(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
+            ink_astgen_string(scope, expr);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
             break;
         case INK_AST_INLINE_LOGIC:
-            ink_astgen_inline_logic(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
+            ink_astgen_inline_logic(scope, expr);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
             break;
         case INK_AST_IF_STMT:
         case INK_AST_MULTI_IF_STMT:
         case INK_AST_SWITCH_STMT:
-            ink_astgen_conditional(astgen, expr);
+            ink_astgen_conditional(scope, expr);
             break;
         case INK_AST_IF_EXPR:
-            ink_astgen_if_expr(astgen, expr);
-            ink_astgen_emit_byte(astgen, INK_OP_CONTENT);
+            ink_astgen_if_expr(scope, expr);
+            ink_astgen_emit_byte(scope, INK_OP_CONTENT);
             break;
         case INK_AST_GLUE:
-            ink_astgen_emit_byte(astgen, INK_OP_GLUE);
+            ink_astgen_emit_byte(scope, INK_OP_GLUE);
             break;
         default:
-            INK_ASTGEN_BUG(expr);
+            INK_ASTGEN_BUG(scope, expr);
             break;
         }
     }
     if (!expr || expr->type == INK_AST_STRING) {
-        ink_astgen_emit_byte(astgen, INK_OP_LINE);
+        ink_astgen_emit_byte(scope, INK_OP_LINE);
     }
 }
 
@@ -1288,7 +1293,7 @@ static void ink_astgen_divert_expr(struct ink_astgen *scope,
         return;
     }
     default:
-        INK_ASTGEN_BUG(lhs);
+        INK_ASTGEN_BUG(scope, lhs);
         return;
     }
 
@@ -1527,7 +1532,7 @@ static void ink_astgen_stmt(struct ink_astgen *scope,
         ink_astgen_gather_stmt(scope, stmt);
         break;
     default:
-        INK_ASTGEN_BUG(stmt);
+        INK_ASTGEN_BUG(scope, stmt);
         break;
     }
 }
